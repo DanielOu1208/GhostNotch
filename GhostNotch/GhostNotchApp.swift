@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct NotchTermApp: App {
+struct GhostNotchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {

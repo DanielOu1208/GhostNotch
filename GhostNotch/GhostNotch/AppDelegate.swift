@@ -21,10 +21,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMenuBarItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = ">_"
-        item.button?.toolTip = "NotchTerm"
+        item.button?.toolTip = "GhostNotch"
 
         let menu = NSMenu()
-        let openItem = NSMenuItem(title: "Open NotchTerm", action: #selector(openNotchTerm), keyEquivalent: "")
+        let openItem = NSMenuItem(title: "Open GhostNotch", action: #selector(openGhostNotch), keyEquivalent: "")
         openItem.target = self
         menu.addItem(openItem)
         menu.addItem(NSMenuItem.separator())
@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
     }
 
-    @objc private func openNotchTerm() {
+    @objc private func openGhostNotch() {
         islandController?.expand()
     }
 

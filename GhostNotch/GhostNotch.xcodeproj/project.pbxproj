@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		1A0001010000000000000001 /* NotchTermApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000001 /* NotchTermApp.swift */; };
+		1A0001010000000000000001 /* GhostNotchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000010000000000000001 /* GhostNotchApp.swift */; };
 		1A0001020000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000020000000000000001 /* AppDelegate.swift */; };
 		1A0001030000000000000001 /* IslandPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000030000000000000001 /* IslandPanel.swift */; };
 		1A0001040000000000000001 /* IslandPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000040000000000000001 /* IslandPanelController.swift */; };
@@ -19,7 +19,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		1A0000010000000000000001 /* NotchTermApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchTermApp.swift; sourceTree = "<group>"; };
+		1A0000010000000000000001 /* GhostNotchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostNotchApp.swift; sourceTree = "<group>"; };
 		1A0000020000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		1A0000030000000000000001 /* IslandPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandPanel.swift; sourceTree = "<group>"; };
 		1A0000040000000000000001 /* IslandPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandPanelController.swift; sourceTree = "<group>"; };
@@ -28,7 +28,7 @@
 		1A0000070000000000000001 /* IslandRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandRootView.swift; sourceTree = "<group>"; };
 		1A0000080000000000000001 /* IslandIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandIndicatorView.swift; sourceTree = "<group>"; };
 		1A0000090000000000000001 /* IslandExpandedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandExpandedView.swift; sourceTree = "<group>"; };
-		1A00000A0000000000000001 /* NotchTerm.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotchTerm.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A00000A0000000000000001 /* GhostNotch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GhostNotch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,26 +45,26 @@
 		1A0003010000000000000001 = {
 			isa = PBXGroup;
 			children = (
-				1A0003020000000000000001 /* NotchTerm */,
+				1A0003020000000000000001 /* GhostNotch */,
 				1A0003030000000000000001 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		1A0003020000000000000001 /* NotchTerm */ = {
+		1A0003020000000000000001 /* GhostNotch */ = {
 			isa = PBXGroup;
 			children = (
-				1A0000010000000000000001 /* NotchTermApp.swift */,
+				1A0000010000000000000001 /* GhostNotchApp.swift */,
 				1A0000020000000000000001 /* AppDelegate.swift */,
 				1A0003040000000000000001 /* Window */,
 				1A0003050000000000000001 /* UI */,
 			);
-			path = NotchTerm;
+			path = GhostNotch;
 			sourceTree = "<group>";
 		};
 		1A0003030000000000000001 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				1A00000A0000000000000001 /* NotchTerm.app */,
+				1A00000A0000000000000001 /* GhostNotch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -93,9 +93,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		1A0004010000000000000001 /* NotchTerm */ = {
+		1A0004010000000000000001 /* GhostNotch */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1A0005010000000000000001 /* Build configuration list for PBXNativeTarget "NotchTerm" */;
+			buildConfigurationList = 1A0005010000000000000001 /* Build configuration list for PBXNativeTarget "GhostNotch" */;
 			buildPhases = (
 				1A0006010000000000000001 /* Sources */,
 				1A0002010000000000000001 /* Frameworks */,
@@ -105,9 +105,9 @@
 			);
 			dependencies = (
 			);
-			name = NotchTerm;
-			productName = NotchTerm;
-			productReference = 1A00000A0000000000000001 /* NotchTerm.app */;
+			name = GhostNotch;
+			productName = GhostNotch;
+			productReference = 1A00000A0000000000000001 /* GhostNotch.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -125,7 +125,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 1A0005020000000000000001 /* Build configuration list for PBXProject "NotchTerm" */;
+			buildConfigurationList = 1A0005020000000000000001 /* Build configuration list for PBXProject "GhostNotch" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -138,7 +138,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				1A0004010000000000000001 /* NotchTerm */,
+				1A0004010000000000000001 /* GhostNotch */,
 			);
 		};
 /* End PBXProject section */
@@ -158,7 +158,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1A0001010000000000000001 /* NotchTermApp.swift in Sources */,
+				1A0001010000000000000001 /* GhostNotchApp.swift in Sources */,
 				1A0001020000000000000001 /* AppDelegate.swift in Sources */,
 				1A0001030000000000000001 /* IslandPanel.swift in Sources */,
 				1A0001040000000000000001 /* IslandPanelController.swift in Sources */,
@@ -299,7 +299,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.notchterm.local;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ghostnotch.local;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -321,7 +321,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.notchterm.local;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ghostnotch.local;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -331,7 +331,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		1A0005010000000000000001 /* Build configuration list for PBXNativeTarget "NotchTerm" */ = {
+		1A0005010000000000000001 /* Build configuration list for PBXNativeTarget "GhostNotch" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1A0008030000000000000001 /* Debug */,
@@ -340,7 +340,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1A0005020000000000000001 /* Build configuration list for PBXProject "NotchTerm" */ = {
+		1A0005020000000000000001 /* Build configuration list for PBXProject "GhostNotch" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1A0008010000000000000001 /* Debug */,

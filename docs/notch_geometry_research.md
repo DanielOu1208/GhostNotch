@@ -1,6 +1,6 @@
 # MacBook Notch Geometry Research
 
-This note captures the notch sizing reference for NotchTerm so the Stage 1 UI can be tuned against real MacBook notch geometry instead of guessing.
+This note captures the notch sizing reference for GhostNotch so the Stage 1 UI can be tuned against real MacBook notch geometry instead of guessing.
 
 ## Sources and Measurement Method
 
@@ -43,7 +43,7 @@ Computed physical notch in backing pixels: 440 x 76 px
 
 This is the most important number for the current prototype.
 
-The previous collapsed NotchTerm width was `232 pt`, only `12 pt` wider than the measured physical notch. That creates a visible extension of only `6 pt` per side, which is too small to read as an active indicator.
+The previous collapsed GhostNotch width was `232 pt`, only `12 pt` wider than the measured physical notch. That creates a visible extension of only `6 pt` per side, which is too small to read as an active indicator.
 
 ## Apple Silicon MacBook Display Context
 
@@ -58,7 +58,7 @@ MacBook Air 15.3-inch: 2880 x 1864 native pixels, normally 1440 x 932 pt at 2x
 
 Do not hard-code these as notch sizes. Use AppKit at runtime when possible because display scaling and model differences affect logical coordinates.
 
-## Recommended NotchTerm Geometry
+## Recommended GhostNotch Geometry
 
 For the current measured `220 x 38 pt` physical notch, the collapsed state needs to extend visibly beyond the hardware notch.
 

@@ -10,16 +10,16 @@ struct IslandExpandedView: View {
                 .frame(height: 1)
 
             VStack(alignment: .leading, spacing: 9) {
-                TerminalLine(prompt: "notchterm", command: "pwd")
+                TerminalLine(prompt: "ghostnotch", command: "pwd")
                 Text("/Users/danielou")
                     .foregroundStyle(.white.opacity(0.52))
 
-                TerminalLine(prompt: "notchterm", command: "git status")
+                TerminalLine(prompt: "ghostnotch", command: "git status")
                 Text("Stage 1 placeholder terminal")
                     .foregroundStyle(.green.opacity(0.78))
 
                 HStack(spacing: 0) {
-                    Text("notchterm")
+                    Text("ghostnotch")
                         .foregroundStyle(.cyan.opacity(0.82))
                     Text(" % ")
                         .foregroundStyle(.white.opacity(0.55))
@@ -44,7 +44,7 @@ struct IslandExpandedView: View {
                 .frame(width: 8, height: 8)
                 .shadow(color: .green.opacity(0.45), radius: 5)
 
-            Text("NotchTerm")
+            Text("GhostNotch")
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.88))
 

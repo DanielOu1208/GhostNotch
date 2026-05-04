@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "1A0004010000000000000001"
-               BuildableName = "NotchTerm.app"
-               BlueprintName = "NotchTerm"
-               ReferencedContainer = "container:NotchTerm.xcodeproj">
+               BuildableName = "GhostNotch.app"
+               BlueprintName = "GhostNotch"
+               ReferencedContainer = "container:GhostNotch.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -46,9 +46,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "1A0004010000000000000001"
-            BuildableName = "NotchTerm.app"
-            BlueprintName = "NotchTerm"
-            ReferencedContainer = "container:NotchTerm.xcodeproj">
+            BuildableName = "GhostNotch.app"
+            BlueprintName = "GhostNotch"
+            ReferencedContainer = "container:GhostNotch.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -63,9 +63,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "1A0004010000000000000001"
-            BuildableName = "NotchTerm.app"
-            BlueprintName = "NotchTerm"
-            ReferencedContainer = "container:NotchTerm.xcodeproj">
+            BuildableName = "GhostNotch.app"
+            BlueprintName = "GhostNotch"
+            ReferencedContainer = "container:GhostNotch.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
