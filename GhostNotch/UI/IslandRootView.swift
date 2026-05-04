@@ -3,7 +3,6 @@ import SwiftUI
 struct IslandRootView: View {
     @EnvironmentObject private var controller: IslandPanelController
 
-    let onHoverChanged: (Bool) -> Void
     let onClick: () -> Void
 
     var body: some View {
@@ -11,15 +10,18 @@ struct IslandRootView: View {
             NotchBackground(state: controller.state, fillMode: controller.notchFillMode)
 
             switch controller.state {
-            case .collapsed, .hover:
-                IslandIndicatorView(isHovering: controller.state == .hover)
+            case .collapsed:
+                IslandIndicatorView(isHovering: false, contentVisible: true)
+            case .hover:
+                IslandIndicatorView(isHovering: true, contentVisible: controller.motionPhase.contentVisible)
             case .expanded:
                 IslandExpandedView()
+                    .stagedIslandContent(isVisible: controller.motionPhase.contentVisible, anchor: .top)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .contentShape(NotchExtensionShape(cornerRadius: controller.state.notchCornerRadius))
-        .onHover(perform: onHoverChanged)
+        .ignoresSafeArea(.all)
+        .contentShape(Rectangle())
         .onTapGesture(perform: onClick)
     }
 }
@@ -32,10 +34,20 @@ private struct NotchBackground: View {
         NotchExtensionShape(cornerRadius: cornerRadius)
             .fill(fillMode.color)
             .shadow(color: .black.opacity(state == .expanded ? 0.32 : 0), radius: state == .expanded ? 22 : 0, y: state == .expanded ? 14 : 0)
+            .animation(.interactiveSpring(response: 0.36, dampingFraction: 0.58, blendDuration: 0), value: state)
     }
 
     private var cornerRadius: CGFloat {
         state.notchCornerRadius
+    }
+}
+
+private extension View {
+    func stagedIslandContent(isVisible: Bool, anchor: UnitPoint) -> some View {
+        opacity(isVisible ? 1 : 0)
+            .scaleEffect(isVisible ? 1 : 0.965, anchor: anchor)
+            .offset(y: isVisible ? 0 : -8)
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.72, blendDuration: 0), value: isVisible)
     }
 }
 
@@ -74,10 +86,11 @@ private struct NotchExtensionShape: Shape {
     let cornerRadius: CGFloat
 
     func path(in rect: CGRect) -> Path {
+        let topBleed: CGFloat = 2
         let radius = min(cornerRadius, rect.width / 2, rect.height)
         let minX = rect.minX
         let maxX = rect.maxX
-        let minY = rect.minY
+        let minY = rect.minY - topBleed
         let maxY = rect.maxY
 
         var path = Path()

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct IslandIndicatorView: View {
     let isHovering: Bool
+    let contentVisible: Bool
 
     var body: some View {
         if isHovering {
@@ -65,6 +66,9 @@ struct IslandIndicatorView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .padding(.bottom, 15)
-        .animation(.easeInOut(duration: 0.12), value: isHovering)
+        .opacity(contentVisible ? 1 : 0)
+        .scaleEffect(contentVisible ? 1 : 0.94, anchor: .bottom)
+        .offset(y: contentVisible ? 0 : -6)
+        .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.7, blendDuration: 0), value: contentVisible)
     }
 }
