@@ -1,0 +1,107 @@
+import Foundation
+
+struct TerminalColor: Equatable {
+    let red: UInt8
+    let green: UInt8
+    let blue: UInt8
+
+    static let foreground = TerminalColor(red: 220, green: 224, blue: 232)
+    static let background = TerminalColor(red: 0, green: 0, blue: 0)
+    static let cursor = TerminalColor(red: 245, green: 245, blue: 245)
+
+    static func ansi(index: Int, bright: Bool = false) -> TerminalColor {
+        let normal = [
+            TerminalColor(red: 69, green: 71, blue: 90),
+            TerminalColor(red: 243, green: 139, blue: 168),
+            TerminalColor(red: 166, green: 227, blue: 161),
+            TerminalColor(red: 249, green: 226, blue: 175),
+            TerminalColor(red: 137, green: 180, blue: 250),
+            TerminalColor(red: 245, green: 194, blue: 231),
+            TerminalColor(red: 148, green: 226, blue: 213),
+            TerminalColor(red: 186, green: 194, blue: 222),
+        ]
+        let brightColors = [
+            TerminalColor(red: 88, green: 91, blue: 112),
+            TerminalColor(red: 243, green: 139, blue: 168),
+            TerminalColor(red: 166, green: 227, blue: 161),
+            TerminalColor(red: 249, green: 226, blue: 175),
+            TerminalColor(red: 137, green: 180, blue: 250),
+            TerminalColor(red: 245, green: 194, blue: 231),
+            TerminalColor(red: 148, green: 226, blue: 213),
+            TerminalColor(red: 245, green: 245, blue: 245),
+        ]
+
+        return (bright ? brightColors : normal)[max(0, min(index, 7))]
+    }
+}
+
+struct TerminalCellStyle: Equatable {
+    var foreground: TerminalColor
+    var background: TerminalColor
+    var isBold: Bool
+    var isItalic: Bool
+    var isInverse: Bool
+
+    static let `default` = TerminalCellStyle(
+        foreground: .foreground,
+        background: .background,
+        isBold: false,
+        isItalic: false,
+        isInverse: false
+    )
+}
+
+struct TerminalCell: Equatable {
+    var character: String
+    var style: TerminalCellStyle
+
+    static let blank = TerminalCell(character: " ", style: .default)
+}
+
+struct TerminalRenderSnapshot: Equatable {
+    let columns: Int
+    let rows: Int
+    let cells: [TerminalCell]
+    let cursorColumn: Int
+    let cursorRow: Int
+    let cursorVisible: Bool
+    let isAlternateScreen: Bool
+
+    static func empty(columns: Int = 80, rows: Int = 18) -> TerminalRenderSnapshot {
+        TerminalRenderSnapshot(
+            columns: columns,
+            rows: rows,
+            cells: Array(repeating: .blank, count: max(columns, 1) * max(rows, 1)),
+            cursorColumn: 0,
+            cursorRow: 0,
+            cursorVisible: true,
+            isAlternateScreen: false
+        )
+    }
+
+    static func message(_ text: String, columns: Int = 80, rows: Int = 18) -> TerminalRenderSnapshot {
+        let core = GhosttyTerminalCore(columns: columns, rows: rows)
+        core.processOutput(Data(text.utf8))
+        return core.snapshot
+    }
+
+    func cell(row: Int, column: Int) -> TerminalCell {
+        guard row >= 0, row < rows, column >= 0, column < columns else {
+            return .blank
+        }
+
+        return cells[row * columns + column]
+    }
+
+    var plainText: String {
+        var lines: [String] = []
+        for row in 0..<rows {
+            var line = ""
+            for column in 0..<columns {
+                line += cell(row: row, column: column).character
+            }
+            lines.append(line.trimmingCharacters(in: .whitespaces))
+        }
+        return lines.joined(separator: "\n")
+    }
+}

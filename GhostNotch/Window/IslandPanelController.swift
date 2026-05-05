@@ -6,9 +6,11 @@ final class IslandPanelController: ObservableObject {
     @Published private(set) var state: IslandState = .collapsed
     @Published private(set) var notchFillMode: NotchFillMode = .black
     @Published private(set) var terminalFocusRequestID = 0
+    @Published private(set) var terminalSnapshot = TerminalRenderSnapshot.empty()
 
     private let panel: IslandPanel
     private let terminalSession: TerminalSession
+    private let terminalEngine: TerminalRenderingEngine
     private var localMouseMonitor: Any?
     private var globalMouseMonitor: Any?
     private lazy var outsideClickMonitor = OutsideClickMonitor(
@@ -21,8 +23,12 @@ final class IslandPanelController: ObservableObject {
         terminalSession.state
     }
 
-    init(terminalSession: TerminalSession = TerminalSession()) {
+    init(
+        terminalSession: TerminalSession = TerminalSession(),
+        terminalEngine: TerminalRenderingEngine = GhosttyTerminalEngine()
+    ) {
         self.terminalSession = terminalSession
+        self.terminalEngine = terminalEngine
 
         panel = IslandPanel(
             contentRect: WindowPositioner.frame(for: .collapsed),
@@ -30,6 +36,14 @@ final class IslandPanelController: ObservableObject {
             backing: .buffered,
             defer: false
         )
+
+        terminalEngine.start(session: terminalSession)
+        terminalEngine.onSnapshotChange = { [weak self] snapshot in
+            self?.terminalSnapshot = snapshot
+        }
+        terminalSession.addOutputObserver { [weak self] data in
+            self?.terminalEngine.processOutput(data)
+        }
 
         configurePanel()
 
@@ -67,6 +81,7 @@ final class IslandPanelController: ObservableObject {
         transition(to: .expanded)
         panel.makeKeyAndOrderFront(nil)
         requestTerminalFocus()
+        terminalEngine.focus()
     }
 
     func collapse() {
@@ -77,6 +92,7 @@ final class IslandPanelController: ObservableObject {
         panel.shouldAcceptKeyFocus = false
         panel.resignKey()
         panel.styleMask.insert(.nonactivatingPanel)
+        terminalEngine.blur()
         transition(to: .collapsed)
     }
 
@@ -85,23 +101,11 @@ final class IslandPanelController: ObservableObject {
     }
 
     func writeToTerminal(_ data: Data) {
-        do {
-            try terminalSession.write(data)
-        } catch {
-            NSLog("GhostNotch failed to write terminal input: \(error.localizedDescription)")
-        }
+        terminalEngine.sendInput(data)
     }
 
     func resizeTerminal(cols: Int, rows: Int) {
-        guard terminalSession.isRunning else {
-            return
-        }
-
-        do {
-            try terminalSession.resize(cols: max(cols, 2), rows: max(rows, 1))
-        } catch {
-            NSLog("GhostNotch failed to resize terminal: \(error.localizedDescription)")
-        }
+        terminalEngine.resize(cols: max(cols, 2), rows: max(rows, 1))
     }
 
     private func startHoverMonitoring() {

@@ -64,4 +64,9 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertNil(TerminalInputMapping.data(forInsertedText: ""))
         XCTAssertNil(TerminalInputMapping.data(forKeyCode: 0, characters: nil))
     }
+
+    func testTerminalPasteMappingSanitizesUnsafeEscapesWithoutBracketedWrappers() {
+        XCTAssertEqual(TerminalInputMapping.data(forPastedText: "echo hi\u{1B}\n"), Data("echo hi \r".utf8))
+        XCTAssertNil(TerminalInputMapping.data(forPastedText: ""))
+    }
 }

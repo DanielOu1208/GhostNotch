@@ -21,13 +21,21 @@
 		1A00010C0000000000000001 /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000D0000000000000001 /* TerminalSession.swift */; };
 		1A00010D0000000000000001 /* TerminalSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000E0000000000000001 /* TerminalSessionState.swift */; };
 		1A00010E0000000000000001 /* TerminalRenderingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000F0000000000000001 /* TerminalRenderingEngine.swift */; };
+		1A0001160000000000000001 /* TerminalRenderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000130000000000000001 /* TerminalRenderModel.swift */; };
+		1A0001170000000000000001 /* GhosttyTerminalCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000140000000000000001 /* GhosttyTerminalCore.swift */; };
+		1A0001180000000000000001 /* GhosttyTerminalEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000150000000000000001 /* GhosttyTerminalEngine.swift */; };
+		1A0001190000000000000001 /* TerminalGridSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000160000000000000001 /* TerminalGridSurfaceView.swift */; };
 		1A00010F0000000000000001 /* ShellResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000B0000000000000001 /* ShellResolver.swift */; };
 		1A0001100000000000000001 /* PTYProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000C0000000000000001 /* PTYProcess.swift */; };
 		1A0001110000000000000001 /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000D0000000000000001 /* TerminalSession.swift */; };
 		1A0001120000000000000001 /* TerminalSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000E0000000000000001 /* TerminalSessionState.swift */; };
 		1A0001130000000000000001 /* TerminalRenderingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000F0000000000000001 /* TerminalRenderingEngine.swift */; };
+		1A00011A0000000000000001 /* TerminalRenderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000130000000000000001 /* TerminalRenderModel.swift */; };
+		1A00011B0000000000000001 /* GhosttyTerminalCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000140000000000000001 /* GhosttyTerminalCore.swift */; };
+		1A00011C0000000000000001 /* GhosttyTerminalEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000150000000000000001 /* GhosttyTerminalEngine.swift */; };
 		1A0001140000000000000001 /* ShellResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000110000000000000001 /* ShellResolverTests.swift */; };
 		1A0001150000000000000001 /* TerminalSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000120000000000000001 /* TerminalSessionTests.swift */; };
+		1A00011D0000000000000001 /* GhosttyTerminalCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000170000000000000001 /* GhosttyTerminalCoreTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,9 +54,14 @@
 		1A00000D0000000000000001 /* TerminalSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSession.swift; sourceTree = "<group>"; };
 		1A00000E0000000000000001 /* TerminalSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionState.swift; sourceTree = "<group>"; };
 		1A00000F0000000000000001 /* TerminalRenderingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRenderingEngine.swift; sourceTree = "<group>"; };
+		1A0000130000000000000001 /* TerminalRenderModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRenderModel.swift; sourceTree = "<group>"; };
+		1A0000140000000000000001 /* GhosttyTerminalCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalCore.swift; sourceTree = "<group>"; };
+		1A0000150000000000000001 /* GhosttyTerminalEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalEngine.swift; sourceTree = "<group>"; };
+		1A0000160000000000000001 /* TerminalGridSurfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalGridSurfaceView.swift; sourceTree = "<group>"; };
 		1A0000100000000000000001 /* GhostNotchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GhostNotchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A0000110000000000000001 /* ShellResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellResolverTests.swift; sourceTree = "<group>"; };
 		1A0000120000000000000001 /* TerminalSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionTests.swift; sourceTree = "<group>"; };
+		1A0000170000000000000001 /* GhosttyTerminalCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalCoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,6 +129,7 @@
 				1A0000070000000000000001 /* IslandRootView.swift */,
 				1A0000080000000000000001 /* IslandIndicatorView.swift */,
 				1A0000090000000000000001 /* IslandExpandedView.swift */,
+				1A0000160000000000000001 /* TerminalGridSurfaceView.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -128,6 +142,9 @@
 				1A00000D0000000000000001 /* TerminalSession.swift */,
 				1A00000E0000000000000001 /* TerminalSessionState.swift */,
 				1A00000F0000000000000001 /* TerminalRenderingEngine.swift */,
+				1A0000130000000000000001 /* TerminalRenderModel.swift */,
+				1A0000140000000000000001 /* GhosttyTerminalCore.swift */,
+				1A0000150000000000000001 /* GhosttyTerminalEngine.swift */,
 			);
 			path = Terminal;
 			sourceTree = "<group>";
@@ -137,6 +154,7 @@
 			children = (
 				1A0000110000000000000001 /* ShellResolverTests.swift */,
 				1A0000120000000000000001 /* TerminalSessionTests.swift */,
+				1A0000170000000000000001 /* GhosttyTerminalCoreTests.swift */,
 			);
 			path = GhostNotchTests;
 			sourceTree = "<group>";
@@ -252,6 +270,10 @@
 				1A00010C0000000000000001 /* TerminalSession.swift in Sources */,
 				1A00010D0000000000000001 /* TerminalSessionState.swift in Sources */,
 				1A00010E0000000000000001 /* TerminalRenderingEngine.swift in Sources */,
+				1A0001160000000000000001 /* TerminalRenderModel.swift in Sources */,
+				1A0001170000000000000001 /* GhosttyTerminalCore.swift in Sources */,
+				1A0001180000000000000001 /* GhosttyTerminalEngine.swift in Sources */,
+				1A0001190000000000000001 /* TerminalGridSurfaceView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -264,8 +286,12 @@
 				1A0001110000000000000001 /* TerminalSession.swift in Sources */,
 				1A0001120000000000000001 /* TerminalSessionState.swift in Sources */,
 				1A0001130000000000000001 /* TerminalRenderingEngine.swift in Sources */,
+				1A00011A0000000000000001 /* TerminalRenderModel.swift in Sources */,
+				1A00011B0000000000000001 /* GhosttyTerminalCore.swift in Sources */,
+				1A00011C0000000000000001 /* GhosttyTerminalEngine.swift in Sources */,
 				1A0001140000000000000001 /* ShellResolverTests.swift in Sources */,
 				1A0001150000000000000001 /* TerminalSessionTests.swift in Sources */,
+				1A00011D0000000000000001 /* GhosttyTerminalCoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

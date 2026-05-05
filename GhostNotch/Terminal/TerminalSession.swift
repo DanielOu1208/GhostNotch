@@ -7,6 +7,7 @@ final class TerminalSession {
     private let shellResolver: ShellResolver
     private let workingDirectory: String
     private let process: PTYProcess
+    private var outputObservers: [@MainActor (Data) -> Void] = []
 
     init(
         shellResolver: ShellResolver = ShellResolver(),
@@ -21,6 +22,7 @@ final class TerminalSession {
 
         process.onOutput = { [weak self] data in
             self?.state.appendOutput(data)
+            self?.notifyOutputObservers(data)
         }
 
         process.onTermination = { [weak self] in
@@ -77,6 +79,16 @@ final class TerminalSession {
             throw error
         }
     }
+
+    func addOutputObserver(_ observer: @escaping @MainActor (Data) -> Void) {
+        outputObservers.append(observer)
+    }
+
+    private func notifyOutputObservers(_ data: Data) {
+        for observer in outputObservers {
+            observer(data)
+        }
+    }
 }
 
 enum TerminalInputMapping {
@@ -93,6 +105,10 @@ enum TerminalInputMapping {
             .replacingOccurrences(of: "\r\n", with: "\r")
             .replacingOccurrences(of: "\n", with: "\r")
             .data(using: .utf8)
+    }
+
+    static func data(forPastedText text: String) -> Data? {
+        GhosttyTerminalCore.encodePaste(text, bracketed: false)
     }
 
     static func data(forKeyCode keyCode: UInt16, characters: String?) -> Data? {

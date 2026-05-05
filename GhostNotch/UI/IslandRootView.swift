@@ -15,6 +15,7 @@ struct IslandRootView: View {
             case .expanded:
                 IslandExpandedView(
                     sessionState: controller.terminalState,
+                    snapshot: controller.terminalSnapshot,
                     focusRequestID: controller.terminalFocusRequestID,
                     onInput: controller.writeToTerminal,
                     onResize: controller.resizeTerminal,
