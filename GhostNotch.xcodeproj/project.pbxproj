@@ -25,6 +25,8 @@
 		1A0001170000000000000001 /* GhosttyTerminalCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000140000000000000001 /* GhosttyTerminalCore.swift */; };
 		1A0001180000000000000001 /* GhosttyTerminalEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000150000000000000001 /* GhosttyTerminalEngine.swift */; };
 		1A0001190000000000000001 /* TerminalGridSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000160000000000000001 /* TerminalGridSurfaceView.swift */; };
+		1A00011E0000000000000001 /* GhosttyVTBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000190000000000000001 /* GhosttyVTBridge.c */; };
+		1A00011F0000000000000001 /* GhosttyVT.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00001B0000000000000001 /* GhosttyVT.xcframework */; };
 		1A00010F0000000000000001 /* ShellResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000B0000000000000001 /* ShellResolver.swift */; };
 		1A0001100000000000000001 /* PTYProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000C0000000000000001 /* PTYProcess.swift */; };
 		1A0001110000000000000001 /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000D0000000000000001 /* TerminalSession.swift */; };
@@ -33,6 +35,8 @@
 		1A00011A0000000000000001 /* TerminalRenderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000130000000000000001 /* TerminalRenderModel.swift */; };
 		1A00011B0000000000000001 /* GhosttyTerminalCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000140000000000000001 /* GhosttyTerminalCore.swift */; };
 		1A00011C0000000000000001 /* GhosttyTerminalEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000150000000000000001 /* GhosttyTerminalEngine.swift */; };
+		1A0001200000000000000001 /* GhosttyVTBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000190000000000000001 /* GhosttyVTBridge.c */; };
+		1A0001210000000000000001 /* GhosttyVT.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00001B0000000000000001 /* GhosttyVT.xcframework */; };
 		1A0001140000000000000001 /* ShellResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000110000000000000001 /* ShellResolverTests.swift */; };
 		1A0001150000000000000001 /* TerminalSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000120000000000000001 /* TerminalSessionTests.swift */; };
 		1A00011D0000000000000001 /* GhosttyTerminalCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000170000000000000001 /* GhosttyTerminalCoreTests.swift */; };
@@ -58,6 +62,10 @@
 		1A0000140000000000000001 /* GhosttyTerminalCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalCore.swift; sourceTree = "<group>"; };
 		1A0000150000000000000001 /* GhosttyTerminalEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalEngine.swift; sourceTree = "<group>"; };
 		1A0000160000000000000001 /* TerminalGridSurfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalGridSurfaceView.swift; sourceTree = "<group>"; };
+		1A0000180000000000000001 /* GhostNotch-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "GhostNotch-Bridging-Header.h"; sourceTree = "<group>"; };
+		1A0000190000000000000001 /* GhosttyVTBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = GhosttyVTBridge.c; sourceTree = "<group>"; };
+		1A00001A0000000000000001 /* GhosttyVTBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GhosttyVTBridge.h; sourceTree = "<group>"; };
+		1A00001B0000000000000001 /* GhosttyVT.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = "vendor/ghostty-vt/GhosttyVT.xcframework"; sourceTree = SOURCE_ROOT; };
 		1A0000100000000000000001 /* GhostNotchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GhostNotchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A0000110000000000000001 /* ShellResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellResolverTests.swift; sourceTree = "<group>"; };
 		1A0000120000000000000001 /* TerminalSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionTests.swift; sourceTree = "<group>"; };
@@ -69,6 +77,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A00011F0000000000000001 /* GhosttyVT.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -76,6 +85,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A0001210000000000000001 /* GhosttyVT.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -87,6 +97,7 @@
 			children = (
 				1A0003020000000000000001 /* GhostNotch */,
 				1A0003070000000000000001 /* GhostNotchTests */,
+				1A0003080000000000000001 /* Vendor */,
 				1A0003030000000000000001 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -96,6 +107,7 @@
 			children = (
 				1A0000010000000000000001 /* GhostNotchApp.swift */,
 				1A0000020000000000000001 /* AppDelegate.swift */,
+				1A0000180000000000000001 /* GhostNotch-Bridging-Header.h */,
 				1A0003060000000000000001 /* Terminal */,
 				1A0003040000000000000001 /* Window */,
 				1A0003050000000000000001 /* UI */,
@@ -145,8 +157,18 @@
 				1A0000130000000000000001 /* TerminalRenderModel.swift */,
 				1A0000140000000000000001 /* GhosttyTerminalCore.swift */,
 				1A0000150000000000000001 /* GhosttyTerminalEngine.swift */,
+				1A0000190000000000000001 /* GhosttyVTBridge.c */,
+				1A00001A0000000000000001 /* GhosttyVTBridge.h */,
 			);
 			path = Terminal;
+			sourceTree = "<group>";
+		};
+		1A0003080000000000000001 /* Vendor */ = {
+			isa = PBXGroup;
+			children = (
+				1A00001B0000000000000001 /* GhosttyVT.xcframework */,
+			);
+			name = Vendor;
 			sourceTree = "<group>";
 		};
 		1A0003070000000000000001 /* GhostNotchTests */ = {
@@ -274,6 +296,7 @@
 				1A0001170000000000000001 /* GhosttyTerminalCore.swift in Sources */,
 				1A0001180000000000000001 /* GhosttyTerminalEngine.swift in Sources */,
 				1A0001190000000000000001 /* TerminalGridSurfaceView.swift in Sources */,
+				1A00011E0000000000000001 /* GhosttyVTBridge.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -289,6 +312,7 @@
 				1A00011A0000000000000001 /* TerminalRenderModel.swift in Sources */,
 				1A00011B0000000000000001 /* GhosttyTerminalCore.swift in Sources */,
 				1A00011C0000000000000001 /* GhosttyTerminalEngine.swift in Sources */,
+				1A0001200000000000000001 /* GhosttyVTBridge.c in Sources */,
 				1A0001140000000000000001 /* ShellResolverTests.swift in Sources */,
 				1A0001150000000000000001 /* TerminalSessionTests.swift in Sources */,
 				1A00011D0000000000000001 /* GhosttyTerminalCoreTests.swift in Sources */,
@@ -424,8 +448,13 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lc++",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.ghostnotch.local;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "GhostNotch/GhostNotch-Bridging-Header.h";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 			};
@@ -446,8 +475,13 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lc++",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.ghostnotch.local;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "GhostNotch/GhostNotch-Bridging-Header.h";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 			};
@@ -466,8 +500,13 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lc++",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.ghostnotch.local.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "GhostNotch/GhostNotch-Bridging-Header.h";
 				SWIFT_VERSION = 6.0;
 				TEST_HOST = "";
 			};
@@ -486,8 +525,13 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lc++",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.ghostnotch.local.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "GhostNotch/GhostNotch-Bridging-Header.h";
 				SWIFT_VERSION = 6.0;
 				TEST_HOST = "";
 			};

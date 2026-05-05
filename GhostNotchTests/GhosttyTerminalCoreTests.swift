@@ -65,7 +65,7 @@ final class GhosttyTerminalCoreTests: XCTestCase {
 
         core.processOutput(Data("\u{1B}[c".utf8))
 
-        XCTAssertEqual(written, Data("\u{1B}[?62;c".utf8))
+        XCTAssertEqual(written, Data("\u{1B}[?62;22c".utf8))
     }
 
     func testPasteEncodingUsesBracketedPasteAndRemovesEscape() {
