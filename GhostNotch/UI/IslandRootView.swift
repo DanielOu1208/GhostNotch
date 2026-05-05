@@ -17,7 +17,8 @@ struct IslandRootView: View {
                     sessionState: controller.terminalState,
                     focusRequestID: controller.terminalFocusRequestID,
                     onInput: controller.writeToTerminal,
-                    onResize: controller.resizeTerminal
+                    onResize: controller.resizeTerminal,
+                    onCollapse: controller.collapse
                 )
             }
         }

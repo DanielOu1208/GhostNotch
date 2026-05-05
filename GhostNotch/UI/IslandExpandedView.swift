@@ -7,11 +7,10 @@ struct IslandExpandedView: View {
     let focusRequestID: Int
     let onInput: (Data) -> Void
     let onResize: (Int, Int) -> Void
+    let onCollapse: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            Color.clear
-                .frame(height: 38)
 
             header
 
@@ -50,12 +49,15 @@ struct IslandExpandedView: View {
 
             Spacer()
 
-            Text("Esc")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.54))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            Button(action: onCollapse) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.54))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 22)
         .frame(height: 44)
