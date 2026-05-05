@@ -61,18 +61,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupNotchColorHotKey() {
-        var hotKeyID = EventHotKeyID(signature: notchColorHotKeySignature, id: notchColorHotKeyID)
-        RegisterEventHotKey(
+        let hotKeyID = EventHotKeyID(signature: notchColorHotKeySignature, id: notchColorHotKeyID)
+        var registeredHotKey: EventHotKeyRef?
+        let hotKeyStatus = RegisterEventHotKey(
             UInt32(kVK_ANSI_G),
             UInt32(cmdKey | optionKey),
             hotKeyID,
             GetApplicationEventTarget(),
             0,
-            &notchColorHotKey
+            &registeredHotKey
         )
 
+        guard hotKeyStatus == noErr, let registeredHotKey else {
+            NSLog("GhostNotch failed to register notch color hotkey: \(hotKeyStatus)")
+            return
+        }
+
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(
+        var installedHandler: EventHandlerRef?
+        let handlerStatus = InstallEventHandler(
             GetApplicationEventTarget(),
             { _, event, userData in
                 guard let event, let userData else {
@@ -106,8 +113,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             1,
             &eventType,
             Unmanaged.passUnretained(self).toOpaque(),
-            &hotKeyHandler
+            &installedHandler
         )
+
+        guard handlerStatus == noErr, let installedHandler else {
+            NSLog("GhostNotch failed to install notch color hotkey handler: \(handlerStatus)")
+            UnregisterEventHotKey(registeredHotKey)
+            return
+        }
+
+        notchColorHotKey = registeredHotKey
+        hotKeyHandler = installedHandler
     }
 
     private func tearDownNotchColorHotKey() {

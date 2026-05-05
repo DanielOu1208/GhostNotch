@@ -20,7 +20,7 @@ GhostNotch/
 └── UI/
 ```
 
-There is also an older nested project/source copy under `GhostNotch/GhostNotch.xcodeproj` and `GhostNotch/GhostNotch/`. Future implementation work should use the root project and root `GhostNotch/` source tree unless the duplicate layout is intentionally removed or reconciled.
+The duplicate project/source copy has been removed. Future implementation work should use the root project and root `GhostNotch/` source tree.
 
 ## Product Goal
 
@@ -164,9 +164,9 @@ This is a Stage 1 debug aid for visually comparing the software fill against the
 
 `IslandIndicatorView` keeps the center hardware-notch region visually clear in collapsed state and places active indicators in the side extensions:
 
-- Left extension: green active dot.
+- Left extension: Ghostty-style mark.
 - Center gap: physical notch reference width.
-- Right extension: `>_` glyph.
+- Right extension: green status dot.
 
 Hover state shows:
 
@@ -355,14 +355,13 @@ For non-notch displays, the island should still appear top center, using a conse
 ## Implementation Order From Current State
 
 1. Keep the root project/source tree as the implementation target.
-2. Reconcile or remove the older nested project/source copy to avoid future confusion.
-3. Add `Terminal/` with shell resolution and PTY session lifecycle.
-4. Replace `IslandExpandedView` placeholder content with a terminal container view.
-5. Wire terminal focus/input to expanded panel state.
-6. Preserve the shell session across collapse/expand.
-7. Add the product toggle hotkey separately from the debug color hotkey.
-8. Add runtime notch measurement and fallback display behavior.
-9. Remove or hide Stage 1 debug color controls before public MVP.
+2. Add `Terminal/` with shell resolution and PTY session lifecycle.
+3. Replace `IslandExpandedView` placeholder content with a terminal container view.
+4. Wire terminal focus/input to expanded panel state.
+5. Preserve the shell session across collapse/expand.
+6. Add the product toggle hotkey separately from the debug color hotkey.
+7. Add runtime notch measurement and fallback display behavior.
+8. Remove or hide Stage 1 debug color controls before public MVP.
 
 ## Acceptance Criteria
 

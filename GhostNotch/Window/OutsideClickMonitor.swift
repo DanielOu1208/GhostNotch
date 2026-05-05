@@ -22,7 +22,7 @@ final class OutsideClickMonitor {
         let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
 
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self?.handleClick(at: NSEvent.mouseLocation)
             }
             return event
