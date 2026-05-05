@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 
 struct IslandMetrics {
     static let physicalNotchReferenceWidth: CGFloat = 220
@@ -25,12 +26,28 @@ enum IslandState: Equatable {
 }
 
 enum WindowPositioner {
-    static func frame(for state: IslandState, on screen: NSScreen = NSScreen.main ?? NSScreen.screens[0]) -> NSRect {
+    static var notchScreen: NSScreen {
+        NSScreen.screens.first(where: \.isBuiltInDisplay) ?? NSScreen.main ?? NSScreen.screens[0]
+    }
+
+    static func frame(for state: IslandState, on screen: NSScreen = WindowPositioner.notchScreen) -> NSRect {
         let size = state.size
         let screenFrame = screen.frame
         let x = screenFrame.midX - size.width / 2
         let y = screenFrame.maxY - size.height
 
         return NSRect(origin: NSPoint(x: x, y: y), size: size)
+    }
+}
+
+private extension NSScreen {
+    var isBuiltInDisplay: Bool {
+        guard
+            let screenNumber = deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        else {
+            return false
+        }
+
+        return CGDisplayIsBuiltin(CGDirectDisplayID(screenNumber.uint32Value)) != 0
     }
 }
