@@ -2,7 +2,7 @@
 
 ## Current Implementation Baseline
 
-GhostNotch is a native macOS Dynamic-Island-style terminal utility. The current codebase has completed the Stage 1 floating island shell, notch geometry work, and a native PTY-backed terminal session module. The expanded island UI still shows placeholder terminal content and is not yet wired to the real session.
+GhostNotch is a native macOS Dynamic-Island-style terminal utility. The current codebase has completed the Stage 1 floating island shell, notch geometry work, a native PTY-backed terminal session module, and first-pass expanded terminal UI/input integration. The expanded island now starts a real default-shell session on first open, renders recent raw PTY output, accepts keyboard input and paste, resizes the PTY from the terminal surface, and preserves the session while collapsed.
 
 The canonical project is the root Xcode project:
 
@@ -55,12 +55,16 @@ The current implementation already includes:
 - Local and global outside-click collapse.
 - Status-bar-level panel placement.
 - All-Spaces/full-screen auxiliary collection behavior.
-- Stage 1 placeholder terminal UI.
+- Expanded terminal UI backed by the real PTY session.
+- First-open terminal session lifecycle owned by the panel/controller layer.
+- Raw PTY text output rendering in the expanded island.
+- Keyboard input routing for text, Return, Tab, Backspace/Delete, and paste.
+- PTY resize propagation from the expanded terminal surface.
 - Debug notch fill color toggle via menu item and `Command+Option+G`.
 - Native `Terminal/` module with shell resolution and PTY session lifecycle.
-- `GhostNotchTests` target covering shell resolution and real PTY command output.
+- `GhostNotchTests` target covering shell resolution, real PTY command output, session stopping, and input mapping.
 
-The current expanded island content is still mock UI only. It displays placeholder commands and output; it does not yet render the real PTY session or route keyboard input into it.
+The current expanded island terminal is intentionally a lean raw-text renderer. It is suitable for basic shell commands, but it does not yet implement full terminal emulation such as ANSI color/style handling, cursor-addressed screen updates, alternate screen support, or Ghostty-backed rendering.
 
 ## Current Implemented Architecture
 
@@ -113,10 +117,14 @@ Current focus behavior:
 
 - `state: IslandState`
 - `notchFillMode: NotchFillMode`
+- One long-lived `TerminalSession`
+- Terminal focus request state
 - Panel creation and configuration.
 - Expand/collapse transitions.
 - Hover state transitions.
 - Outside-click monitor lifecycle.
+- First-open terminal startup.
+- Terminal input and resize forwarding.
 
 Current panel configuration:
 
@@ -189,8 +197,22 @@ Hover state shows:
 
 - 38 pt top clear area matching the physical notch height.
 - Header row.
-- Placeholder terminal lines.
+- Real terminal status.
+- AppKit-backed raw terminal text surface.
 - Escape hint.
+
+The embedded terminal surface currently:
+
+- Displays decoded recent PTY output from `TerminalSessionState`.
+- Shows startup and error states.
+- Accepts ordinary text input.
+- Maps Return to carriage return.
+- Maps Tab to tab.
+- Maps Backspace/Delete to `0x7F`.
+- Supports paste from the system pasteboard.
+- Keeps the caret at the end of terminal output.
+- Scrolls to the latest output.
+- Estimates terminal columns and rows from the visible monospaced surface and resizes the PTY.
 
 ### Terminal Backend
 
@@ -200,9 +222,10 @@ Hover state shows:
 - `PTYProcess` opens a native pseudo-terminal, launches the resolved shell in the user's home directory, reads output, writes input, resizes the PTY, and cleans up the child process.
 - `TerminalSession` is the app-facing facade for start, stop, write, resize, and output state.
 - `TerminalSessionState` stores running status, recent output data, decoded output text, and the latest error.
+- `TerminalInputMapping` maps AppKit text/key events into the bytes currently sent to the PTY.
 - `TerminalRenderingEngine` defines the future rendering/input boundary.
 
-The terminal backend is intentionally not owned by SwiftUI views. The next integration step should decide the lifecycle owner, likely the panel/controller layer, without moving PTY process details into `IslandPanelController`.
+The terminal backend is intentionally not owned by SwiftUI views. `IslandPanelController` owns the single app-lifecycle `TerminalSession`, starts it on first expand, forwards input and resize requests, and stops it during teardown. PTY process details stay inside the terminal module.
 
 ## MVP User Experience
 
@@ -222,16 +245,14 @@ The shell session continues running in the background.
 
 ## MVP Scope Still To Implement
 
-### Terminal UI Integration
+### Terminal Rendering Improvements
 
-Wire the implemented terminal backend into the expanded island:
+The first terminal UI integration is complete, but rendering is still raw PTY text. Future rendering work should improve the terminal surface without moving shell lifecycle into SwiftUI views:
 
-- Create one `TerminalSession` for the app lifecycle.
+- Add ANSI parsing for common color, style, clear-screen, and cursor movement behavior, or replace the raw renderer with a Ghostty-backed view if embedding proves feasible.
+- Preserve the existing `TerminalSession` lifecycle and `TerminalRenderingEngine` boundary.
 - Keep the shell process alive while collapsed.
-- Preserve the terminal buffer while collapsed.
-- Reopen into the same session.
-- Resize the terminal backend when the island size changes.
-- Replace placeholder terminal lines with a terminal container view.
+- Keep Escape as collapse behavior until a deliberate terminal-program Escape-forwarding design exists.
 
 Current implemented shell resolution:
 
@@ -284,6 +305,7 @@ Responsibilities:
 - `ShellResolver`: default shell lookup and validation.
 - `TerminalRenderingEngine`: rendering/input abstraction.
 - `TerminalSessionState`: observable state needed by the UI.
+- `TerminalInputMapping`: text/key to PTY byte mapping, currently colocated in `TerminalSession.swift`.
 
 Future rendering work may add `GhosttyBridge` and `GhosttyTerminalView` when Ghostty embedding begins.
 
@@ -297,13 +319,20 @@ The current panel focus behavior should stay:
 
 Terminal implementation must add:
 
-- Text input routing into the terminal engine.
-- Paste support.
-- Basic modifier key handling.
-- Resize propagation.
 - Focus/blur calls to the renderer.
+- A deliberate policy for forwarding Escape to terminal programs.
 
-Escape should continue to collapse the island, but terminal input should be handled carefully so Escape can still be sent to terminal programs in a future enhancement.
+Current implemented input behavior:
+
+- Text input is routed into the PTY.
+- Paste is routed into the PTY with newline normalization.
+- Return is sent as carriage return.
+- Tab is sent as tab.
+- Backspace/Delete are sent as `0x7F`.
+- Command-key combinations are left to AppKit.
+- Escape is still intercepted by `IslandPanel.keyDown` and collapses the island.
+
+Escape should continue to collapse the island until terminal-program Escape forwarding is designed deliberately.
 
 ### Product Hotkey
 
@@ -375,12 +404,11 @@ For non-notch displays, the island should still appear top center, using a conse
 ## Implementation Order From Current State
 
 1. Keep the root project/source tree as the implementation target.
-2. Replace `IslandExpandedView` placeholder content with a terminal container view.
-3. Wire terminal focus/input to expanded panel state.
-4. Preserve the shell session across collapse/expand in the UI integration.
-5. Add the product toggle hotkey separately from the debug color hotkey.
-6. Add runtime notch measurement and fallback display behavior.
-7. Remove or hide Stage 1 debug color controls before public MVP.
+2. Add the product toggle hotkey separately from the debug color hotkey.
+3. Improve terminal rendering beyond raw PTY text or begin Ghostty-backed rendering integration.
+4. Add runtime notch measurement and fallback display behavior.
+5. Remove or hide Stage 1 debug color controls before public MVP.
+6. Revisit Escape forwarding once terminal programs beyond simple shell commands are in scope.
 
 ## Acceptance Criteria
 
@@ -398,6 +426,22 @@ The MVP is complete when:
 - The island remains top-flush and visually aligned with the notch.
 - The app has a product hotkey for toggling the terminal.
 - The implementation uses the root `GhostNotch.xcodeproj` and root `GhostNotch/` source tree.
+
+Currently satisfied from the baseline above:
+
+- Root project/source tree.
+- Notch-attached collapsed, hover, and expanded panel behavior.
+- First-pass real PTY shell session startup.
+- Basic terminal input, paste, output, and resize.
+- Session preservation across collapse/reopen.
+- Escape and outside-click collapse.
+
+Still required for full MVP:
+
+- Product terminal toggle hotkey.
+- Runtime notch measurement/fallback behavior.
+- Public-build cleanup of the debug notch color control.
+- Terminal rendering improvements beyond raw PTY text if basic shell output proves insufficient.
 
 ## Documentation References
 

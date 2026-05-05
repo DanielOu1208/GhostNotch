@@ -5,8 +5,10 @@ import SwiftUI
 final class IslandPanelController: ObservableObject {
     @Published private(set) var state: IslandState = .collapsed
     @Published private(set) var notchFillMode: NotchFillMode = .black
+    @Published private(set) var terminalFocusRequestID = 0
 
     private let panel: IslandPanel
+    private let terminalSession: TerminalSession
     private var localMouseMonitor: Any?
     private var globalMouseMonitor: Any?
     private lazy var outsideClickMonitor = OutsideClickMonitor(
@@ -15,7 +17,13 @@ final class IslandPanelController: ObservableObject {
         collapse: { [weak self] in self?.collapse() }
     )
 
-    init() {
+    var terminalState: TerminalSessionState {
+        terminalSession.state
+    }
+
+    init(terminalSession: TerminalSession = TerminalSession()) {
+        self.terminalSession = terminalSession
+
         panel = IslandPanel(
             contentRect: WindowPositioner.frame(for: .collapsed),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -42,19 +50,23 @@ final class IslandPanelController: ObservableObject {
     func tearDown() {
         outsideClickMonitor.stop()
         stopHoverMonitoring()
+        terminalSession.stop()
         panel.close()
     }
 
     func expand() {
-        guard state != .expanded else {
+        if state == .expanded {
+            requestTerminalFocus()
             return
         }
 
         panel.shouldAcceptKeyFocus = true
         panel.styleMask.remove(.nonactivatingPanel)
         NSApp.activate()
+        startTerminalIfNeeded()
         transition(to: .expanded)
         panel.makeKeyAndOrderFront(nil)
+        requestTerminalFocus()
     }
 
     func collapse() {
@@ -70,6 +82,26 @@ final class IslandPanelController: ObservableObject {
 
     func toggleNotchFillMode() {
         notchFillMode.toggle()
+    }
+
+    func writeToTerminal(_ data: Data) {
+        do {
+            try terminalSession.write(data)
+        } catch {
+            NSLog("GhostNotch failed to write terminal input: \(error.localizedDescription)")
+        }
+    }
+
+    func resizeTerminal(cols: Int, rows: Int) {
+        guard terminalSession.isRunning else {
+            return
+        }
+
+        do {
+            try terminalSession.resize(cols: max(cols, 2), rows: max(rows, 1))
+        } catch {
+            NSLog("GhostNotch failed to resize terminal: \(error.localizedDescription)")
+        }
     }
 
     private func startHoverMonitoring() {
@@ -134,6 +166,22 @@ final class IslandPanelController: ObservableObject {
         panel.titlebarAppearsTransparent = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.animationBehavior = .none
+    }
+
+    private func startTerminalIfNeeded() {
+        guard !terminalSession.isRunning else {
+            return
+        }
+
+        do {
+            try terminalSession.start(cols: 80, rows: 18)
+        } catch {
+            NSLog("GhostNotch failed to start terminal session: \(error.localizedDescription)")
+        }
+    }
+
+    private func requestTerminalFocus() {
+        terminalFocusRequestID += 1
     }
 
     private func transition(to newState: IslandState) {

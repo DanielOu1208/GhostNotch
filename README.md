@@ -9,4 +9,6 @@ The current product and implementation reference is:
 
 Use the root `GhostNotch.xcodeproj` as the canonical project. It builds the root `GhostNotch/` source tree, which contains the latest notch-integrated island shell and native PTY-backed terminal session module.
 
-The next implementation stage is UI/input integration: replace the placeholder expanded view with the persistent default-shell session while preserving the current notch geometry and focus behavior.
+The expanded island now starts a persistent default-shell PTY session on first open, renders recent terminal output, accepts keyboard input and paste, and keeps the session alive while collapsed.
+
+The next implementation stage is product polish around the terminal shell: add the product toggle hotkey, improve terminal rendering beyond raw PTY text, and generalize runtime notch measurement while preserving the current geometry and focus behavior.

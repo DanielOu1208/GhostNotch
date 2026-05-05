@@ -13,7 +13,12 @@ struct IslandRootView: View {
             case .collapsed, .hover:
                 IslandIndicatorView(isHovering: controller.state == .hover)
             case .expanded:
-                IslandExpandedView()
+                IslandExpandedView(
+                    sessionState: controller.terminalState,
+                    focusRequestID: controller.terminalFocusRequestID,
+                    onInput: controller.writeToTerminal,
+                    onResize: controller.resizeTerminal
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

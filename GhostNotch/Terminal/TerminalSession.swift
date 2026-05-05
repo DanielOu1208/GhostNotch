@@ -78,3 +78,37 @@ final class TerminalSession {
         }
     }
 }
+
+enum TerminalInputMapping {
+    static let returnData = Data([0x0D])
+    static let tabData = Data([0x09])
+    static let deleteData = Data([0x7F])
+
+    static func data(forInsertedText text: String) -> Data? {
+        guard !text.isEmpty else {
+            return nil
+        }
+
+        return text
+            .replacingOccurrences(of: "\r\n", with: "\r")
+            .replacingOccurrences(of: "\n", with: "\r")
+            .data(using: .utf8)
+    }
+
+    static func data(forKeyCode keyCode: UInt16, characters: String?) -> Data? {
+        switch keyCode {
+        case 36, 76:
+            return returnData
+        case 48:
+            return tabData
+        case 51, 117:
+            return deleteData
+        default:
+            guard let characters, !characters.isEmpty else {
+                return nil
+            }
+
+            return data(forInsertedText: characters)
+        }
+    }
+}

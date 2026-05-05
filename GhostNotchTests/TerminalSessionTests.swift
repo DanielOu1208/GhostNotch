@@ -48,4 +48,20 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertFalse(session.isRunning)
         XCTAssertFalse(state.isRunning)
     }
+
+    func testTerminalInputMappingUsesPTYControlBytes() {
+        XCTAssertEqual(TerminalInputMapping.data(forKeyCode: 36, characters: "\r"), Data([0x0D]))
+        XCTAssertEqual(TerminalInputMapping.data(forKeyCode: 76, characters: "\r"), Data([0x0D]))
+        XCTAssertEqual(TerminalInputMapping.data(forKeyCode: 48, characters: "\t"), Data([0x09]))
+        XCTAssertEqual(TerminalInputMapping.data(forKeyCode: 51, characters: "\u{7F}"), Data([0x7F]))
+        XCTAssertEqual(TerminalInputMapping.data(forKeyCode: 117, characters: "\u{7F}"), Data([0x7F]))
+    }
+
+    func testTerminalInputMappingPreservesTextAndNormalizesNewlines() {
+        XCTAssertEqual(TerminalInputMapping.data(forInsertedText: "pwd"), Data("pwd".utf8))
+        XCTAssertEqual(TerminalInputMapping.data(forInsertedText: "echo hi\n"), Data("echo hi\r".utf8))
+        XCTAssertEqual(TerminalInputMapping.data(forKeyCode: 0, characters: "a"), Data("a".utf8))
+        XCTAssertNil(TerminalInputMapping.data(forInsertedText: ""))
+        XCTAssertNil(TerminalInputMapping.data(forKeyCode: 0, characters: nil))
+    }
 }
