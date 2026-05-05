@@ -63,6 +63,9 @@ The current implementation already includes:
 - Debug notch fill color toggle via menu item and `Command+Option+G`.
 - Native `Terminal/` module with shell resolution and PTY session lifecycle.
 - `GhostNotchTests` target covering shell resolution, real PTY command output, session stopping, and input mapping.
+- Product toggle hotkey (`Option+Space`) for expand/collapse.
+- Header sits flush at top of expanded panel (38pt spacer removed).
+- Enlarged close button with 14pt icon and 12/6 padding for easier clicking.
 
 The current expanded island terminal is intentionally a lean raw-text renderer. It is suitable for basic shell commands, but it does not yet implement full terminal emulation such as ANSI color/style handling, cursor-addressed screen updates, alternate screen support, or Ghostty-backed rendering.
 
@@ -195,11 +198,10 @@ Hover state shows:
 
 `IslandExpandedView` currently renders:
 
-- 38 pt top clear area matching the physical notch height.
-- Header row.
+- Header row with status dot, "GhostNotch" title, shell status, and close button — flush at top of panel.
 - Real terminal status.
 - AppKit-backed raw terminal text surface.
-- Escape hint.
+- Close button (14pt xmark icon, 12/6 padding).
 
 The embedded terminal surface currently:
 
@@ -404,7 +406,7 @@ For non-notch displays, the island should still appear top center, using a conse
 ## Implementation Order From Current State
 
 1. Keep the root project/source tree as the implementation target.
-2. Add the product toggle hotkey separately from the debug color hotkey.
+2. ~~Add the product toggle hotkey separately from the debug color hotkey.~~ **Done** — `Option+Space` implemented.
 3. Improve terminal rendering beyond raw PTY text or begin Ghostty-backed rendering integration.
 4. Add runtime notch measurement and fallback display behavior.
 5. Remove or hide Stage 1 debug color controls before public MVP.
@@ -435,10 +437,12 @@ Currently satisfied from the baseline above:
 - Basic terminal input, paste, output, and resize.
 - Session preservation across collapse/reopen.
 - Escape and outside-click collapse.
+- Product toggle hotkey (`Option+Space`).
+- Header flush at top of expanded panel (38pt spacer removed).
+- Enlarged close button.
 
 Still required for full MVP:
 
-- Product terminal toggle hotkey.
 - Runtime notch measurement/fallback behavior.
 - Public-build cleanup of the debug notch color control.
 - Terminal rendering improvements beyond raw PTY text if basic shell output proves insufficient.
