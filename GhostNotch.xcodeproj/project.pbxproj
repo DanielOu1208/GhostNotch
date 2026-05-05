@@ -16,6 +16,18 @@
 		1A0001070000000000000001 /* IslandRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000070000000000000001 /* IslandRootView.swift */; };
 		1A0001080000000000000001 /* IslandIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000080000000000000001 /* IslandIndicatorView.swift */; };
 		1A0001090000000000000001 /* IslandExpandedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000090000000000000001 /* IslandExpandedView.swift */; };
+		1A00010A0000000000000001 /* ShellResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000B0000000000000001 /* ShellResolver.swift */; };
+		1A00010B0000000000000001 /* PTYProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000C0000000000000001 /* PTYProcess.swift */; };
+		1A00010C0000000000000001 /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000D0000000000000001 /* TerminalSession.swift */; };
+		1A00010D0000000000000001 /* TerminalSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000E0000000000000001 /* TerminalSessionState.swift */; };
+		1A00010E0000000000000001 /* TerminalRenderingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000F0000000000000001 /* TerminalRenderingEngine.swift */; };
+		1A00010F0000000000000001 /* ShellResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000B0000000000000001 /* ShellResolver.swift */; };
+		1A0001100000000000000001 /* PTYProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000C0000000000000001 /* PTYProcess.swift */; };
+		1A0001110000000000000001 /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000D0000000000000001 /* TerminalSession.swift */; };
+		1A0001120000000000000001 /* TerminalSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000E0000000000000001 /* TerminalSessionState.swift */; };
+		1A0001130000000000000001 /* TerminalRenderingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000F0000000000000001 /* TerminalRenderingEngine.swift */; };
+		1A0001140000000000000001 /* ShellResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000110000000000000001 /* ShellResolverTests.swift */; };
+		1A0001150000000000000001 /* TerminalSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000120000000000000001 /* TerminalSessionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,10 +41,25 @@
 		1A0000080000000000000001 /* IslandIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandIndicatorView.swift; sourceTree = "<group>"; };
 		1A0000090000000000000001 /* IslandExpandedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandExpandedView.swift; sourceTree = "<group>"; };
 		1A00000A0000000000000001 /* GhostNotch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GhostNotch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A00000B0000000000000001 /* ShellResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellResolver.swift; sourceTree = "<group>"; };
+		1A00000C0000000000000001 /* PTYProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PTYProcess.swift; sourceTree = "<group>"; };
+		1A00000D0000000000000001 /* TerminalSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSession.swift; sourceTree = "<group>"; };
+		1A00000E0000000000000001 /* TerminalSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionState.swift; sourceTree = "<group>"; };
+		1A00000F0000000000000001 /* TerminalRenderingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRenderingEngine.swift; sourceTree = "<group>"; };
+		1A0000100000000000000001 /* GhostNotchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GhostNotchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A0000110000000000000001 /* ShellResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellResolverTests.swift; sourceTree = "<group>"; };
+		1A0000120000000000000001 /* TerminalSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		1A0002010000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1A0002020000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -46,6 +73,7 @@
 			isa = PBXGroup;
 			children = (
 				1A0003020000000000000001 /* GhostNotch */,
+				1A0003070000000000000001 /* GhostNotchTests */,
 				1A0003030000000000000001 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -55,6 +83,7 @@
 			children = (
 				1A0000010000000000000001 /* GhostNotchApp.swift */,
 				1A0000020000000000000001 /* AppDelegate.swift */,
+				1A0003060000000000000001 /* Terminal */,
 				1A0003040000000000000001 /* Window */,
 				1A0003050000000000000001 /* UI */,
 			);
@@ -65,6 +94,7 @@
 			isa = PBXGroup;
 			children = (
 				1A00000A0000000000000001 /* GhostNotch.app */,
+				1A0000100000000000000001 /* GhostNotchTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -90,6 +120,27 @@
 			path = UI;
 			sourceTree = "<group>";
 		};
+		1A0003060000000000000001 /* Terminal */ = {
+			isa = PBXGroup;
+			children = (
+				1A00000B0000000000000001 /* ShellResolver.swift */,
+				1A00000C0000000000000001 /* PTYProcess.swift */,
+				1A00000D0000000000000001 /* TerminalSession.swift */,
+				1A00000E0000000000000001 /* TerminalSessionState.swift */,
+				1A00000F0000000000000001 /* TerminalRenderingEngine.swift */,
+			);
+			path = Terminal;
+			sourceTree = "<group>";
+		};
+		1A0003070000000000000001 /* GhostNotchTests */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000110000000000000001 /* ShellResolverTests.swift */,
+				1A0000120000000000000001 /* TerminalSessionTests.swift */,
+			);
+			path = GhostNotchTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -110,6 +161,23 @@
 			productReference = 1A00000A0000000000000001 /* GhostNotch.app */;
 			productType = "com.apple.product-type.application";
 		};
+		1A0004020000000000000001 /* GhostNotchTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A0005030000000000000001 /* Build configuration list for PBXNativeTarget "GhostNotchTests" */;
+			buildPhases = (
+				1A0006030000000000000001 /* Sources */,
+				1A0002020000000000000001 /* Frameworks */,
+				1A0006040000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GhostNotchTests;
+			productName = GhostNotchTests;
+			productReference = 1A0000100000000000000001 /* GhostNotchTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -122,6 +190,10 @@
 				TargetAttributes = {
 					1A0004010000000000000001 = {
 						CreatedOnToolsVersion = 26.4.1;
+					};
+					1A0004020000000000000001 = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = 1A0004010000000000000001;
 					};
 				};
 			};
@@ -139,12 +211,20 @@
 			projectRoot = "";
 			targets = (
 				1A0004010000000000000001 /* GhostNotch */,
+				1A0004020000000000000001 /* GhostNotchTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		1A0006020000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1A0006040000000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -167,6 +247,25 @@
 				1A0001070000000000000001 /* IslandRootView.swift in Sources */,
 				1A0001080000000000000001 /* IslandIndicatorView.swift in Sources */,
 				1A0001090000000000000001 /* IslandExpandedView.swift in Sources */,
+				1A00010A0000000000000001 /* ShellResolver.swift in Sources */,
+				1A00010B0000000000000001 /* PTYProcess.swift in Sources */,
+				1A00010C0000000000000001 /* TerminalSession.swift in Sources */,
+				1A00010D0000000000000001 /* TerminalSessionState.swift in Sources */,
+				1A00010E0000000000000001 /* TerminalRenderingEngine.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1A0006030000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A00010F0000000000000001 /* ShellResolver.swift in Sources */,
+				1A0001100000000000000001 /* PTYProcess.swift in Sources */,
+				1A0001110000000000000001 /* TerminalSession.swift in Sources */,
+				1A0001120000000000000001 /* TerminalSessionState.swift in Sources */,
+				1A0001130000000000000001 /* TerminalRenderingEngine.swift in Sources */,
+				1A0001140000000000000001 /* ShellResolverTests.swift in Sources */,
+				1A0001150000000000000001 /* TerminalSessionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -328,6 +427,46 @@
 			};
 			name = Release;
 		};
+		1A0008050000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ghostnotch.local.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "";
+			};
+			name = Debug;
+		};
+		1A0008060000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ghostnotch.local.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -345,6 +484,15 @@
 			buildConfigurations = (
 				1A0008010000000000000001 /* Debug */,
 				1A0008020000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1A0005030000000000000001 /* Build configuration list for PBXNativeTarget "GhostNotchTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A0008050000000000000001 /* Debug */,
+				1A0008060000000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

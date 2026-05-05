@@ -7,6 +7,6 @@ The current product and implementation reference is:
 - [MVP specification](docs/ghostnotch_mvp_spec.md)
 - [MacBook notch geometry research](docs/notch_geometry_research.md)
 
-Use the root `GhostNotch.xcodeproj` as the canonical project. It builds the root `GhostNotch/` source tree, which contains the latest Stage 1 notch-integrated island shell.
+Use the root `GhostNotch.xcodeproj` as the canonical project. It builds the root `GhostNotch/` source tree, which contains the latest notch-integrated island shell and native PTY-backed terminal session module.
 
-The next implementation stage is terminal integration: replace the placeholder expanded view with one persistent default-shell session while preserving the current notch geometry and focus behavior.
+The next implementation stage is UI/input integration: replace the placeholder expanded view with the persistent default-shell session while preserving the current notch geometry and focus behavior.

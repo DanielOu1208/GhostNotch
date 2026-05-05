@@ -2,7 +2,7 @@
 
 ## Current Implementation Baseline
 
-GhostNotch is a native macOS Dynamic-Island-style terminal utility. The current codebase has completed the Stage 1 floating island shell and notch geometry work, but it does not yet contain a real terminal backend.
+GhostNotch is a native macOS Dynamic-Island-style terminal utility. The current codebase has completed the Stage 1 floating island shell, notch geometry work, and a native PTY-backed terminal session module. The expanded island UI still shows placeholder terminal content and is not yet wired to the real session.
 
 The canonical project is the root Xcode project:
 
@@ -16,6 +16,7 @@ That project builds source files from:
 GhostNotch/
 ├── AppDelegate.swift
 ├── GhostNotchApp.swift
+├── Terminal/
 ├── Window/
 └── UI/
 ```
@@ -36,7 +37,7 @@ Build a tiny floating terminal island for macOS that:
 
 The MVP should prioritize a reliable native shell, fast interaction, and polished notch integration over advanced terminal features.
 
-## Completed Stage 1 Scope
+## Completed Scope
 
 The current implementation already includes:
 
@@ -56,8 +57,10 @@ The current implementation already includes:
 - All-Spaces/full-screen auxiliary collection behavior.
 - Stage 1 placeholder terminal UI.
 - Debug notch fill color toggle via menu item and `Command+Option+G`.
+- Native `Terminal/` module with shell resolution and PTY session lifecycle.
+- `GhostNotchTests` target covering shell resolution and real PTY command output.
 
-The current terminal content is mock UI only. It displays placeholder commands and output; it does not run a shell or preserve a PTY session yet.
+The current expanded island content is still mock UI only. It displays placeholder commands and output; it does not yet render the real PTY session or route keyboard input into it.
 
 ## Current Implemented Architecture
 
@@ -65,6 +68,13 @@ The current terminal content is mock UI only. It displays placeholder commands a
 GhostNotch/
 ├── GhostNotchApp.swift
 ├── AppDelegate.swift
+│
+├── Terminal/
+│   ├── ShellResolver.swift
+│   ├── PTYProcess.swift
+│   ├── TerminalSession.swift
+│   ├── TerminalSessionState.swift
+│   └── TerminalRenderingEngine.swift
 │
 ├── Window/
 │   ├── IslandPanel.swift
@@ -182,6 +192,18 @@ Hover state shows:
 - Placeholder terminal lines.
 - Escape hint.
 
+### Terminal Backend
+
+`GhostNotch/Terminal/` provides the backend foundation for one persistent terminal session:
+
+- `ShellResolver` uses the `SHELL` environment variable when it points to an executable file and falls back to `/bin/zsh`.
+- `PTYProcess` opens a native pseudo-terminal, launches the resolved shell in the user's home directory, reads output, writes input, resizes the PTY, and cleans up the child process.
+- `TerminalSession` is the app-facing facade for start, stop, write, resize, and output state.
+- `TerminalSessionState` stores running status, recent output data, decoded output text, and the latest error.
+- `TerminalRenderingEngine` defines the future rendering/input boundary.
+
+The terminal backend is intentionally not owned by SwiftUI views. The next integration step should decide the lifecycle owner, likely the panel/controller layer, without moving PTY process details into `IslandPanelController`.
+
 ## MVP User Experience
 
 The MVP should behave as follows:
@@ -200,18 +222,18 @@ The shell session continues running in the background.
 
 ## MVP Scope Still To Implement
 
-### Terminal Session
+### Terminal UI Integration
 
-Add one persistent terminal session:
+Wire the implemented terminal backend into the expanded island:
 
-- Use the user's default shell.
-- Start in the user's home directory.
+- Create one `TerminalSession` for the app lifecycle.
 - Keep the shell process alive while collapsed.
-- Preserve terminal buffer while collapsed.
+- Preserve the terminal buffer while collapsed.
 - Reopen into the same session.
 - Resize the terminal backend when the island size changes.
+- Replace placeholder terminal lines with a terminal container view.
 
-Default shell resolution:
+Current implemented shell resolution:
 
 ```text
 1. Use SHELL environment variable if valid.
@@ -240,11 +262,11 @@ protocol TerminalRenderingEngine {
 }
 ```
 
-If Ghostty embedding is blocked or unstable, implement a temporary native PTY-backed fallback behind the same abstraction. Do not mix terminal process management into `IslandPanelController` or SwiftUI views.
+The native PTY-backed fallback is now implemented behind this abstraction. Ghostty rendering remains the preferred future rendering path, but the shell/session lifecycle no longer depends on Ghostty embedding.
 
-### Suggested Terminal Files
+### Terminal Files
 
-Add a `Terminal/` module under the canonical root source tree:
+Current `Terminal/` module under the canonical root source tree:
 
 ```text
 GhostNotch/Terminal/
@@ -252,8 +274,6 @@ GhostNotch/Terminal/
 ├── PTYProcess.swift
 ├── ShellResolver.swift
 ├── TerminalRenderingEngine.swift
-├── GhosttyBridge.swift
-├── GhosttyTerminalView.swift
 └── TerminalSessionState.swift
 ```
 
@@ -263,9 +283,9 @@ Responsibilities:
 - `PTYProcess`: pseudo-terminal process setup, read/write, resize, cleanup.
 - `ShellResolver`: default shell lookup and validation.
 - `TerminalRenderingEngine`: rendering/input abstraction.
-- `GhosttyBridge`: Ghostty-specific integration boundary.
-- `GhosttyTerminalView`: SwiftUI/AppKit wrapper for the terminal renderer.
 - `TerminalSessionState`: observable state needed by the UI.
+
+Future rendering work may add `GhosttyBridge` and `GhosttyTerminalView` when Ghostty embedding begins.
 
 ### Input and Focus
 
@@ -355,13 +375,12 @@ For non-notch displays, the island should still appear top center, using a conse
 ## Implementation Order From Current State
 
 1. Keep the root project/source tree as the implementation target.
-2. Add `Terminal/` with shell resolution and PTY session lifecycle.
-3. Replace `IslandExpandedView` placeholder content with a terminal container view.
-4. Wire terminal focus/input to expanded panel state.
-5. Preserve the shell session across collapse/expand.
-6. Add the product toggle hotkey separately from the debug color hotkey.
-7. Add runtime notch measurement and fallback display behavior.
-8. Remove or hide Stage 1 debug color controls before public MVP.
+2. Replace `IslandExpandedView` placeholder content with a terminal container view.
+3. Wire terminal focus/input to expanded panel state.
+4. Preserve the shell session across collapse/expand in the UI integration.
+5. Add the product toggle hotkey separately from the debug color hotkey.
+6. Add runtime notch measurement and fallback display behavior.
+7. Remove or hide Stage 1 debug color controls before public MVP.
 
 ## Acceptance Criteria
 
@@ -369,6 +388,7 @@ The MVP is complete when:
 
 - The app launches and shows the notch-attached collapsed island.
 - Hover expands to the preview state without stealing focus.
+- A native PTY-backed session can resolve the default shell, start, accept input, emit output, resize, and stop cleanly.
 - Click expands into a compact terminal and accepts keyboard input.
 - The user can run real commands in the default shell.
 - Escape collapses the island.
