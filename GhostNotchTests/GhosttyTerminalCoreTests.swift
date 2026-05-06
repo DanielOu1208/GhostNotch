@@ -81,4 +81,47 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertEqual(core.focusData(), Data("\u{1B}[I".utf8))
         XCTAssertEqual(core.blurData(), Data("\u{1B}[O".utf8))
     }
+
+    func testGhosttyKeyEncodingHandlesEscapeAndArrows() {
+        let core = GhosttyTerminalCore()
+
+        XCTAssertEqual(
+            core.encodeKey(TerminalKeyEvent(key: .escape, modifiers: [], utf8: nil, isRepeat: false)),
+            Data("\u{1B}".utf8)
+        )
+        XCTAssertEqual(
+            core.encodeKey(TerminalKeyEvent(key: .arrowUp, modifiers: [], utf8: nil, isRepeat: false)),
+            Data("\u{1B}[A".utf8)
+        )
+    }
+
+    func testGhosttyKeyEncodingUsesModifierAwareControlInput() {
+        let core = GhosttyTerminalCore()
+
+        XCTAssertEqual(
+            core.encodeKey(TerminalKeyEvent(key: .letter("c"), modifiers: [.control], utf8: "c", isRepeat: false)),
+            Data([0x03])
+        )
+    }
+
+    func testScrollbackViewportUsesGhosttyState() {
+        let core = GhosttyTerminalCore(columns: 12, rows: 3)
+        core.processOutput(Data((0..<12).map { "line\($0)" }.joined(separator: "\n").utf8))
+        let bottomText = core.snapshot.plainText
+
+        XCTAssertGreaterThan(core.snapshot.scrollbackRows, 0)
+
+        core.scrollViewport(deltaRows: -2)
+
+        XCTAssertNotEqual(core.snapshot.plainText, bottomText)
+        XCTAssertGreaterThan(core.snapshot.scrollbackRows, 0)
+    }
+
+    func testCursorStyleMetadataComesFromGhosttyRenderState() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+
+        core.processOutput(Data("\u{1B}[2 q".utf8))
+
+        XCTAssertEqual(core.snapshot.cursorStyle, .block)
+    }
 }

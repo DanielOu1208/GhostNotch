@@ -32,6 +32,19 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         writeToSession(input)
     }
 
+    func sendKeyEvent(_ event: TerminalKeyEvent) {
+        guard let input = core.encodeKey(event) else {
+            return
+        }
+
+        writeToSession(input)
+    }
+
+    func scrollViewport(deltaRows: Int) {
+        core.scrollViewport(deltaRows: deltaRows)
+        publishSnapshot()
+    }
+
     func resize(cols: Int, rows: Int) {
         core.resize(columns: cols, rows: rows)
         publishSnapshot()
@@ -48,13 +61,11 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
     }
 
     func focus() {
-        // The core exposes focus encoding for the eventual libghostty-vt bridge.
-        // GhostNotch still reserves Escape for collapse, so focus reporting is not forced on programs yet.
-        _ = core.focusData()
+        writeToSession(core.focusData())
     }
 
     func blur() {
-        _ = core.blurData()
+        writeToSession(core.blurData())
     }
 
     private func writeToSession(_ data: Data) {

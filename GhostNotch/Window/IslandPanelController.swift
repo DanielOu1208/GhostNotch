@@ -104,6 +104,14 @@ final class IslandPanelController: ObservableObject {
         terminalEngine.sendInput(data)
     }
 
+    func sendTerminalKeyEvent(_ event: TerminalKeyEvent) {
+        terminalEngine.sendKeyEvent(event)
+    }
+
+    func scrollTerminal(deltaRows: Int) {
+        terminalEngine.scrollViewport(deltaRows: deltaRows)
+    }
+
     func resizeTerminal(cols: Int, rows: Int) {
         terminalEngine.resize(cols: max(cols, 2), rows: max(rows, 1))
     }

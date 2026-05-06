@@ -18,6 +18,8 @@ struct IslandRootView: View {
                     snapshot: controller.terminalSnapshot,
                     focusRequestID: controller.terminalFocusRequestID,
                     onInput: controller.writeToTerminal,
+                    onKeyEvent: controller.sendTerminalKeyEvent,
+                    onScroll: controller.scrollTerminal,
                     onResize: controller.resizeTerminal,
                     onCollapse: controller.collapse
                 )

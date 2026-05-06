@@ -58,6 +58,13 @@ struct TerminalCell: Equatable {
     static let blank = TerminalCell(character: " ", style: .default)
 }
 
+enum TerminalCursorStyle: UInt8, Equatable {
+    case bar = 0
+    case block = 1
+    case underline = 2
+    case hollowBlock = 3
+}
+
 struct TerminalRenderSnapshot: Equatable {
     let columns: Int
     let rows: Int
@@ -65,7 +72,12 @@ struct TerminalRenderSnapshot: Equatable {
     let cursorColumn: Int
     let cursorRow: Int
     let cursorVisible: Bool
+    let cursorBlinking: Bool
+    let cursorStyle: TerminalCursorStyle
     let isAlternateScreen: Bool
+    let hasMouseTracking: Bool
+    let totalRows: Int
+    let scrollbackRows: Int
 
     static func empty(columns: Int = 80, rows: Int = 18) -> TerminalRenderSnapshot {
         TerminalRenderSnapshot(
@@ -75,7 +87,12 @@ struct TerminalRenderSnapshot: Equatable {
             cursorColumn: 0,
             cursorRow: 0,
             cursorVisible: true,
-            isAlternateScreen: false
+            cursorBlinking: false,
+            cursorStyle: .bar,
+            isAlternateScreen: false,
+            hasMouseTracking: false,
+            totalRows: rows,
+            scrollbackRows: 0
         )
     }
 
@@ -103,5 +120,50 @@ struct TerminalRenderSnapshot: Equatable {
             lines.append(line.trimmingCharacters(in: .whitespaces))
         }
         return lines.joined(separator: "\n")
+    }
+
+    func text(in selection: TerminalSelection) -> String {
+        let normalized = selection.normalized
+        var lines: [String] = []
+
+        for row in normalized.start.row...normalized.end.row {
+            let startColumn = row == normalized.start.row ? normalized.start.column : 0
+            let endColumn = row == normalized.end.row ? normalized.end.column : columns - 1
+            guard startColumn <= endColumn else {
+                continue
+            }
+
+            var line = ""
+            for column in startColumn...endColumn {
+                line += cell(row: row, column: column).character
+            }
+            lines.append(line.trimmingCharacters(in: .whitespaces))
+        }
+
+        return lines.joined(separator: "\n")
+    }
+}
+
+struct TerminalGridPoint: Equatable, Comparable {
+    let row: Int
+    let column: Int
+
+    static func < (lhs: TerminalGridPoint, rhs: TerminalGridPoint) -> Bool {
+        lhs.row == rhs.row ? lhs.column < rhs.column : lhs.row < rhs.row
+    }
+}
+
+struct TerminalSelection: Equatable {
+    let start: TerminalGridPoint
+    let end: TerminalGridPoint
+
+    var normalized: TerminalSelection {
+        start <= end ? self : TerminalSelection(start: end, end: start)
+    }
+
+    func contains(row: Int, column: Int) -> Bool {
+        let normalized = normalized
+        let point = TerminalGridPoint(row: row, column: column)
+        return point >= normalized.start && point <= normalized.end
     }
 }

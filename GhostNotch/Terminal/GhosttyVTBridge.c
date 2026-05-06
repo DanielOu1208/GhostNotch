@@ -9,6 +9,7 @@ struct GNVTTerminal {
     GhosttyRenderState renderState;
     GhosttyRenderStateRowIterator rowIterator;
     GhosttyRenderStateRowCells rowCells;
+    GhosttyKeyEncoder keyEncoder;
     GNVTWriteCallback writeCallback;
     void *userdata;
 };
@@ -70,6 +71,82 @@ static GNVTColor GNVTColorFromGhostty(GhosttyColorRgb color) {
     return result;
 }
 
+static GhosttyKey GNVTGhosttyKeyFromKey(GNVTKey key) {
+    switch (key) {
+        case GNVT_KEY_ESCAPE: return GHOSTTY_KEY_ESCAPE;
+        case GNVT_KEY_ENTER: return GHOSTTY_KEY_ENTER;
+        case GNVT_KEY_TAB: return GHOSTTY_KEY_TAB;
+        case GNVT_KEY_BACKSPACE: return GHOSTTY_KEY_BACKSPACE;
+        case GNVT_KEY_DELETE: return GHOSTTY_KEY_DELETE;
+        case GNVT_KEY_ARROW_UP: return GHOSTTY_KEY_ARROW_UP;
+        case GNVT_KEY_ARROW_DOWN: return GHOSTTY_KEY_ARROW_DOWN;
+        case GNVT_KEY_ARROW_LEFT: return GHOSTTY_KEY_ARROW_LEFT;
+        case GNVT_KEY_ARROW_RIGHT: return GHOSTTY_KEY_ARROW_RIGHT;
+        case GNVT_KEY_HOME: return GHOSTTY_KEY_HOME;
+        case GNVT_KEY_END: return GHOSTTY_KEY_END;
+        case GNVT_KEY_PAGE_UP: return GHOSTTY_KEY_PAGE_UP;
+        case GNVT_KEY_PAGE_DOWN: return GHOSTTY_KEY_PAGE_DOWN;
+        case GNVT_KEY_SPACE: return GHOSTTY_KEY_SPACE;
+        case GNVT_KEY_A: return GHOSTTY_KEY_A;
+        case GNVT_KEY_B: return GHOSTTY_KEY_B;
+        case GNVT_KEY_C: return GHOSTTY_KEY_C;
+        case GNVT_KEY_D: return GHOSTTY_KEY_D;
+        case GNVT_KEY_E: return GHOSTTY_KEY_E;
+        case GNVT_KEY_F: return GHOSTTY_KEY_F;
+        case GNVT_KEY_G: return GHOSTTY_KEY_G;
+        case GNVT_KEY_H: return GHOSTTY_KEY_H;
+        case GNVT_KEY_I: return GHOSTTY_KEY_I;
+        case GNVT_KEY_J: return GHOSTTY_KEY_J;
+        case GNVT_KEY_K: return GHOSTTY_KEY_K;
+        case GNVT_KEY_L: return GHOSTTY_KEY_L;
+        case GNVT_KEY_M: return GHOSTTY_KEY_M;
+        case GNVT_KEY_N: return GHOSTTY_KEY_N;
+        case GNVT_KEY_O: return GHOSTTY_KEY_O;
+        case GNVT_KEY_P: return GHOSTTY_KEY_P;
+        case GNVT_KEY_Q: return GHOSTTY_KEY_Q;
+        case GNVT_KEY_R: return GHOSTTY_KEY_R;
+        case GNVT_KEY_S: return GHOSTTY_KEY_S;
+        case GNVT_KEY_T: return GHOSTTY_KEY_T;
+        case GNVT_KEY_U: return GHOSTTY_KEY_U;
+        case GNVT_KEY_V: return GHOSTTY_KEY_V;
+        case GNVT_KEY_W: return GHOSTTY_KEY_W;
+        case GNVT_KEY_X: return GHOSTTY_KEY_X;
+        case GNVT_KEY_Y: return GHOSTTY_KEY_Y;
+        case GNVT_KEY_Z: return GHOSTTY_KEY_Z;
+        case GNVT_KEY_F1: return GHOSTTY_KEY_F1;
+        case GNVT_KEY_F2: return GHOSTTY_KEY_F2;
+        case GNVT_KEY_F3: return GHOSTTY_KEY_F3;
+        case GNVT_KEY_F4: return GHOSTTY_KEY_F4;
+        case GNVT_KEY_F5: return GHOSTTY_KEY_F5;
+        case GNVT_KEY_F6: return GHOSTTY_KEY_F6;
+        case GNVT_KEY_F7: return GHOSTTY_KEY_F7;
+        case GNVT_KEY_F8: return GHOSTTY_KEY_F8;
+        case GNVT_KEY_F9: return GHOSTTY_KEY_F9;
+        case GNVT_KEY_F10: return GHOSTTY_KEY_F10;
+        case GNVT_KEY_F11: return GHOSTTY_KEY_F11;
+        case GNVT_KEY_F12: return GHOSTTY_KEY_F12;
+        case GNVT_KEY_UNIDENTIFIED:
+        default: return GHOSTTY_KEY_UNIDENTIFIED;
+    }
+}
+
+static GhosttyMods GNVTGhosttyModsFromMods(uint16_t mods) {
+    GhosttyMods result = 0;
+    if ((mods & GNVT_MOD_SHIFT) != 0) {
+        result |= GHOSTTY_MODS_SHIFT;
+    }
+    if ((mods & GNVT_MOD_CONTROL) != 0) {
+        result |= GHOSTTY_MODS_CTRL;
+    }
+    if ((mods & GNVT_MOD_OPTION) != 0) {
+        result |= GHOSTTY_MODS_ALT;
+    }
+    if ((mods & GNVT_MOD_COMMAND) != 0) {
+        result |= GHOSTTY_MODS_SUPER;
+    }
+    return result;
+}
+
 static void GNVTWritePty(GhosttyTerminal terminal,
                          void *userdata,
                          const uint8_t *data,
@@ -121,7 +198,8 @@ GNVTTerminal *GNVTTerminalCreate(uint16_t columns,
     if (ghostty_terminal_new(NULL, &wrapper->terminal, options) != GHOSTTY_SUCCESS ||
         ghostty_render_state_new(NULL, &wrapper->renderState) != GHOSTTY_SUCCESS ||
         ghostty_render_state_row_iterator_new(NULL, &wrapper->rowIterator) != GHOSTTY_SUCCESS ||
-        ghostty_render_state_row_cells_new(NULL, &wrapper->rowCells) != GHOSTTY_SUCCESS) {
+        ghostty_render_state_row_cells_new(NULL, &wrapper->rowCells) != GHOSTTY_SUCCESS ||
+        ghostty_key_encoder_new(NULL, &wrapper->keyEncoder) != GHOSTTY_SUCCESS) {
         GNVTTerminalDestroy(wrapper);
         return NULL;
     }
@@ -141,6 +219,10 @@ GNVTTerminal *GNVTTerminalCreate(uint16_t columns,
     ghostty_terminal_set(wrapper->terminal, GHOSTTY_TERMINAL_OPT_USERDATA, wrapper);
     ghostty_terminal_set(wrapper->terminal, GHOSTTY_TERMINAL_OPT_WRITE_PTY, (const void *)GNVTWritePty);
     ghostty_terminal_set(wrapper->terminal, GHOSTTY_TERMINAL_OPT_DEVICE_ATTRIBUTES, (const void *)GNVTDeviceAttributes);
+    GhosttyOptionAsAlt optionAsAlt = GHOSTTY_OPTION_AS_ALT_TRUE;
+    ghostty_key_encoder_setopt(wrapper->keyEncoder,
+                               GHOSTTY_KEY_ENCODER_OPT_MACOS_OPTION_AS_ALT,
+                               &optionAsAlt);
 
     return wrapper;
 }
@@ -150,6 +232,7 @@ void GNVTTerminalDestroy(GNVTTerminal *terminal) {
         return;
     }
 
+    ghostty_key_encoder_free(terminal->keyEncoder);
     ghostty_render_state_row_cells_free(terminal->rowCells);
     ghostty_render_state_row_iterator_free(terminal->rowIterator);
     ghostty_render_state_free(terminal->renderState);
@@ -194,18 +277,28 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     uint16_t cursorColumn = 0;
     uint16_t cursorRow = 0;
     bool cursorVisible = true;
+    bool cursorBlinking = false;
     bool hasCursorPosition = false;
+    bool hasMouseTracking = false;
+    size_t totalRows = 0;
+    size_t scrollbackRows = 0;
+    GhosttyRenderStateCursorVisualStyle cursorStyle = GHOSTTY_RENDER_STATE_CURSOR_VISUAL_STYLE_BAR;
     GhosttyTerminalScreen activeScreen = GHOSTTY_TERMINAL_SCREEN_PRIMARY;
 
     ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_COLS, &columns);
     ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_ROWS, &rows);
     ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VISIBLE, &cursorVisible);
+    ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_BLINKING, &cursorBlinking);
+    ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VISUAL_STYLE, &cursorStyle);
     ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_HAS_VALUE, &hasCursorPosition);
     if (hasCursorPosition) {
         ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_X, &cursorColumn);
         ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_Y, &cursorRow);
     }
     ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_ACTIVE_SCREEN, &activeScreen);
+    ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_MOUSE_TRACKING, &hasMouseTracking);
+    ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_TOTAL_ROWS, &totalRows);
+    ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_SCROLLBACK_ROWS, &scrollbackRows);
 
     size_t required = (size_t)columns * (size_t)rows;
     if (cellCount < required) {
@@ -286,8 +379,77 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     meta->cursorColumn = cursorColumn;
     meta->cursorRow = cursorRow;
     meta->cursorVisible = cursorVisible && hasCursorPosition;
+    meta->cursorBlinking = cursorBlinking;
+    meta->cursorStyle = (uint8_t)cursorStyle;
     meta->isAlternateScreen = activeScreen == GHOSTTY_TERMINAL_SCREEN_ALTERNATE;
+    meta->hasMouseTracking = hasMouseTracking;
+    meta->totalRows = totalRows;
+    meta->scrollbackRows = scrollbackRows;
     return true;
+}
+
+void GNVTTerminalScrollViewport(GNVTTerminal *terminal, intptr_t deltaRows) {
+    if (terminal == NULL || terminal->terminal == NULL || deltaRows == 0) {
+        return;
+    }
+
+    GhosttyTerminalScrollViewport scroll = {
+        .tag = GHOSTTY_SCROLL_VIEWPORT_DELTA,
+        .value = {.delta = deltaRows},
+    };
+    ghostty_terminal_scroll_viewport(terminal->terminal, scroll);
+}
+
+void GNVTTerminalScrollToBottom(GNVTTerminal *terminal) {
+    if (terminal == NULL || terminal->terminal == NULL) {
+        return;
+    }
+
+    GhosttyTerminalScrollViewport scroll = {
+        .tag = GHOSTTY_SCROLL_VIEWPORT_BOTTOM,
+        .value = {.delta = 0},
+    };
+    ghostty_terminal_scroll_viewport(terminal->terminal, scroll);
+}
+
+bool GNVTTerminalEncodeKey(GNVTTerminal *terminal,
+                           GNVTKey key,
+                           uint16_t mods,
+                           const char *utf8,
+                           size_t utf8Len,
+                           bool isRepeat,
+                           char *output,
+                           size_t outputLen,
+                           size_t *written) {
+    if (terminal == NULL || terminal->terminal == NULL || terminal->keyEncoder == NULL || written == NULL) {
+        return false;
+    }
+
+    GhosttyKeyEvent event = NULL;
+    if (ghostty_key_event_new(NULL, &event) != GHOSTTY_SUCCESS) {
+        return false;
+    }
+
+    ghostty_key_event_set_action(event, isRepeat ? GHOSTTY_KEY_ACTION_REPEAT : GHOSTTY_KEY_ACTION_PRESS);
+    ghostty_key_event_set_key(event, GNVTGhosttyKeyFromKey(key));
+    ghostty_key_event_set_mods(event, GNVTGhosttyModsFromMods(mods));
+    if (utf8 != NULL && utf8Len > 0) {
+        ghostty_key_event_set_utf8(event, utf8, utf8Len);
+    }
+
+    ghostty_key_encoder_setopt_from_terminal(terminal->keyEncoder, terminal->terminal);
+    GhosttyOptionAsAlt optionAsAlt = GHOSTTY_OPTION_AS_ALT_TRUE;
+    ghostty_key_encoder_setopt(terminal->keyEncoder,
+                               GHOSTTY_KEY_ENCODER_OPT_MACOS_OPTION_AS_ALT,
+                               &optionAsAlt);
+
+    GhosttyResult result = ghostty_key_encoder_encode(terminal->keyEncoder,
+                                                      event,
+                                                      output,
+                                                      outputLen,
+                                                      written);
+    ghostty_key_event_free(event);
+    return result == GHOSTTY_SUCCESS;
 }
 
 bool GNVTPasteEncode(char *data,

@@ -7,6 +7,8 @@ struct IslandExpandedView: View {
     let snapshot: TerminalRenderSnapshot
     let focusRequestID: Int
     let onInput: (Data) -> Void
+    let onKeyEvent: (TerminalKeyEvent) -> Void
+    let onScroll: (Int) -> Void
     let onResize: (Int, Int) -> Void
     let onCollapse: () -> Void
 
@@ -23,6 +25,8 @@ struct IslandExpandedView: View {
                 snapshot: terminalSnapshot,
                 focusRequestID: focusRequestID,
                 onInput: onInput,
+                onKeyEvent: onKeyEvent,
+                onScroll: onScroll,
                 onResize: onResize
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)

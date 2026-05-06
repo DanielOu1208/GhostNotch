@@ -2,7 +2,7 @@
 
 ## Current Implementation Baseline
 
-GhostNotch is a native macOS Dynamic-Island-style terminal utility. The current codebase has completed the Stage 1 floating island shell, notch geometry work, a native PTY-backed terminal session module, and grid-based expanded terminal rendering. The expanded island now starts a real default-shell session on first open, renders PTY output through a Ghostty-style VT boundary, accepts keyboard input and paste, resizes the PTY from the terminal surface, and preserves the session while collapsed.
+GhostNotch is a native macOS Dynamic-Island-style terminal utility. The current codebase has completed the Stage 1 floating island shell, notch geometry work, a native PTY-backed terminal session module, and Ghostty-backed grid terminal rendering. The expanded island now starts a real default-shell session on first open, renders PTY output through a vendored `libghostty-vt` artifact, accepts keyboard input and paste, resizes the PTY from the terminal surface, and preserves the session while collapsed. It should be treated as a Ghostty-backed notch terminal surface, not a full Ghostty-equivalent renderer or shell environment yet.
 
 The canonical project is the root Xcode project:
 
@@ -32,10 +32,10 @@ Build a tiny floating terminal island for macOS that:
 - Expands on hover for a preview state.
 - Expands on click into a compact terminal panel with keyboard focus.
 - Keeps one terminal session alive while collapsed.
-- Uses Ghostty's terminal engine through `libghostty` / `ghosttylib` if embedding proves feasible.
+- Uses Ghostty's VT engine through a vendored `libghostty-vt` artifact while GhostNotch owns the AppKit renderer, PTY lifecycle, and notch UI.
 - Feels like a notch-native utility, not a normal terminal window.
 
-The MVP should prioritize a reliable native shell, fast interaction, and polished notch integration over advanced terminal features.
+The MVP should prioritize a reliable native shell, fast interaction, polished notch integration, and the Ghostty parity work that most affects daily terminal use: rendering fidelity and shell integration.
 
 ## Completed Scope
 
@@ -51,15 +51,17 @@ The current implementation already includes:
 - Collapsed, hover, and expanded visual states.
 - Hover-driven preview expansion.
 - Click-to-expand behavior.
-- Escape-to-collapse behavior.
+- Escape forwarding when terminal grid is focused, with non-terminal Escape collapse fallback.
 - Local and global outside-click collapse.
 - Status-bar-level panel placement.
 - All-Spaces/full-screen auxiliary collection behavior.
 - Expanded terminal UI backed by the real PTY session.
 - First-open terminal session lifecycle owned by the panel/controller layer.
-- Grid-based VT output rendering in the expanded island.
-- ANSI color/style, cursor movement, clear-screen, alternate-screen, resize, focus/blur encoding, paste encoding, and device-query write-back coverage in the terminal core tests.
-- Keyboard input routing for text, Return, Tab, Backspace/Delete, and paste.
+- Ghostty-backed grid VT output rendering in the expanded island.
+- ANSI color/style, cursor movement, cursor visual style, clear-screen, alternate-screen, resize, focus/blur encoding, paste encoding, Ghostty-backed key encoding, scrollback viewport movement, and device-query write-back coverage in the terminal core tests.
+- Keyboard input routing for text, Ghostty-encoded special keys/modifiers, Escape forwarding when the terminal grid is focused, and paste.
+- Primary-screen scrollback via `libghostty-vt` viewport APIs.
+- App-level terminal text selection and copy from the grid surface.
 - PTY resize propagation from the expanded terminal surface.
 - Debug notch fill color toggle via menu item and `Command+Option+G`.
 - Native `Terminal/` module with shell resolution and PTY session lifecycle.
@@ -67,8 +69,18 @@ The current implementation already includes:
 - Product toggle hotkey (`Option+Space`) for expand/collapse.
 - Header sits flush at top of expanded panel (38pt spacer removed).
 - Enlarged close button with 14pt icon and 12/6 padding for easier clicking.
+- Pinned Ghostty VT vendor boundary under `vendor/ghostty-vt/`, including `GhosttyVT.xcframework`, copied public headers, source/version metadata, and a reproducible build script.
+- C bridge layer that isolates unstable `libghostty-vt` symbols from Swift app code.
 
-The current expanded island terminal is intentionally a lean Ghostty-compatible rendering path. It uses a Swift compatibility core behind the `TerminalRenderingEngine` boundary because this checkout does not yet vendor a built `libghostty-vt` artifact. The remaining Ghostty work is to replace the compatibility core with the real library while keeping the same app-facing renderer and PTY ownership.
+The current expanded island terminal is intentionally a lean Ghostty-backed rendering path. `GhosttyTerminalCore` now calls a GhostNotch-owned C bridge over `libghostty-vt` for VT parsing, terminal state, render snapshots, paste/focus encoding, and PTY write-back callbacks. SwiftUI still does not own terminal lifecycle; the panel/controller layer owns the persistent PTY session and renderer.
+
+Current Ghostty parity limits:
+
+- GhostNotch uses Ghostty's VT state and key/paste/focus encoders, but not Ghostty's full Metal/CoreText renderer.
+- The current AppKit grid draws one visible scalar per cell and does not yet match Ghostty's ligature, grapheme cluster, emoji, wide-character, or font-feature behavior.
+- Kitty graphics/images, synchronized rendering presentation polish, hyperlinks, semantic selection, and richer clipboard/control-sequence UX are not surfaced yet.
+- The launched shell currently uses a conservative `TERM=xterm-256color` environment rather than a Ghostty-style `xterm-ghostty` terminfo and shell integration setup.
+- Ghostty shell integration features such as working-directory reporting, shell-aware SSH behavior, `TERM_PROGRAM`/`COLORTERM` metadata, and resource-directory based shell scripts are not installed or advertised yet.
 
 ## Current Implemented Architecture
 
@@ -85,7 +97,9 @@ GhostNotch/
 │   ├── TerminalRenderingEngine.swift
 │   ├── TerminalRenderModel.swift
 │   ├── GhosttyTerminalCore.swift
-│   └── GhosttyTerminalEngine.swift
+│   ├── GhosttyTerminalEngine.swift
+│   ├── GhosttyVTBridge.h
+│   └── GhosttyVTBridge.c
 │
 ├── Window/
 │   ├── IslandPanel.swift
@@ -119,7 +133,7 @@ Current focus behavior:
 
 - Collapsed and hover states use `.nonactivatingPanel`.
 - Expanded state removes `.nonactivatingPanel`, activates the app, and makes the panel key.
-- Escape key is intercepted in `IslandPanel.keyDown` and routed to collapse.
+- Escape is routed to the focused terminal grid; if the terminal grid is not focused, `IslandPanel.keyDown` can still route Escape to collapse.
 
 `IslandPanelController` owns:
 
@@ -213,11 +227,11 @@ The embedded terminal surface currently:
 - Displays a `TerminalRenderSnapshot` produced by the rendering engine from PTY output bytes.
 - Shows startup and error states.
 - Accepts ordinary text input.
-- Maps Return to carriage return.
-- Maps Tab to tab.
-- Maps Backspace/Delete to `0x7F`.
+- Encodes special keys, modifiers, and Escape through `libghostty-vt`.
 - Supports paste from the system pasteboard.
-- Draws foreground/background colors, bold/italic/inverse style, and cursor state.
+- Supports primary-screen scrollback using Ghostty viewport state.
+- Supports app-level text selection and `Command+C` copy from the grid surface.
+- Draws foreground/background colors, bold/italic/inverse style, and cursor state/style.
 - Estimates terminal columns and rows from the visible monospaced surface and resizes the PTY.
 
 ### Terminal Backend
@@ -228,8 +242,10 @@ The embedded terminal surface currently:
 - `PTYProcess` opens a native pseudo-terminal, launches the resolved shell in the user's home directory, reads output, writes input, resizes the PTY, and cleans up the child process.
 - `TerminalSession` is the app-facing facade for start, stop, write, resize, and output state.
 - `TerminalSessionState` stores running status, recent output data, decoded output text, and the latest error.
-- `TerminalInputMapping` maps AppKit text/key events into the bytes currently sent to the PTY.
-- `GhosttyTerminalCore` is the compatibility implementation of the planned `libghostty-vt` boundary for VT parsing, terminal state, snapshots, paste/focus encoding, and PTY write-back callbacks.
+- `TerminalInputMapping` provides paste and legacy text mapping helpers.
+- `TerminalKeyEvent` is the app-facing keyboard event model for Ghostty-backed key encoding.
+- `GhosttyVTBridge` is the C boundary over the vendored `libghostty-vt` API. It creates and resizes Ghostty terminals, writes PTY output into Ghostty's VT parser, snapshots visible cells and cursor/scroll metadata, exposes paste/focus/key encoding, maps default colors, scrolls the viewport, and forwards Ghostty write-back effects to the PTY path.
+- `GhosttyTerminalCore` is the Swift app-facing wrapper around `GhosttyVTBridge` for VT parsing, terminal state, snapshots, paste/focus/key encoding, scrollback viewport control, and PTY write-back callbacks.
 - `GhosttyTerminalEngine` is the app-facing renderer engine that consumes PTY output bytes, updates render snapshots, forwards input, and coordinates terminal resize.
 - `TerminalRenderingEngine` defines the rendering/input boundary.
 
@@ -246,7 +262,7 @@ Island grows into a preview without taking keyboard focus.
 User clicks the island.
 Island expands into a compact terminal and accepts keyboard input.
 User runs quick shell commands.
-User presses Escape or clicks elsewhere.
+User presses Option+Space, clicks the close button, or clicks elsewhere.
 Island collapses back into the notch extension.
 The shell session continues running in the background.
 ```
@@ -255,13 +271,15 @@ The shell session continues running in the background.
 
 ### Terminal Rendering Improvements
 
-The first grid-based terminal rendering integration is complete. Future rendering work should replace the Swift compatibility core with the real Ghostty VT library without moving shell lifecycle into SwiftUI views:
+The first Ghostty-backed grid terminal rendering integration is complete. The app now vendors and links a real `libghostty-vt` artifact without moving shell lifecycle into SwiftUI views:
 
-- Build and vendor a pinned `libghostty-vt` artifact under `vendor/ghostty-vt/`.
-- Replace `GhosttyTerminalCore` internals with direct `libghostty-vt` calls.
-- Preserve the existing `TerminalSession` lifecycle and `TerminalRenderingEngine` boundary.
-- Keep the shell process alive while collapsed.
-- Keep Escape as collapse behavior until a deliberate terminal-program Escape-forwarding design exists.
+- `vendor/ghostty-vt/GhosttyVT.xcframework` is linked by the app and test targets.
+- `scripts/build-ghostty-vt.sh` rebuilds the vendor artifact from the pinned source boundary recorded in `vendor/ghostty-vt/VERSION`.
+- `GhosttyVTBridge` contains the direct `libghostty-vt` calls so upstream C API churn stays isolated.
+- `GhosttyTerminalCore` remains the stable Swift wrapper consumed by `GhosttyTerminalEngine`.
+- The existing `TerminalSession` lifecycle and `TerminalRenderingEngine` boundary are preserved.
+- The shell process stays alive while collapsed.
+- Escape is forwarded to the terminal while the terminal grid is focused; collapse remains available through `Option+Space`, the close button, and outside click.
 
 Current implemented shell resolution:
 
@@ -275,10 +293,10 @@ Current implemented shell resolution:
 Preferred rendering path:
 
 ```text
-libghostty / ghosttylib
+libghostty-vt
 ```
 
-The terminal UI should be abstracted so the app shell does not depend directly on Ghostty internals.
+The terminal UI is abstracted so the app shell does not depend directly on Ghostty internals.
 
 Recommended abstraction:
 
@@ -290,13 +308,39 @@ protocol TerminalRenderingEngine {
     func start(session: TerminalSession)
     func processOutput(_ data: Data)
     func sendInput(_ input: Data)
+    func sendKeyEvent(_ event: TerminalKeyEvent)
+    func scrollViewport(deltaRows: Int)
     func resize(cols: Int, rows: Int)
     func focus()
     func blur()
 }
 ```
 
-The native PTY-backed fallback and Ghostty-compatible renderer are now implemented behind this abstraction. The real `libghostty-vt` bridge remains the preferred next step, but the shell/session lifecycle no longer depends on Ghostty embedding.
+The native PTY-backed session and Ghostty-backed renderer are implemented behind this abstraction. GhostNotch owns the AppKit grid renderer; Ghostty owns VT parsing, terminal state, render snapshots, paste/focus encoding, and terminal query write-back behavior.
+
+Rendering fidelity work required before the terminal feels close to Ghostty:
+
+- Replace one-codepoint cell drawing with render data that preserves full grapheme clusters and display width.
+- Handle emoji, combining marks, and wide characters without cursor drift or selection/copy corruption.
+- Decide whether GhostNotch should keep an AppKit/CoreText grid renderer or move toward a fuller `libghostty` renderer path when that API is practical for embedding.
+- Add font metrics, line height, baseline, bold/italic, and fallback-font handling that behaves predictably across common developer fonts.
+- Add ligature and OpenType feature handling if the renderer remains GhostNotch-owned.
+- Surface hyperlink and image/graphics protocol support only after the text renderer is correct enough not to distort normal shell/editor usage.
+- Add renderer acceptance cases for `vim`/`nvim`, `less`, `top`, emoji/wide-character output, powerline prompts, and ANSI color/style stress output.
+
+### Shell Integration
+
+The current shell launch path resolves the user's default shell and starts it in a PTY with a conservative terminal environment. That is enough for basic commands, but it is not yet Ghostty-like.
+
+Shell integration work required before the terminal feels close to Ghostty:
+
+- Decide whether the MVP should advertise `TERM=xterm-ghostty` with bundled terminfo, or keep `xterm-256color` until terminfo install/copy behavior is implemented.
+- Set terminal metadata such as `TERM_PROGRAM=GhostNotch`, `COLORTERM=truecolor`, and a version variable consistently.
+- Add a bundled GhostNotch/Ghostty-compatible shell integration resource directory and expose it through an environment variable.
+- Support opt-in sourcing snippets for zsh, bash, fish, and other shells without mutating user dotfiles silently.
+- Add working-directory reporting so future terminal sessions, commands, or UI affordances can inherit the current shell directory.
+- Define SSH behavior for hosts without `xterm-ghostty` terminfo, including whether to downgrade `TERM`, copy terminfo, or document the limitation.
+- Add acceptance tests or manual checks for login shells, non-login shells, shell switches, SSH, and common prompt frameworks.
 
 ### Terminal Files
 
@@ -311,6 +355,8 @@ GhostNotch/Terminal/
 ├── TerminalRenderModel.swift
 ├── GhosttyTerminalCore.swift
 ├── GhosttyTerminalEngine.swift
+├── GhosttyVTBridge.h
+├── GhosttyVTBridge.c
 └── TerminalSessionState.swift
 ```
 
@@ -321,12 +367,14 @@ Responsibilities:
 - `ShellResolver`: default shell lookup and validation.
 - `TerminalRenderingEngine`: rendering/input abstraction.
 - `TerminalRenderModel`: snapshot, cell, style, and color data consumed by the grid renderer.
-- `GhosttyTerminalCore`: current compatibility VT core and future C bridge boundary.
+- `GhosttyVTBridge`: direct C bridge over `libghostty-vt`.
+- `GhosttyTerminalCore`: Swift wrapper over the C bridge.
 - `GhosttyTerminalEngine`: renderer/session coordination.
 - `TerminalSessionState`: observable state needed by the UI.
-- `TerminalInputMapping`: text/key to PTY byte mapping, currently colocated in `TerminalSession.swift`.
+- `TerminalInputMapping`: paste and legacy text mapping helpers, currently colocated in `TerminalSession.swift`.
+- `TerminalKeyEvent`: app-facing keyboard event model used by the Ghostty key encoder path.
 
-Future rendering work should swap `GhosttyTerminalCore` internals for the real `libghostty-vt` API rather than changing SwiftUI or panel ownership.
+Future rendering work should extend the existing bridge/wrapper boundary rather than changing SwiftUI or panel ownership.
 
 ### Input and Focus
 
@@ -339,29 +387,22 @@ The current panel focus behavior should stay:
 Current renderer focus behavior:
 
 - Focus/blur calls are routed through `TerminalRenderingEngine`.
-- Escape continues to collapse the island; forwarding Escape into terminal programs remains a future deliberate policy decision.
+- Escape is forwarded to terminal programs when the terminal grid is focused.
 
 Current implemented input behavior:
 
 - Text input is routed into the PTY.
 - Paste is routed into the PTY with newline normalization.
-- Return is sent as carriage return.
-- Tab is sent as tab.
-- Backspace/Delete are sent as `0x7F`.
+- Return, Tab, Backspace/Delete, arrows, Home/End, Page Up/Page Down, function keys, Escape, and modifier-aware letter input are encoded through `libghostty-vt`.
 - Command-key combinations are left to AppKit.
-- Escape is still intercepted by `IslandPanel.keyDown` and collapses the island.
+- `Command+C` copies terminal grid selection when present.
+- `Command+V` pastes through the existing paste path.
 
-Escape should continue to collapse the island until terminal-program Escape forwarding is designed deliberately.
+Collapse remains available through `Option+Space`, the close button, and outside click.
 
 ### Product Hotkey
 
-The current `Command+Option+G` hotkey is only for toggling the notch test fill color.
-
-The MVP terminal toggle hotkey is still not implemented. Recommended default:
-
-```text
-Option+Space
-```
+`Option+Space` is the implemented MVP terminal toggle hotkey.
 
 Expected behavior:
 
@@ -370,7 +411,7 @@ Collapsed or hover -> expand and focus terminal.
 Expanded -> collapse.
 ```
 
-When adding this, keep it separate from the debug color hotkey. The debug hotkey can be removed before a public MVP build.
+The current `Command+Option+G` hotkey is only for toggling the notch test fill color. It should stay separate from the product hotkey and can be removed before a public MVP build.
 
 ## Geometry Requirements
 
@@ -417,6 +458,8 @@ For non-notch displays, the island should still appear top center, using a conse
 - App Store distribution.
 - Full terminal replacement behavior.
 - Advanced theming.
+- Full Ghostty renderer parity.
+- Full Ghostty shell integration parity.
 - Multi-monitor perfection.
 - Perfect fullscreen behavior.
 
@@ -424,10 +467,12 @@ For non-notch displays, the island should still appear top center, using a conse
 
 1. Keep the root project/source tree as the implementation target.
 2. ~~Add the product toggle hotkey separately from the debug color hotkey.~~ **Done** — `Option+Space` implemented.
-3. ~~Improve terminal rendering beyond raw PTY text or begin Ghostty-backed rendering integration.~~ **Done** — grid-based Ghostty-compatible VT rendering boundary implemented; real `libghostty-vt` artifact still needs to be vendored.
-4. Add runtime notch measurement and fallback display behavior.
-5. Remove or hide Stage 1 debug color controls before public MVP.
-6. Revisit Escape forwarding once terminal programs beyond simple shell commands are in scope.
+3. ~~Improve terminal rendering beyond raw PTY text or begin Ghostty-backed rendering integration.~~ **Done** — grid-based rendering now uses a vendored `libghostty-vt` artifact through `GhosttyVTBridge` and `GhosttyTerminalCore`.
+4. Improve rendering fidelity: grapheme clusters, wide characters, emoji/fallback fonts, font metrics, line height, and renderer acceptance cases for editor/TUI output.
+5. Add shell integration basics: terminal metadata environment, terminfo strategy, shell integration resource path, and manual setup guidance for common shells.
+6. Add runtime notch measurement and fallback display behavior.
+7. Remove or hide Stage 1 debug color controls before public MVP.
+8. Continue hardening mouse reporting and formatter-backed selection once terminal programs beyond simple shell commands are in scope.
 
 ## Acceptance Criteria
 
@@ -438,13 +483,16 @@ The MVP is complete when:
 - A native PTY-backed session can resolve the default shell, start, accept input, emit output, resize, and stop cleanly.
 - Click expands into a compact terminal and accepts keyboard input.
 - The user can run real commands in the default shell.
-- Escape collapses the island.
+- Escape is forwarded to focused terminal programs.
+- `Option+Space`, the close button, or clicking outside collapses the island.
 - Clicking outside collapses the island.
 - Collapsing does not kill the shell session.
 - Reopening shows the same shell session and output buffer.
 - The island remains top-flush and visually aligned with the notch.
 - The app has a product hotkey for toggling the terminal.
 - The implementation uses the root `GhostNotch.xcodeproj` and root `GhostNotch/` source tree.
+- Text rendering handles grapheme clusters, wide characters, emoji/fallback fonts, and common developer-font metrics well enough for shell/editor use.
+- The shell environment exposes a deliberate GhostNotch terminal identity, truecolor capability, and a documented terminfo/shell-integration strategy.
 
 Currently satisfied from the baseline above:
 
@@ -453,17 +501,23 @@ Currently satisfied from the baseline above:
 - First-pass real PTY shell session startup.
 - Basic terminal input, paste, output, and resize.
 - Session preservation across collapse/reopen.
-- Escape and outside-click collapse.
+- Escape forwarding while terminal grid is focused; outside-click collapse.
 - Product toggle hotkey (`Option+Space`).
 - Header flush at top of expanded panel (38pt spacer removed).
 - Enlarged close button.
 - Grid-based terminal rendering with ANSI style, cursor addressing, alternate-screen, resize, paste encoding, focus/blur encoding, and device-query write-back coverage.
+- Ghostty-backed key encoding for special keys/modifiers and primary-screen scrollback.
+- App-level terminal grid text selection/copy.
+- Vendored `libghostty-vt` artifact linked into the app and tests.
+- Reproducible Ghostty VT vendor build script and version metadata.
 
 Still required for full MVP:
 
 - Runtime notch measurement/fallback behavior.
 - Public-build cleanup of the debug notch color control.
-- Build and vendor a pinned `libghostty-vt` artifact, then replace the Swift compatibility core internals with direct Ghostty C API calls.
+- Rendering fidelity work for grapheme clusters, wide characters, emoji/fallback fonts, font metrics, and editor/TUI stress cases.
+- Shell integration basics: terminal metadata environment, terminfo policy, shell integration resource path, and common-shell setup guidance.
+- Manual acceptance pass for shell/editor commands against the Ghostty-backed renderer: `ls`, ANSI color commands, `top`, `vim` or `nano`, resize-sensitive commands, collapse/reopen session persistence, and focused-terminal Escape forwarding.
 
 ## Documentation References
 

@@ -15,7 +15,7 @@ final class IslandPanel: NSPanel {
     }
 
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 {
+        if event.keyCode == 53, !(firstResponder is TerminalGridView) {
             onEscape?()
             return
         }
