@@ -5,7 +5,7 @@ struct IslandMetrics {
     static let physicalNotchReferenceWidth: CGFloat = 220
     static let collapsedSize = NSSize(width: 280, height: 38)
     static let hoverSize = NSSize(width: 420, height: 72)
-    static let expandedSize = NSSize(width: 680, height: 320)
+    static let expandedSize = NSSize(width: 748, height: 400)
 }
 
 enum IslandState: Equatable {

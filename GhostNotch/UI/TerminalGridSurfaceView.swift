@@ -57,8 +57,8 @@ final class TerminalGridView: NSView {
     var onScroll: ((Int) -> Void)?
     var onResize: ((Int, Int) -> Void)?
 
-    private let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-    private let boldFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold)
+    private let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+    private let boldFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .semibold)
     private var lastReportedSize: NSSize = .zero
     private var selection: TerminalSelection?
 
