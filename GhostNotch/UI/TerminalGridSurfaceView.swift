@@ -232,6 +232,12 @@ final class TerminalGridView: NSView {
             width: cellSize.width,
             height: cellSize.height
         )
+        let textRect = NSRect(
+            x: rect.minX,
+            y: rect.minY,
+            width: cell.widthRole == .wideHead && column + 1 < snapshot.columns ? cellSize.width * 2 : cellSize.width,
+            height: cellSize.height
+        )
 
         let style = cell.style
         let foreground = style.isInverse ? style.background : style.foreground
@@ -245,7 +251,8 @@ final class TerminalGridView: NSView {
             rect.fill()
         }
 
-        guard !cell.character.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard !cell.widthRole.isSpacer,
+              !cell.character.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }
 
@@ -258,7 +265,7 @@ final class TerminalGridView: NSView {
             attributes[.obliqueness] = 0.18
         }
 
-        (cell.character as NSString).draw(at: NSPoint(x: rect.minX, y: rect.minY), withAttributes: attributes)
+        (cell.character as NSString).draw(in: textRect, withAttributes: attributes)
     }
 
     private func drawCursor(cellSize: NSSize) {

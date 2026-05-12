@@ -16,13 +16,22 @@ typedef struct {
 } GNVTColor;
 
 typedef struct {
-    uint32_t codepoint;
+    size_t graphemeStart;
+    uint32_t graphemeLength;
+    uint8_t widthRole;
     GNVTColor foreground;
     GNVTColor background;
     bool bold;
     bool italic;
     bool inverse;
 } GNVTCell;
+
+typedef enum {
+    GNVT_CELL_WIDTH_NARROW = 0,
+    GNVT_CELL_WIDTH_WIDE_HEAD = 1,
+    GNVT_CELL_WIDTH_WIDE_SPACER_TAIL = 2,
+    GNVT_CELL_WIDTH_WIDE_SPACER_HEAD = 3,
+} GNVTCellWidthRole;
 
 typedef struct {
     uint16_t columns;
@@ -115,6 +124,9 @@ void GNVTTerminalResize(GNVTTerminal *terminal,
 bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
                           GNVTCell *cells,
                           size_t cellCount,
+                          uint32_t *graphemes,
+                          size_t graphemeCapacity,
+                          size_t *requiredGraphemeCount,
                           GNVTSnapshotMeta *meta);
 void GNVTTerminalScrollViewport(GNVTTerminal *terminal, intptr_t deltaRows);
 void GNVTTerminalScrollToBottom(GNVTTerminal *terminal);

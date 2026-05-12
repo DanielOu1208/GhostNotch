@@ -32,6 +32,55 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertEqual(snapshot.cell(row: 0, column: 4).character, " ")
     }
 
+    func testCombiningGraphemeClustersArePreserved() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+        let grapheme = "e\u{0301}"
+
+        core.processOutput(Data("\u{1B}[?2027h\(grapheme)x".utf8))
+
+        let snapshot = core.snapshot
+        XCTAssertEqual(snapshot.cell(row: 0, column: 0).character, grapheme)
+        XCTAssertEqual(snapshot.cell(row: 0, column: 1).character, "x")
+        XCTAssertTrue(snapshot.plainText.contains("\(grapheme)x"))
+    }
+
+    func testEmojiGraphemesArePreservedInSnapshotText() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+
+        core.processOutput(Data("🙂x".utf8))
+
+        let snapshot = core.snapshot
+        XCTAssertEqual(snapshot.cell(row: 0, column: 0).character, "🙂")
+        XCTAssertTrue(snapshot.plainText.contains("🙂x"))
+    }
+
+    func testWideCharactersUseSpacerCellsWithoutDuplicatingCopiedText() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+
+        core.processOutput(Data("界x".utf8))
+
+        let snapshot = core.snapshot
+        XCTAssertEqual(snapshot.cell(row: 0, column: 0).character, "界")
+        XCTAssertEqual(snapshot.cell(row: 0, column: 0).widthRole, .wideHead)
+        XCTAssertEqual(snapshot.cell(row: 0, column: 1).widthRole, .wideSpacerTail)
+        XCTAssertEqual(snapshot.cell(row: 0, column: 2).character, "x")
+        XCTAssertEqual(
+            snapshot.text(in: TerminalSelection(start: TerminalGridPoint(row: 0, column: 0), end: TerminalGridPoint(row: 0, column: 2))),
+            "界x"
+        )
+    }
+
+    func testPrivateUsePromptGlyphsFlowThrough() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+        let glyph = "\u{E0B0}"
+
+        core.processOutput(Data("\(glyph)x".utf8))
+
+        let snapshot = core.snapshot
+        XCTAssertEqual(snapshot.cell(row: 0, column: 0).character, glyph)
+        XCTAssertTrue(snapshot.plainText.contains("\(glyph)x"))
+    }
+
     func testAlternateScreenEnterAndExitPreservesPrimaryScreen() {
         let core = GhosttyTerminalCore(columns: 12, rows: 3)
 

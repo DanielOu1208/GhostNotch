@@ -54,8 +54,20 @@ struct TerminalCellStyle: Equatable {
 struct TerminalCell: Equatable {
     var character: String
     var style: TerminalCellStyle
+    var widthRole: TerminalCellWidthRole
 
-    static let blank = TerminalCell(character: " ", style: .default)
+    static let blank = TerminalCell(character: " ", style: .default, widthRole: .narrow)
+}
+
+enum TerminalCellWidthRole: UInt8, Equatable {
+    case narrow = 0
+    case wideHead = 1
+    case wideSpacerTail = 2
+    case wideSpacerHead = 3
+
+    var isSpacer: Bool {
+        self == .wideSpacerTail || self == .wideSpacerHead
+    }
 }
 
 enum TerminalCursorStyle: UInt8, Equatable {
@@ -115,7 +127,7 @@ struct TerminalRenderSnapshot: Equatable {
         for row in 0..<rows {
             var line = ""
             for column in 0..<columns {
-                line += cell(row: row, column: column).character
+                appendVisibleText(from: cell(row: row, column: column), to: &line)
             }
             lines.append(line.trimmingCharacters(in: .whitespaces))
         }
@@ -135,12 +147,20 @@ struct TerminalRenderSnapshot: Equatable {
 
             var line = ""
             for column in startColumn...endColumn {
-                line += cell(row: row, column: column).character
+                appendVisibleText(from: cell(row: row, column: column), to: &line)
             }
             lines.append(line.trimmingCharacters(in: .whitespaces))
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    private func appendVisibleText(from cell: TerminalCell, to line: inout String) {
+        guard !cell.widthRole.isSpacer else {
+            return
+        }
+
+        line += cell.character
     }
 }
 

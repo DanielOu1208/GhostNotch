@@ -58,7 +58,7 @@ The current implementation already includes:
 - Expanded terminal UI backed by the real PTY session.
 - First-open terminal session lifecycle owned by the panel/controller layer.
 - Ghostty-backed grid VT output rendering in the expanded island.
-- ANSI color/style, cursor movement, cursor visual style, clear-screen, alternate-screen, resize, focus/blur encoding, paste encoding, Ghostty-backed key encoding, scrollback viewport movement, and device-query write-back coverage in the terminal core tests.
+- ANSI color/style, cursor movement, cursor visual style, clear-screen, alternate-screen, resize, focus/blur encoding, paste encoding, Ghostty-backed key encoding, scrollback viewport movement, grapheme-aware cell snapshots, wide-cell spacer metadata, and device-query write-back coverage in the terminal core tests.
 - Keyboard input routing for text, Ghostty-encoded special keys/modifiers, Escape forwarding when the terminal grid is focused, and paste.
 - Primary-screen scrollback via `libghostty-vt` viewport APIs.
 - App-level terminal text selection and copy from the grid surface.
@@ -77,7 +77,7 @@ The current expanded island terminal is intentionally a lean Ghostty-backed rend
 Current Ghostty parity limits:
 
 - GhostNotch uses Ghostty's VT state and key/paste/focus encoders, but not Ghostty's full Metal/CoreText renderer.
-- The current AppKit grid draws one visible scalar per cell and does not yet match Ghostty's ligature, grapheme cluster, emoji, wide-character, or font-feature behavior.
+- The current AppKit grid preserves Ghostty grapheme clusters and wide-cell spacer metadata, but still does not match Ghostty's full ligature, font-feature, metric, fallback-font, or renderer presentation behavior.
 - Kitty graphics/images, synchronized rendering presentation polish, hyperlinks, semantic selection, and richer clipboard/control-sequence UX are not surfaced yet.
 - The launched shell currently uses a conservative `TERM=xterm-256color` environment rather than a Ghostty-style `xterm-ghostty` terminfo and shell integration setup.
 - Ghostty shell integration features such as working-directory reporting, shell-aware SSH behavior, `TERM_PROGRAM`/`COLORTERM` metadata, and resource-directory based shell scripts are not installed or advertised yet.
@@ -320,8 +320,8 @@ The native PTY-backed session and Ghostty-backed renderer are implemented behind
 
 Rendering fidelity work required before the terminal feels close to Ghostty:
 
-- Replace one-codepoint cell drawing with render data that preserves full grapheme clusters and display width.
-- Handle emoji, combining marks, and wide characters without cursor drift or selection/copy corruption.
+- ~~Replace one-codepoint cell drawing with render data that preserves full grapheme clusters and display width.~~ **Done** — `GNVTTerminalSnapshot` now carries a grapheme sidecar buffer and wide-cell roles into `TerminalRenderSnapshot`.
+- ~~Handle emoji, combining marks, and wide characters without cursor drift or selection/copy corruption.~~ **Done for the model/copy path** — combining graphemes, emoji, CJK wide cells, and private-use prompt glyphs are covered in terminal core tests.
 - Decide whether GhostNotch should keep an AppKit/CoreText grid renderer or move toward a fuller `libghostty` renderer path when that API is practical for embedding.
 - Add font metrics, line height, baseline, bold/italic, and fallback-font handling that behaves predictably across common developer fonts.
 - Add ligature and OpenType feature handling if the renderer remains GhostNotch-owned.
@@ -468,7 +468,7 @@ For non-notch displays, the island should still appear top center, using a conse
 1. Keep the root project/source tree as the implementation target.
 2. ~~Add the product toggle hotkey separately from the debug color hotkey.~~ **Done** — `Option+Space` implemented.
 3. ~~Improve terminal rendering beyond raw PTY text or begin Ghostty-backed rendering integration.~~ **Done** — grid-based rendering now uses a vendored `libghostty-vt` artifact through `GhosttyVTBridge` and `GhosttyTerminalCore`.
-4. Improve rendering fidelity: grapheme clusters, wide characters, emoji/fallback fonts, font metrics, line height, and renderer acceptance cases for editor/TUI output.
+4. ~~Improve rendering fidelity: grapheme clusters, wide characters, emoji/fallback fonts, font metrics, line height, and renderer acceptance cases for editor/TUI output.~~ **Partially done** — grapheme clusters, emoji, wide-cell spacer metadata, private-use glyphs, and selection/copy behavior are implemented; font metrics, fallback-font behavior, and editor/TUI stress acceptance remain.
 5. Add shell integration basics: terminal metadata environment, terminfo strategy, shell integration resource path, and manual setup guidance for common shells.
 6. Add runtime notch measurement and fallback display behavior.
 7. Remove or hide Stage 1 debug color controls before public MVP.
@@ -506,6 +506,7 @@ Currently satisfied from the baseline above:
 - Header flush at top of expanded panel (38pt spacer removed).
 - Enlarged close button.
 - Grid-based terminal rendering with ANSI style, cursor addressing, alternate-screen, resize, paste encoding, focus/blur encoding, and device-query write-back coverage.
+- Grapheme-aware snapshots and rendering for combining marks, emoji, CJK wide cells, wide spacer cells, and private-use prompt glyphs.
 - Ghostty-backed key encoding for special keys/modifiers and primary-screen scrollback.
 - App-level terminal grid text selection/copy.
 - Vendored `libghostty-vt` artifact linked into the app and tests.
@@ -515,7 +516,7 @@ Still required for full MVP:
 
 - Runtime notch measurement/fallback behavior.
 - Public-build cleanup of the debug notch color control.
-- Rendering fidelity work for grapheme clusters, wide characters, emoji/fallback fonts, font metrics, and editor/TUI stress cases.
+- Remaining rendering fidelity work for font metrics, fallback-font behavior, ligature/font-feature handling, and editor/TUI stress cases.
 - Shell integration basics: terminal metadata environment, terminfo policy, shell integration resource path, and common-shell setup guidance.
 - Manual acceptance pass for shell/editor commands against the Ghostty-backed renderer: `ls`, ANSI color commands, `top`, `vim` or `nano`, resize-sensitive commands, collapse/reopen session persistence, and focused-terminal Escape forwarding.
 

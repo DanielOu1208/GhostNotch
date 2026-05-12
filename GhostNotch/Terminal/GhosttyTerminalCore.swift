@@ -139,24 +139,27 @@ final class GhosttyTerminalCore {
     }
 
     private func refreshSnapshot() {
-        var cells = Array(repeating: GNVTCell.blank, count: columns * rows)
-        var meta = GNVTSnapshotMeta()
-
-        let success = cells.withUnsafeMutableBufferPointer { buffer in
-            GNVTTerminalSnapshot(terminal, buffer.baseAddress, buffer.count, &meta)
+        var loadResult = loadSnapshot(graphemeCapacity: max(columns * rows * 2, 1))
+        var retryCount = 0
+        while !loadResult.success,
+              loadResult.requiredGraphemeCount > loadResult.graphemes.count,
+              retryCount < 2 {
+            loadResult = loadSnapshot(graphemeCapacity: loadResult.requiredGraphemeCount)
+            retryCount += 1
         }
 
-        guard success else {
+        guard loadResult.success else {
             cachedSnapshot = .empty(columns: columns, rows: rows)
             return
         }
 
+        let meta = loadResult.meta
         columns = Int(meta.columns)
         rows = Int(meta.rows)
         cachedSnapshot = TerminalRenderSnapshot(
             columns: columns,
             rows: rows,
-            cells: cells.map(TerminalCell.init(ghosttyCell:)),
+            cells: loadResult.cells.map { TerminalCell(ghosttyCell: $0, graphemes: loadResult.graphemes) },
             cursorColumn: Int(meta.cursorColumn),
             cursorRow: Int(meta.cursorRow),
             cursorVisible: meta.cursorVisible,
@@ -166,6 +169,39 @@ final class GhosttyTerminalCore {
             hasMouseTracking: meta.hasMouseTracking,
             totalRows: Int(meta.totalRows),
             scrollbackRows: Int(meta.scrollbackRows)
+        )
+    }
+
+    private func loadSnapshot(graphemeCapacity: Int) -> GhosttySnapshotLoadResult {
+        var cells = Array(repeating: GNVTCell.blank, count: columns * rows)
+        var graphemes = Array(repeating: UInt32(0), count: max(graphemeCapacity, 1))
+        var requiredGraphemeCount = 0
+        var meta = GNVTSnapshotMeta()
+
+        let success = cells.withUnsafeMutableBufferPointer { cellBuffer in
+            graphemes.withUnsafeMutableBufferPointer { graphemeBuffer in
+                GNVTTerminalSnapshot(
+                    terminal,
+                    cellBuffer.baseAddress,
+                    cellBuffer.count,
+                    graphemeBuffer.baseAddress,
+                    graphemeBuffer.count,
+                    &requiredGraphemeCount,
+                    &meta
+                )
+            }
+        }
+
+        if requiredGraphemeCount < graphemes.count {
+            graphemes.removeSubrange(requiredGraphemeCount..<graphemes.count)
+        }
+
+        return GhosttySnapshotLoadResult(
+            success: success,
+            cells: cells,
+            graphemes: graphemes,
+            requiredGraphemeCount: requiredGraphemeCount,
+            meta: meta
         )
     }
 
@@ -208,6 +244,14 @@ final class GhosttyTerminalCore {
 
         onWriteToPTY?(Data(bytes: bytes, count: count))
     }
+}
+
+private struct GhosttySnapshotLoadResult {
+    let success: Bool
+    let cells: [GNVTCell]
+    let graphemes: [UInt32]
+    let requiredGraphemeCount: Int
+    let meta: GNVTSnapshotMeta
 }
 
 struct TerminalKeyEvent: Equatable {
@@ -322,7 +366,9 @@ private let ghosttyTerminalWriteCallback: GNVTWriteCallback = { data, len, userd
 private extension GNVTCell {
     static var blank: GNVTCell {
         GNVTCell(
-            codepoint: 0,
+            graphemeStart: 0,
+            graphemeLength: 0,
+            widthRole: 0,
             foreground: GNVTColor(red: 220, green: 224, blue: 232),
             background: GNVTColor(red: 0, green: 0, blue: 0),
             bold: false,
@@ -333,15 +379,8 @@ private extension GNVTCell {
 }
 
 private extension TerminalCell {
-    init(ghosttyCell: GNVTCell) {
-        let character: String
-        if ghosttyCell.codepoint == 0 {
-            character = " "
-        } else if let scalar = UnicodeScalar(ghosttyCell.codepoint) {
-            character = String(Character(scalar))
-        } else {
-            character = " "
-        }
+    init(ghosttyCell: GNVTCell, graphemes: [UInt32]) {
+        let character = Self.character(from: ghosttyCell, graphemes: graphemes)
 
         self.init(
             character: character,
@@ -351,8 +390,32 @@ private extension TerminalCell {
                 isBold: ghosttyCell.bold,
                 isItalic: ghosttyCell.italic,
                 isInverse: ghosttyCell.inverse
-            )
+            ),
+            widthRole: TerminalCellWidthRole(rawValue: ghosttyCell.widthRole) ?? .narrow
         )
+    }
+
+    private static func character(from ghosttyCell: GNVTCell, graphemes: [UInt32]) -> String {
+        guard ghosttyCell.graphemeLength > 0 else {
+            return " "
+        }
+
+        let start = ghosttyCell.graphemeStart
+        let end = start + Int(ghosttyCell.graphemeLength)
+        guard start >= 0, end <= graphemes.count else {
+            return " "
+        }
+
+        let scalars = graphemes[start..<end].compactMap(UnicodeScalar.init)
+        guard !scalars.isEmpty else {
+            return " "
+        }
+
+        var view = String.UnicodeScalarView()
+        for scalar in scalars {
+            view.append(scalar)
+        }
+        return String(view)
     }
 }
 
