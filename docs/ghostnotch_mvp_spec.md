@@ -479,22 +479,31 @@ For non-notch displays, the island should still appear top center, using a conse
 1. Keep the root project/source tree as the implementation target.
 2. ~~Add the product toggle hotkey separately from the debug color hotkey.~~ **Done** — `Option+Space` implemented.
 3. ~~Improve terminal rendering beyond raw PTY text or begin Ghostty-backed rendering integration.~~ **Done** — grid-based rendering now uses a vendored `libghostty-vt` artifact through `GhosttyVTBridge` and `GhosttyTerminalCore`.
-4. Improve rendering fidelity:
+4. Complete renderer acceptance before expanding shell identity:
    - ~~Grapheme clusters, wide characters, and emoji/private-use glyph model support.~~ **Done** — render snapshots carry grapheme clusters and wide-cell metadata.
    - ~~Selection/copy behavior for whitespace and wide cells.~~ **Done** — leading indentation, selected internal spaces, narrow trailing selections, and wide-cell spacer suppression are covered in tests.
    - ~~Initial CoreText-backed AppKit drawing, installed developer-font preference, fallback-font handling, and cursor/cell metric alignment.~~ **Done** — the renderer remains GhostNotch-owned for MVP because the pinned Ghostty VT boundary does not expose a complete embeddable renderer API.
-   - **Next:** complete R4-R8: manual TUI acceptance, bracketed paste/full-screen paste behavior, font feature/ligature audit, color/style polish, and mouse/selection/alternate-screen hardening.
-5. Add shell integration basics in order:
-   - **S1:** terminal identity environment while keeping `TERM=xterm-256color`.
-   - **S2:** terminfo policy before any `TERM=xterm-ghostty` advertisement.
+   - **Next:** run **R4 — Manual TUI renderer acceptance** in the app and record visible failures before making more shell-integration claims.
+   - Fix each R4 failure as a focused renderer change rather than starting a broad renderer rewrite.
+5. Harden paste, alternate-screen, scroll, and selection together:
+   - Complete **R5 — Bracketed paste and full-screen app paste behavior**.
+   - Fold in the alternate-screen, scrollback, mouse-reporting, wheel behavior, and selection-clearing parts of **R8 — Mouse, selection, and alternate-screen behavior hardening**.
+   - Acceptance means shell prompts, `vim`/`nano`, `less`, and `top` do not fight paste, Escape, scroll, or selection behavior.
+6. Polish visual renderer fidelity:
+   - Complete **R6 — Font features and ligature pass** for ligatures, private-use glyphs, fallback fonts, bold/italic synthesis, baseline alignment, and line-height consistency.
+   - Complete **R7 — Color/style presentation pass** for ANSI 16-color, 256-color, truecolor, bold, dim, italic, underline, inverse, and cursor presentation.
+   - Defer **R9 — Hyperlinks and graphics protocols** until R4-R8 are usable; hyperlinks can be MVP-adjacent, Kitty graphics/images remain post-MVP unless the acceptance suite proves otherwise.
+7. Add shell integration basics only after the renderer batches above are usable:
+   - **S1:** terminal identity environment while keeping `TERM=xterm-256color`; set GhostNotch-owned `TERM_PROGRAM`, version metadata, and `COLORTERM=truecolor`, with tests proving inherited values do not override them.
+   - **S2:** decide and implement terminfo policy before any `TERM=xterm-ghostty` advertisement.
    - **S3-S4:** shell integration resource directory and working-directory reporting.
    - **S5-S6:** SSH behavior and common-shell acceptance.
-6. Add Ghostty/libghostty alignment scaffolding:
+8. Add Ghostty/libghostty alignment scaffolding:
    - **G1-G2:** keep renderer boundaries replaceable and expand the C bridge only around durable Ghostty concepts.
    - **G3-G4:** add Ghostty comparison fixtures and vendor capability tracking.
    - **G5:** keep parity claims narrow until a fuller renderer or shell integration stack is truly embedded.
-7. Add runtime notch measurement and fallback display behavior.
-8. Remove or hide Stage 1 debug color controls before public MVP.
+9. Add runtime notch measurement and fallback display behavior.
+10. Remove or hide Stage 1 debug color controls before public MVP.
 
 ## Acceptance Criteria
 
@@ -546,6 +555,14 @@ Still required for full MVP:
 ### Manual Renderer Acceptance Suite
 
 Run this suite in the expanded GhostNotch terminal before moving to shell integration:
+
+| Area | Manual check | Result | Notes |
+| --- | --- | --- | --- |
+| ANSI/style rendering | Run the ANSI `printf` command below and inspect foreground color plus bold reset behavior. | Follow-up | Baseline fixture coverage exists; manual app pass still required. |
+| Unicode/graphemes | Run the unicode `printf` command below and inspect combining marks, emoji, CJK, and private-use prompt glyphs. | Follow-up | Baseline fixture coverage exists; powerline glyph quality depends on installed compatible fonts. |
+| CJK/wide-cell copy | Run the wide-column command below, select/copy the line, and confirm wide spacer cells are not duplicated. | Follow-up | Baseline fixture coverage exists; manual grid selection pass still required. |
+| TUI/editor rendering | Open `top`, `less`, and `vim` or `nano`; inspect alternate-screen rendering, cursor position, and status lines. | Follow-up | Manual app pass required; paste-specific issues become R5 follow-ups. |
+| Resize/collapse/Escape | Resize through the expanded island, collapse/reopen, and confirm focused Escape reaches the foreground terminal program. | Follow-up | Manual app pass required because this crosses AppKit focus, layout, and session persistence. |
 
 ```sh
 printf 'plain\n  indented\nred: \033[31mred\033[0m bold: \033[1mbold\033[0m\n'

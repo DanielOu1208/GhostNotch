@@ -204,6 +204,45 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertEqual(core.snapshot.cursorStyle, .block)
     }
 
+    func testRendererAcceptanceFixtureStreamsProtectCoreModel() {
+        let styled = renderFixture("plain\r\n\u{1B}[31;1mred\u{1B}[0m", columns: 12, rows: 3)
+        XCTAssertTrue(styled.plainText.contains("plain"))
+        XCTAssertEqual(styled.cell(row: 1, column: 0).character, "r")
+        XCTAssertEqual(styled.cell(row: 1, column: 0).style.foreground, .ansi(index: 1))
+        XCTAssertTrue(styled.cell(row: 1, column: 0).style.isBold)
+
+        let cursorMovement = renderFixture("abc\u{1B}[1;2HZ", columns: 8, rows: 2)
+        XCTAssertEqual(cursorMovement.cell(row: 0, column: 0).character, "a")
+        XCTAssertEqual(cursorMovement.cell(row: 0, column: 1).character, "Z")
+        XCTAssertEqual(cursorMovement.cell(row: 0, column: 2).character, "c")
+
+        let unicode = renderFixture("\u{1B}[?2027he\u{0301} 🙂 界 \u{E0B0}", columns: 12, rows: 2)
+        XCTAssertEqual(unicode.cell(row: 0, column: 0).character, "e\u{0301}")
+        XCTAssertTrue(unicode.plainText.contains("🙂"))
+        XCTAssertEqual(unicode.cell(row: 0, column: 5).character, "界")
+        XCTAssertEqual(unicode.cell(row: 0, column: 5).widthRole, .wideHead)
+        XCTAssertEqual(unicode.cell(row: 0, column: 6).widthRole, .wideSpacerTail)
+        XCTAssertTrue(unicode.plainText.contains("\u{E0B0}"))
+
+        let wideCopy = renderFixture("wide: |界|x|", columns: 16, rows: 2)
+        XCTAssertEqual(
+            wideCopy.text(in: TerminalSelection(start: TerminalGridPoint(row: 0, column: 6), end: TerminalGridPoint(row: 0, column: 10))),
+            "|界|x"
+        )
+
+        let alternateScreen = renderFixture("primary\u{1B}[?1049halt\u{1B}[2Jalt\u{1B}[?1049l", columns: 12, rows: 3)
+        XCTAssertFalse(alternateScreen.isAlternateScreen)
+        XCTAssertTrue(alternateScreen.plainText.contains("primary"))
+        XCTAssertFalse(alternateScreen.plainText.contains("alt"))
+
+        let scrollback = GhosttyTerminalCore(columns: 12, rows: 3)
+        scrollback.processOutput(Data((0..<12).map { "line\($0)" }.joined(separator: "\n").utf8))
+        let bottomText = scrollback.snapshot.plainText
+        scrollback.scrollViewport(deltaRows: -2)
+        XCTAssertGreaterThan(scrollback.snapshot.scrollbackRows, 0)
+        XCTAssertNotEqual(scrollback.snapshot.plainText, bottomText)
+    }
+
     private func makeSnapshot(rowText: String, columns: Int) -> TerminalRenderSnapshot {
         let cells = Array(rowText.padding(toLength: columns, withPad: " ", startingAt: 0).prefix(columns)).map {
             TerminalCell(character: String($0), style: .default, widthRole: .narrow)
@@ -222,5 +261,11 @@ final class GhosttyTerminalCoreTests: XCTestCase {
             totalRows: 1,
             scrollbackRows: 0
         )
+    }
+
+    private func renderFixture(_ stream: String, columns: Int, rows: Int) -> TerminalRenderSnapshot {
+        let core = GhosttyTerminalCore(columns: columns, rows: rows)
+        core.processOutput(Data(stream.utf8))
+        return core.snapshot
     }
 }
