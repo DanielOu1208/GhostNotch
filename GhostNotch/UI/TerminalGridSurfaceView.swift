@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 import SwiftUI
 
 struct TerminalGridSurfaceView: NSViewRepresentable {
@@ -57,8 +58,7 @@ final class TerminalGridView: NSView {
     var onScroll: ((Int) -> Void)?
     var onResize: ((Int, Int) -> Void)?
 
-    private let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-    private let boldFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .semibold)
+    private let typography = TerminalGridTypography(size: 11)
     private var lastReportedSize: NSSize = .zero
     private var selection: TerminalSelection?
 
@@ -219,10 +219,7 @@ final class TerminalGridView: NSView {
     }
 
     private var measuredCellSize: NSSize {
-        let attributes: [NSAttributedString.Key: Any] = [.font: font]
-        let width = ceil(("W" as NSString).size(withAttributes: attributes).width) + 1
-        let height = ceil(font.ascender - font.descender + font.leading) + 2
-        return NSSize(width: max(width, 7), height: max(height, 15))
+        typography.cellSize
     }
 
     private func drawCell(_ cell: TerminalCell, row: Int, column: Int, cellSize: NSSize) {
@@ -256,16 +253,13 @@ final class TerminalGridView: NSView {
             return
         }
 
-        let drawFont = style.isBold ? boldFont : font
-        var attributes: [NSAttributedString.Key: Any] = [
-            .font: drawFont,
-            .foregroundColor: foreground.nsColor.withAlphaComponent(0.92),
-        ]
-        if style.isItalic {
-            attributes[.obliqueness] = 0.18
-        }
-
-        (cell.character as NSString).draw(in: textRect, withAttributes: attributes)
+        typography.draw(
+            cell.character,
+            style: style,
+            foreground: foreground.nsColor.withAlphaComponent(0.92),
+            in: textRect,
+            viewHeight: bounds.height
+        )
     }
 
     private func drawCursor(cellSize: NSSize) {
@@ -316,6 +310,110 @@ final class TerminalGridView: NSView {
 
         return TerminalGridPoint(row: row, column: column)
     }
+}
+
+private struct TerminalGridTypography {
+    let regularFont: NSFont
+    let boldFont: NSFont
+    let cellSize: NSSize
+    let baselineOffset: CGFloat
+
+    init(size: CGFloat) {
+        regularFont = Self.makeFont(size: size, weight: .regular)
+        boldFont = Self.makeFont(size: size, weight: .semibold, matching: regularFont)
+        let regularCTFont = regularFont as CTFont
+        let advance = CTFontGetAdvancesForGlyphs(regularCTFont, .horizontal, [Self.measurementGlyph(for: regularCTFont)], nil, 1)
+        let width = ceil(advance) + 1
+        let ascent = ceil(CTFontGetAscent(regularCTFont))
+        let descent = ceil(CTFontGetDescent(regularCTFont))
+        let leading = ceil(CTFontGetLeading(regularCTFont))
+        cellSize = NSSize(width: max(width, 7), height: max(ascent + descent + leading + 2, 15))
+        baselineOffset = max(1, floor((cellSize.height - ascent - descent) / 2)) + ascent
+    }
+
+    func draw(_ text: String, style: TerminalCellStyle, foreground: NSColor, in rect: NSRect, viewHeight: CGFloat) {
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            return
+        }
+
+        let baseFont = style.isBold ? boldFont : regularFont
+        let drawFont = Self.font(for: text, baseFont: baseFont)
+        var attributes: [NSAttributedString.Key: Any] = [
+            NSAttributedString.Key(kCTFontAttributeName as String): drawFont,
+            NSAttributedString.Key(kCTForegroundColorAttributeName as String): foreground.cgColor,
+            .ligature: 1,
+        ]
+        if style.isItalic {
+            attributes[.obliqueness] = 0.18
+        }
+
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
+        context.saveGState()
+        context.textMatrix = .identity
+        context.translateBy(x: 0, y: viewHeight)
+        context.scaleBy(x: 1, y: -1)
+        context.textPosition = CGPoint(x: rect.minX, y: viewHeight - rect.minY - baselineOffset)
+        CTLineDraw(line, context)
+        context.restoreGState()
+    }
+
+    private static func makeFont(size: CGFloat, weight: NSFont.Weight, matching baseFont: NSFont? = nil) -> NSFont {
+        if let baseFont,
+           let weightedFont = NSFont(
+            descriptor: baseFont.fontDescriptor.addingAttributes([
+                .traits: [NSFontDescriptor.TraitKey.weight: weight.rawValue],
+            ]),
+            size: size
+           ) {
+            return weightedFont
+        }
+
+        for name in preferredInstalledFontNames {
+            if let font = NSFont(name: name, size: size) {
+                return font
+            }
+        }
+
+        return .monospacedSystemFont(ofSize: size, weight: weight)
+    }
+
+    private static func font(for text: String, baseFont: NSFont) -> CTFont {
+        let baseCTFont = baseFont as CTFont
+        guard !text.isEmpty else {
+            return baseCTFont
+        }
+
+        let codeUnits = Array(text.utf16).map { UniChar($0) }
+        var glyphs = Array(repeating: CGGlyph(), count: codeUnits.count)
+        let supportsText = codeUnits.withUnsafeBufferPointer { codeUnitBuffer in
+            glyphs.withUnsafeMutableBufferPointer { glyphBuffer in
+                CTFontGetGlyphsForCharacters(baseCTFont, codeUnitBuffer.baseAddress!, glyphBuffer.baseAddress!, codeUnitBuffer.count)
+            }
+        }
+
+        guard !supportsText else {
+            return baseCTFont
+        }
+
+        return CTFontCreateForString(baseCTFont, text as CFString, CFRange(location: 0, length: text.utf16.count))
+    }
+
+    private static func measurementGlyph(for font: CTFont) -> CGGlyph {
+        var character: UniChar = 87
+        var glyph = CGGlyph()
+        _ = CTFontGetGlyphsForCharacters(font, &character, &glyph, 1)
+        return glyph
+    }
+
+    private static let preferredInstalledFontNames = [
+        "MesloLGS NF",
+        "MesloLGS NF Regular",
+        "JetBrainsMono Nerd Font",
+        "JetBrains Mono NL",
+        "Hack Nerd Font",
+        "FiraCode Nerd Font",
+        "Menlo",
+    ]
 }
 
 private extension TerminalKeyEvent {

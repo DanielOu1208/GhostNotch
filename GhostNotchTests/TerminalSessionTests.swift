@@ -2,6 +2,18 @@ import XCTest
 
 @MainActor
 final class TerminalSessionTests: XCTestCase {
+    func testPTYEnvironmentForcesConservativeTermType() {
+        let environment = PTYProcess.terminalEnvironment(from: [
+            "SHELL": "/bin/sh",
+            "TERM": "xterm-ghostty",
+            "PATH": "/usr/bin:/bin",
+        ])
+
+        XCTAssertEqual(environment["TERM"], PTYProcess.defaultTerminalType)
+        XCTAssertEqual(environment["SHELL"], "/bin/sh")
+        XCTAssertEqual(environment["PATH"], "/usr/bin:/bin")
+    }
+
     func testSessionRunsCommandAndCapturesOutput() async throws {
         let state = TerminalSessionState(outputLimit: 16 * 1024)
         let session = TerminalSession(

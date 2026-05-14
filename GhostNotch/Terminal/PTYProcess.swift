@@ -31,6 +31,8 @@ enum PTYProcessError: Error, LocalizedError, Equatable {
 }
 
 final class PTYProcess: @unchecked Sendable {
+    static let defaultTerminalType = "xterm-256color"
+
     typealias OutputHandler = @MainActor @Sendable (Data) -> Void
     typealias TerminationHandler = @MainActor @Sendable () -> Void
 
@@ -264,9 +266,7 @@ final class PTYProcess: @unchecked Sendable {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
         process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory)
-        process.environment = ProcessInfo.processInfo.environment.merging(["TERM": "xterm-256color"]) { current, _ in
-            current
-        }
+        process.environment = Self.terminalEnvironment(from: ProcessInfo.processInfo.environment)
         process.standardInput = FileHandle(fileDescriptor: standardInputDescriptor, closeOnDealloc: true)
         process.standardOutput = FileHandle(fileDescriptor: standardOutputDescriptor, closeOnDealloc: true)
         process.standardError = FileHandle(fileDescriptor: standardErrorDescriptor, closeOnDealloc: true)
@@ -278,6 +278,12 @@ final class PTYProcess: @unchecked Sendable {
         }
 
         return process
+    }
+
+    static func terminalEnvironment(from environment: [String: String]) -> [String: String] {
+        var terminalEnvironment = environment
+        terminalEnvironment["TERM"] = defaultTerminalType
+        return terminalEnvironment
     }
 
     private func terminate(_ process: Process) {

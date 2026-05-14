@@ -81,6 +81,36 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertTrue(snapshot.plainText.contains("\(glyph)x"))
     }
 
+    func testPlainTextPreservesLeadingIndentation() {
+        let core = GhosttyTerminalCore(columns: 12, rows: 2)
+
+        core.processOutput(Data("  indented".utf8))
+
+        XCTAssertTrue(core.snapshot.plainText.hasPrefix("  indented"))
+    }
+
+    func testSelectionPreservesInternalAndNarrowTrailingSpaces() {
+        let snapshot = makeSnapshot(rowText: "a  b  ", columns: 8)
+
+        XCTAssertEqual(
+            snapshot.text(in: TerminalSelection(start: TerminalGridPoint(row: 0, column: 0), end: TerminalGridPoint(row: 0, column: 2))),
+            "a  "
+        )
+        XCTAssertEqual(
+            snapshot.text(in: TerminalSelection(start: TerminalGridPoint(row: 0, column: 0), end: TerminalGridPoint(row: 0, column: 3))),
+            "a  b"
+        )
+    }
+
+    func testSelectionTrimsOnlyRightEdgeGridPadding() {
+        let snapshot = makeSnapshot(rowText: "a       ", columns: 8)
+
+        XCTAssertEqual(
+            snapshot.text(in: TerminalSelection(start: TerminalGridPoint(row: 0, column: 0), end: TerminalGridPoint(row: 0, column: 7))),
+            "a"
+        )
+    }
+
     func testAlternateScreenEnterAndExitPreservesPrimaryScreen() {
         let core = GhosttyTerminalCore(columns: 12, rows: 3)
 
@@ -172,5 +202,25 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         core.processOutput(Data("\u{1B}[2 q".utf8))
 
         XCTAssertEqual(core.snapshot.cursorStyle, .block)
+    }
+
+    private func makeSnapshot(rowText: String, columns: Int) -> TerminalRenderSnapshot {
+        let cells = Array(rowText.padding(toLength: columns, withPad: " ", startingAt: 0).prefix(columns)).map {
+            TerminalCell(character: String($0), style: .default, widthRole: .narrow)
+        }
+        return TerminalRenderSnapshot(
+            columns: columns,
+            rows: 1,
+            cells: cells,
+            cursorColumn: 0,
+            cursorRow: 0,
+            cursorVisible: true,
+            cursorBlinking: false,
+            cursorStyle: .bar,
+            isAlternateScreen: false,
+            hasMouseTracking: false,
+            totalRows: 1,
+            scrollbackRows: 0
+        )
     }
 }

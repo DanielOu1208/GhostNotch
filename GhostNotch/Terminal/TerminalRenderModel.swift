@@ -125,11 +125,7 @@ struct TerminalRenderSnapshot: Equatable {
     var plainText: String {
         var lines: [String] = []
         for row in 0..<rows {
-            var line = ""
-            for column in 0..<columns {
-                appendVisibleText(from: cell(row: row, column: column), to: &line)
-            }
-            lines.append(line.trimmingCharacters(in: .whitespaces))
+            lines.append(textLine(row: row, startColumn: 0, endColumn: columns - 1, trimsRightPadding: true))
         }
         return lines.joined(separator: "\n")
     }
@@ -145,14 +141,30 @@ struct TerminalRenderSnapshot: Equatable {
                 continue
             }
 
-            var line = ""
-            for column in startColumn...endColumn {
-                appendVisibleText(from: cell(row: row, column: column), to: &line)
-            }
-            lines.append(line.trimmingCharacters(in: .whitespaces))
+            lines.append(
+                textLine(
+                    row: row,
+                    startColumn: startColumn,
+                    endColumn: endColumn,
+                    trimsRightPadding: endColumn == columns - 1
+                )
+            )
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    private func textLine(row: Int, startColumn: Int, endColumn: Int, trimsRightPadding: Bool) -> String {
+        var line = ""
+        for column in startColumn...endColumn {
+            appendVisibleText(from: cell(row: row, column: column), to: &line)
+        }
+
+        guard trimsRightPadding else {
+            return line
+        }
+
+        return line.trimmingRightCellPadding()
     }
 
     private func appendVisibleText(from cell: TerminalCell, to line: inout String) {
@@ -161,6 +173,16 @@ struct TerminalRenderSnapshot: Equatable {
         }
 
         line += cell.character
+    }
+}
+
+private extension String {
+    func trimmingRightCellPadding() -> String {
+        var result = self
+        while result.last == " " || result.last == "\t" {
+            result.removeLast()
+        }
+        return result
     }
 }
 

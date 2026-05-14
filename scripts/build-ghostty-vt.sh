@@ -45,8 +45,10 @@ download() {
 
 if [[ -n "${GHOSTTY_ZIG:-}" ]]; then
   ZIG_EXE="$GHOSTTY_ZIG"
+  ZIG_PROVIDER="custom"
 elif command -v brew >/dev/null 2>&1 && [[ -x "$(brew --prefix zig@0.15 2>/dev/null)/bin/zig" ]]; then
   ZIG_EXE="$(brew --prefix zig@0.15)/bin/zig"
+  ZIG_PROVIDER="brew"
 else
   download "$ZIG_URL" "$BUILD_DIR/${ZIG_NAME}.tar.xz"
 
@@ -57,6 +59,7 @@ else
   fi
 
   ZIG_EXE="$BUILD_DIR/$ZIG_NAME/zig"
+  ZIG_PROVIDER="downloaded"
 fi
 
 download "$GHOSTTY_URL" "$BUILD_DIR/${GHOSTTY_ARCHIVE_NAME}.tar.gz"
@@ -117,7 +120,7 @@ cat > "$VENDOR_DIR/VERSION" <<VERSION
 ghostty=${GHOSTTY_VERSION}
 ghostty_source=${GHOSTTY_SOURCE_VERSION}
 zig=${ZIG_VERSION}
-zig_exe=${ZIG_EXE}
+zig_provider=${ZIG_PROVIDER}
 source=${GHOSTTY_URL}
 artifact=${ARTIFACT}
 VERSION
