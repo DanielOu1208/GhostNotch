@@ -318,29 +318,40 @@ protocol TerminalRenderingEngine {
 
 The native PTY-backed session and Ghostty-backed renderer are implemented behind this abstraction. GhostNotch owns the AppKit grid renderer; Ghostty owns VT parsing, terminal state, render snapshots, paste/focus encoding, and terminal query write-back behavior.
 
-Rendering fidelity work required before the terminal feels close to Ghostty:
+Rendering fidelity work required before the terminal feels close to Ghostty is now split into concrete work packages:
 
-- ~~Replace one-codepoint cell drawing with render data that preserves full grapheme clusters and display width.~~ **Done** — `GNVTTerminalSnapshot` now carries a grapheme sidecar buffer and wide-cell roles into `TerminalRenderSnapshot`.
-- ~~Handle emoji, combining marks, and wide characters without cursor drift or selection/copy corruption in the model and copy path.~~ **Done** — combining graphemes, emoji, CJK wide cells, private-use prompt glyphs, whitespace-preserving selection, and wide-cell copy behavior are covered in terminal core tests.
-- ~~Decide whether GhostNotch should keep an AppKit/CoreText grid renderer or move toward a fuller `libghostty` renderer path when that API is practical for embedding.~~ **Done for MVP** — the pinned `libghostty-vt` boundary exposes VT state, render-state snapshots, formatter helpers, input encoding, and image geometry helpers, but not a complete embeddable Ghostty font shaping/renderer API. GhostNotch should keep the AppKit/CoreText grid renderer for MVP.
-- ~~Add initial font metrics, line height, baseline, bold/italic, and fallback-font handling that behaves predictably across common developer fonts.~~ **Done for the current AppKit renderer** — `TerminalGridView` now uses CoreText-backed measurement/drawing, prefers installed developer/Nerd Font families when available, falls back through CoreText for missing glyphs, and keeps cursor/cell metrics tied to the selected terminal font.
-- Continue improving ligature and OpenType feature handling if the renderer remains GhostNotch-owned.
-- Surface hyperlink and image/graphics protocol support only after the text renderer is correct enough not to distort normal shell/editor usage.
-- Add and run renderer acceptance cases for `vim`/`nvim`, `less`, `top`, emoji/wide-character output, powerline prompts, and ANSI color/style stress output.
+- **R1 — Renderer model parity, done.** `GNVTTerminalSnapshot` carries grapheme sidecar data and wide-cell roles into `TerminalRenderSnapshot`. Covered by terminal core tests for combining graphemes, emoji, CJK wide cells, private-use prompt glyphs, whitespace-preserving selection, and wide-cell copy behavior.
+- **R2 — Ghostty renderer boundary spike, done for MVP.** The pinned `libghostty-vt` boundary exposes VT state, render-state snapshots, formatter helpers, input encoding, and image geometry helpers, but not a complete embeddable Ghostty font shaping/renderer API. GhostNotch should keep the AppKit/CoreText grid renderer for MVP.
+- **R3 — CoreText renderer baseline, done for MVP.** `TerminalGridView` uses CoreText-backed measurement/drawing, prefers installed developer/Nerd Font families when available, falls back through CoreText for missing glyphs, and keeps cursor/cell metrics tied to the selected terminal font.
+- **R4 — Manual TUI renderer acceptance, next.** Run the acceptance suite below in the app, record visible failures, and turn each failure into one focused renderer fix. Acceptance means `less`, `top`, `vim` or `nano`, ANSI style stress, emoji/CJK/combining marks, powerline prompt glyphs, resize-sensitive output, collapse/reopen, and focused-terminal Escape all behave well enough for daily shell/editor use.
+- **R5 — Bracketed paste and full-screen app paste behavior.** Track Ghostty's bracketed-paste mode state through the bridge, encode paste with bracketed wrappers only when mode 2004 is active, and verify paste behavior in shell prompts, `vim`/`nano`, `less`, and `top`. Acceptance means a paste into a shell prompt remains safe and newline-normalized, while a paste into full-screen TUIs does not accidentally feed command text as ordinary control keystrokes when the app has requested bracketed paste.
+- **R6 — Font features and ligature pass.** Audit whether the current CoreText drawing path enables the same developer-font features users expect from Ghostty: ligatures where appropriate, private-use/powerline glyph stability, bold/italic synthesis, fallback-family choices, baseline alignment, and line-height consistency. Acceptance means common prompts and editor text render without clipped glyphs, drifting cursor positions, or inconsistent fallback sizing.
+- **R7 — Color/style presentation pass.** Compare ANSI 16-color, 256-color, truecolor, bold, dim, italic, underline, inverse, and cursor rendering against Ghostty-like expectations. Acceptance means common CLI output, prompt themes, and editor statuslines are legible and visually stable in the compact island.
+- **R8 — Mouse, selection, and alternate-screen behavior hardening.** Continue hardening mouse reporting, scroll behavior in primary versus alternate screen, formatter-backed selection, and selection clearing. Acceptance means scrollback works in the shell, wheel/key behavior does not fight `less`/`vim`/`top`, and copy remains predictable.
+- **R9 — Hyperlinks and graphics protocols, after text fidelity.** Add OSC 8 hyperlink detection/click behavior and image/graphics protocol support only after R4-R8 are usable. Acceptance for MVP-adjacent work is hyperlinks first; Kitty graphics/images remain a post-MVP feature unless needed by the acceptance suite.
 
 ### Shell Integration
 
 The current shell launch path resolves the user's default shell and starts it in a PTY with a deterministic conservative terminal environment. That is enough for basic commands, but it is not yet Ghostty-like.
 
-Shell integration work required before the terminal feels close to Ghostty:
+Shell integration work required before the terminal feels close to Ghostty is split into these work packages:
 
-- Decide whether the MVP should advertise `TERM=xterm-ghostty` with bundled terminfo, or keep `xterm-256color` until terminfo install/copy behavior is implemented.
-- Set terminal metadata such as `TERM_PROGRAM=GhostNotch`, `COLORTERM=truecolor`, and a version variable consistently.
-- Add a bundled GhostNotch/Ghostty-compatible shell integration resource directory and expose it through an environment variable.
-- Support opt-in sourcing snippets for zsh, bash, fish, and other shells without mutating user dotfiles silently.
-- Add working-directory reporting so future terminal sessions, commands, or UI affordances can inherit the current shell directory.
-- Define SSH behavior for hosts without `xterm-ghostty` terminfo, including whether to downgrade `TERM`, copy terminfo, or document the limitation.
-- Add acceptance tests or manual checks for login shells, non-login shells, shell switches, SSH, and common prompt frameworks.
+- **S1 — Terminal identity environment.** Set `TERM_PROGRAM=GhostNotch`, a stable `GHOSTNOTCH_VERSION` or `TERM_PROGRAM_VERSION`, and `COLORTERM=truecolor` consistently in the PTY environment while preserving the current `TERM=xterm-256color` policy until S2 is complete. Add unit tests proving inherited values do not override GhostNotch-owned terminal identity.
+- **S2 — Terminfo policy.** Decide and implement the MVP terminfo behavior: keep `xterm-256color`, or ship/install/copy an `xterm-ghostty`-compatible entry before advertising `TERM=xterm-ghostty`. Acceptance means local shells, SSH, and common TUIs do not see a `TERM` value without matching terminfo.
+- **S3 — Shell integration resources.** Bundle a GhostNotch-owned shell integration resource directory and expose its path through an environment variable such as `GHOSTNOTCH_RESOURCES_DIR`. Include opt-in snippets for zsh first, then bash and fish, without mutating user dotfiles silently.
+- **S4 — Working-directory reporting.** Implement OSC 7 or equivalent current-directory reporting through the shell integration layer, store the latest directory in session state, and document how future commands or UI affordances can inherit it.
+- **S5 — SSH behavior.** Define behavior for hosts without Ghostty/GhostNotch terminfo: documented downgrade, terminfo copy helper, or explicit limitation. Acceptance means SSH does not silently produce broken colors/keys because of an advertised unsupported `TERM`.
+- **S6 — Shell integration acceptance.** Manually check login shell, non-login shell, zsh, bash, fish if installed, common prompt frameworks, shell switches, SSH, and collapse/reopen session persistence.
+
+### Toward A Fuller Ghostty/libghostty Implementation
+
+Full Ghostty renderer parity is out of MVP, but these changes make the MVP easier to evolve toward a fuller Ghostty/libghostty-backed implementation:
+
+- **G1 — Keep the renderer boundary replaceable.** Do not let SwiftUI or panel code depend on Ghostty C types. Continue routing all terminal rendering through `TerminalRenderingEngine`, `GhosttyTerminalCore`, `TerminalRenderSnapshot`, and `TerminalGridView` so a future embeddable Ghostty renderer can replace only the rendering backend.
+- **G2 — Expand the C bridge only for durable Ghostty concepts.** Add bridge APIs for mode state, hyperlinks, graphics metadata, semantic selection, and renderer capability probing only when the pinned artifact exposes stable boundaries. Avoid mirroring large upstream structs directly into Swift.
+- **G3 — Add Ghostty comparison fixtures.** Build a small set of deterministic fixture streams for prompts, ANSI styles, cursor movement, scrollback, alternate screen, wide text, combining marks, hyperlinks, and graphics negotiation. Acceptance means GhostNotch can replay each fixture and compare model output or screenshots against expected behavior before manual GUI testing.
+- **G4 — Track upstream artifact capabilities.** Each vendor update should record whether the artifact exposes font shaping, metrics, glyph atlas, renderer draw commands, hyperlink metadata, graphics protocol surfaces, shell integration resources, or terminfo assets. If a future artifact exposes a practical renderer API, reopen the AppKit/CoreText versus Ghostty-renderer decision.
+- **G5 — Keep Ghostty parity claims narrow.** Documentation and UI copy should say GhostNotch uses Ghostty's VT/render-state boundary until the app actually embeds Ghostty's full renderer or shell integration stack.
 
 ### Terminal Files
 
@@ -472,11 +483,18 @@ For non-notch displays, the island should still appear top center, using a conse
    - ~~Grapheme clusters, wide characters, and emoji/private-use glyph model support.~~ **Done** — render snapshots carry grapheme clusters and wide-cell metadata.
    - ~~Selection/copy behavior for whitespace and wide cells.~~ **Done** — leading indentation, selected internal spaces, narrow trailing selections, and wide-cell spacer suppression are covered in tests.
    - ~~Initial CoreText-backed AppKit drawing, installed developer-font preference, fallback-font handling, and cursor/cell metric alignment.~~ **Done** — the renderer remains GhostNotch-owned for MVP because the pinned Ghostty VT boundary does not expose a complete embeddable renderer API.
-   - Renderer acceptance cases for editor/TUI output remain manual validation work.
-5. Add shell integration basics: terminal metadata environment, terminfo strategy, shell integration resource path, and manual setup guidance for common shells.
-6. Add runtime notch measurement and fallback display behavior.
-7. Remove or hide Stage 1 debug color controls before public MVP.
-8. Continue hardening mouse reporting and formatter-backed selection once terminal programs beyond simple shell commands are in scope.
+   - **Next:** complete R4-R8: manual TUI acceptance, bracketed paste/full-screen paste behavior, font feature/ligature audit, color/style polish, and mouse/selection/alternate-screen hardening.
+5. Add shell integration basics in order:
+   - **S1:** terminal identity environment while keeping `TERM=xterm-256color`.
+   - **S2:** terminfo policy before any `TERM=xterm-ghostty` advertisement.
+   - **S3-S4:** shell integration resource directory and working-directory reporting.
+   - **S5-S6:** SSH behavior and common-shell acceptance.
+6. Add Ghostty/libghostty alignment scaffolding:
+   - **G1-G2:** keep renderer boundaries replaceable and expand the C bridge only around durable Ghostty concepts.
+   - **G3-G4:** add Ghostty comparison fixtures and vendor capability tracking.
+   - **G5:** keep parity claims narrow until a fuller renderer or shell integration stack is truly embedded.
+7. Add runtime notch measurement and fallback display behavior.
+8. Remove or hide Stage 1 debug color controls before public MVP.
 
 ## Acceptance Criteria
 
@@ -520,9 +538,10 @@ Still required for full MVP:
 
 - Runtime notch measurement/fallback behavior.
 - Public-build cleanup of the debug notch color control.
-- Remaining renderer fidelity acceptance work for ligature/font-feature handling and editor/TUI stress cases.
-- Shell integration basics: terminal metadata environment, terminfo policy, shell integration resource path, and common-shell setup guidance.
-- Manual acceptance pass for shell/editor commands against the Ghostty-backed renderer: `ls`, ANSI color commands, `top`, `vim` or `nano`, resize-sensitive commands, collapse/reopen session persistence, and focused-terminal Escape forwarding.
+- R4-R8 renderer follow-through: manual TUI acceptance, bracketed paste/full-screen paste behavior, ligature/font-feature audit, ANSI color/style polish, mouse/selection/alternate-screen hardening.
+- S1-S6 shell integration basics: terminal metadata environment, terminfo policy, shell integration resource path, working-directory reporting, SSH behavior, and common-shell setup guidance.
+- G1-G5 Ghostty/libghostty alignment scaffolding: replaceable renderer boundary, durable bridge expansion, Ghostty comparison fixtures, vendor capability tracking, and honest parity claims.
+- Manual acceptance pass for shell/editor commands against the Ghostty-backed renderer: `ls`, ANSI color commands, `top`, `vim` or `nano`, resize-sensitive commands, collapse/reopen session persistence, focused-terminal Escape forwarding, and paste behavior in full-screen programs.
 
 ### Manual Renderer Acceptance Suite
 
@@ -542,6 +561,9 @@ Acceptance notes:
 
 - Powerline/private-use glyphs require an installed compatible developer font such as MesloLGS NF, JetBrainsMono Nerd Font, Hack Nerd Font, or FiraCode Nerd Font.
 - Verify cursor alignment after resizing the island and while editing text in `vim` or `nano`.
+- Verify paste at a normal shell prompt with a multi-line command and confirm unsafe escape bytes are stripped or neutralized.
+- Verify paste inside `vim` or `nano` after the editor enables bracketed paste; pasted text should insert as text, not execute editor commands accidentally.
+- Verify accidental paste inside `top`/`less` is understood as foreground-program input until bracketed paste/mode tracking says otherwise; record any confusing behavior as an R5 follow-up.
 - Verify collapse/reopen keeps the same shell session and visible scrollback.
 - Verify focused-terminal Escape reaches the terminal program; use `Option+Space`, the close button, or outside click for app-level collapse.
 
