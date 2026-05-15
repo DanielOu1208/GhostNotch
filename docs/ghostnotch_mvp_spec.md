@@ -323,8 +323,8 @@ Rendering fidelity work required before the terminal feels close to Ghostty is n
 - **R1 — Renderer model parity, done.** `GNVTTerminalSnapshot` carries grapheme sidecar data and wide-cell roles into `TerminalRenderSnapshot`. Covered by terminal core tests for combining graphemes, emoji, CJK wide cells, private-use prompt glyphs, whitespace-preserving selection, and wide-cell copy behavior.
 - **R2 — Ghostty renderer boundary spike, done for MVP.** The pinned `libghostty-vt` boundary exposes VT state, render-state snapshots, formatter helpers, input encoding, and image geometry helpers, but not a complete embeddable Ghostty font shaping/renderer API. GhostNotch should keep the AppKit/CoreText grid renderer for MVP.
 - **R3 — CoreText renderer baseline, done for MVP.** `TerminalGridView` uses CoreText-backed measurement/drawing, prefers installed developer/Nerd Font families when available, falls back through CoreText for missing glyphs, and keeps cursor/cell metrics tied to the selected terminal font.
-- **R4 — Manual TUI renderer acceptance, next.** Run the acceptance suite below in the app, record visible failures, and turn each failure into one focused renderer fix. Acceptance means `less`, `top`, `vim` or `nano`, ANSI style stress, emoji/CJK/combining marks, powerline prompt glyphs, resize-sensitive output, collapse/reopen, and focused-terminal Escape all behave well enough for daily shell/editor use.
-- **R5 — Bracketed paste and full-screen app paste behavior.** Track Ghostty's bracketed-paste mode state through the bridge, encode paste with bracketed wrappers only when mode 2004 is active, and verify paste behavior in shell prompts, `vim`/`nano`, `less`, and `top`. Acceptance means a paste into a shell prompt remains safe and newline-normalized, while a paste into full-screen TUIs does not accidentally feed command text as ordinary control keystrokes when the app has requested bracketed paste.
+- **R4 — Renderer acceptance baseline, done.** The MVP now has deterministic fixture coverage for ANSI/style rendering, cursor movement, alternate screen, scrollback, unicode/graphemes, wide-cell copy, and prompt glyphs. Manual app acceptance remains tracked below because it requires interacting with the expanded GhostNotch terminal.
+- **R5 — Bracketed paste and full-screen app paste behavior, code baseline done.** GhostNotch tracks Ghostty's bracketed-paste mode state through the bridge and encodes paste with bracketed wrappers only when mode 2004 is active. Manual verification in shell prompts, `vim`/`nano`, `less`, and `top` remains tracked below.
 - **R6 — Font features and ligature pass.** Audit whether the current CoreText drawing path enables the same developer-font features users expect from Ghostty: ligatures where appropriate, private-use/powerline glyph stability, bold/italic synthesis, fallback-family choices, baseline alignment, and line-height consistency. Acceptance means common prompts and editor text render without clipped glyphs, drifting cursor positions, or inconsistent fallback sizing.
 - **R7 — Color/style presentation pass.** Compare ANSI 16-color, 256-color, truecolor, bold, dim, italic, underline, inverse, and cursor rendering against Ghostty-like expectations. Acceptance means common CLI output, prompt themes, and editor statuslines are legible and visually stable in the compact island.
 - **R8 — Mouse, selection, and alternate-screen behavior hardening.** Continue hardening mouse reporting, scroll behavior in primary versus alternate screen, formatter-backed selection, and selection clearing. Acceptance means scrollback works in the shell, wheel/key behavior does not fight `less`/`vim`/`top`, and copy remains predictable.
@@ -332,7 +332,7 @@ Rendering fidelity work required before the terminal feels close to Ghostty is n
 
 ### Shell Integration
 
-The current shell launch path resolves the user's default shell and starts it in a PTY with a deterministic conservative terminal environment. That is enough for basic commands, but it is not yet Ghostty-like.
+The current shell launch path resolves the user's default shell and starts it in a PTY with a deterministic conservative terminal environment. It keeps `TERM=xterm-256color` and normalizes empty/`C` locales to UTF-8 so interactive Unicode input works in GUI-launched sessions. That is enough for basic commands, but it is not yet Ghostty-like.
 
 Shell integration work required before the terminal feels close to Ghostty is split into these work packages:
 
@@ -483,10 +483,9 @@ For non-notch displays, the island should still appear top center, using a conse
    - ~~Grapheme clusters, wide characters, and emoji/private-use glyph model support.~~ **Done** — render snapshots carry grapheme clusters and wide-cell metadata.
    - ~~Selection/copy behavior for whitespace and wide cells.~~ **Done** — leading indentation, selected internal spaces, narrow trailing selections, and wide-cell spacer suppression are covered in tests.
    - ~~Initial CoreText-backed AppKit drawing, installed developer-font preference, fallback-font handling, and cursor/cell metric alignment.~~ **Done** — the renderer remains GhostNotch-owned for MVP because the pinned Ghostty VT boundary does not expose a complete embeddable renderer API.
-   - **Next:** run **R4 — Manual TUI renderer acceptance** in the app and record visible failures before making more shell-integration claims.
-   - Fix each R4 failure as a focused renderer change rather than starting a broad renderer rewrite.
+   - ~~Add the R4 deterministic renderer acceptance fixture baseline.~~ **Done** — automated fixture coverage exists; manual app acceptance remains tracked below.
 5. Harden paste, alternate-screen, scroll, and selection together:
-   - Complete **R5 — Bracketed paste and full-screen app paste behavior**.
+   - ~~Complete the R5 bracketed-paste code baseline.~~ **Done** — paste is wrapped only when Ghostty mode 2004 is active; manual app checks remain tracked below.
    - Fold in the alternate-screen, scrollback, mouse-reporting, wheel behavior, and selection-clearing parts of **R8 — Mouse, selection, and alternate-screen behavior hardening**.
    - Acceptance means shell prompts, `vim`/`nano`, `less`, and `top` do not fight paste, Escape, scroll, or selection behavior.
 6. Polish visual renderer fidelity:
@@ -531,6 +530,7 @@ Currently satisfied from the baseline above:
 - Notch-attached collapsed, hover, and expanded panel behavior.
 - First-pass real PTY shell session startup.
 - Basic terminal input, paste, output, and resize.
+- UTF-8 shell locale defaults for GUI-launched PTY sessions, including empty/`C` `LANG` and `LC_CTYPE` inheritance.
 - Session preservation across collapse/reopen.
 - Escape forwarding while terminal grid is focused; outside-click collapse.
 - Product toggle hotkey (`Option+Space`).
@@ -540,6 +540,8 @@ Currently satisfied from the baseline above:
 - Grapheme-aware snapshots and CoreText-backed rendering for combining marks, emoji, CJK wide cells, wide spacer cells, and private-use prompt glyphs when an installed compatible developer font is available.
 - Ghostty-backed key encoding for special keys/modifiers and primary-screen scrollback.
 - App-level terminal grid text selection/copy.
+- R4 deterministic renderer acceptance fixtures for ANSI/style, cursor movement, alternate screen, scrollback, unicode/graphemes, wide-cell copy, and prompt glyphs.
+- R5 bracketed-paste mode tracking and mode-aware paste encoding.
 - Vendored `libghostty-vt` artifact linked into the app and tests.
 - Reproducible Ghostty VT vendor build script and version metadata.
 
@@ -547,10 +549,10 @@ Still required for full MVP:
 
 - Runtime notch measurement/fallback behavior.
 - Public-build cleanup of the debug notch color control.
-- R4-R8 renderer follow-through: manual TUI acceptance, bracketed paste/full-screen paste behavior, ligature/font-feature audit, ANSI color/style polish, mouse/selection/alternate-screen hardening.
+- R6-R8 renderer follow-through: ligature/font-feature audit, ANSI color/style polish, mouse/selection/alternate-screen hardening.
+- Manual app acceptance for R4/R5 behavior: renderer checks and paste behavior in shell prompts, `vim` or `nano`, `less`, and `top`.
 - S1-S6 shell integration basics: terminal metadata environment, terminfo policy, shell integration resource path, working-directory reporting, SSH behavior, and common-shell setup guidance.
 - G1-G5 Ghostty/libghostty alignment scaffolding: replaceable renderer boundary, durable bridge expansion, Ghostty comparison fixtures, vendor capability tracking, and honest parity claims.
-- Manual acceptance pass for shell/editor commands against the Ghostty-backed renderer: `ls`, ANSI color commands, `top`, `vim` or `nano`, resize-sensitive commands, collapse/reopen session persistence, focused-terminal Escape forwarding, and paste behavior in full-screen programs.
 
 ### Manual Renderer Acceptance Suite
 
@@ -559,7 +561,7 @@ Run this suite in the expanded GhostNotch terminal before moving to shell integr
 | Area | Manual check | Result | Notes |
 | --- | --- | --- | --- |
 | ANSI/style rendering | Run the ANSI `printf` command below and inspect foreground color plus bold reset behavior. | Follow-up | Baseline fixture coverage exists; manual app pass still required. |
-| Unicode/graphemes | Run the unicode `printf` command below and inspect combining marks, emoji, CJK, and private-use prompt glyphs. | Follow-up | Baseline fixture coverage exists; powerline glyph quality depends on installed compatible fonts. |
+| Unicode/graphemes | Run the unicode `printf` command below and inspect combining marks, emoji, CJK, and private-use prompt glyphs. | Follow-up | Baseline fixture coverage exists; PTY locale now defaults to UTF-8 for input echo, but manual app retest is required. Powerline glyph quality depends on installed compatible fonts. |
 | CJK/wide-cell copy | Run the wide-column command below, select/copy the line, and confirm wide spacer cells are not duplicated. | Follow-up | Baseline fixture coverage exists; manual grid selection pass still required. |
 | TUI/editor rendering | Open `top`, `less`, and `vim` or `nano`; inspect alternate-screen rendering, cursor position, and status lines. | Follow-up | Manual app pass required; paste-specific issues become R5 follow-ups. |
 | Resize/collapse/Escape | Resize through the expanded island, collapse/reopen, and confirm focused Escape reaches the foreground terminal program. | Follow-up | Manual app pass required because this crosses AppKit focus, layout, and session persistence. |
@@ -577,6 +579,7 @@ vim docs/ghostnotch_mvp_spec.md # or nano if vim is unavailable
 Acceptance notes:
 
 - Powerline/private-use glyphs require an installed compatible developer font such as MesloLGS NF, JetBrainsMono Nerd Font, Hack Nerd Font, or FiraCode Nerd Font.
+- Verify `locale` reports UTF-8 for `LANG` and `LC_CTYPE`; GUI-launched sessions should no longer inherit empty/`C` values by default.
 - Verify cursor alignment after resizing the island and while editing text in `vim` or `nano`.
 - Verify paste at a normal shell prompt with a multi-line command and confirm unsafe escape bytes are stripped or neutralized.
 - Verify paste inside `vim` or `nano` after the editor enables bracketed paste; pasted text should insert as text, not execute editor commands accidentally.

@@ -14,6 +14,30 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(environment["PATH"], "/usr/bin:/bin")
     }
 
+    func testPTYEnvironmentDefaultsToUTF8LocaleWhenInheritedLocaleIsC() {
+        let environment = PTYProcess.terminalEnvironment(from: [
+            "LANG": "",
+            "LC_CTYPE": "C",
+            "LC_ALL": "POSIX",
+        ])
+
+        XCTAssertEqual(environment["LANG"], PTYProcess.defaultUTF8Locale)
+        XCTAssertEqual(environment["LC_CTYPE"], PTYProcess.defaultUTF8Locale)
+        XCTAssertNil(environment["LC_ALL"])
+    }
+
+    func testPTYEnvironmentPreservesInheritedUTF8Locale() {
+        let environment = PTYProcess.terminalEnvironment(from: [
+            "LANG": "fr_CA.UTF-8",
+            "LC_CTYPE": "en_US.UTF-8",
+            "LC_ALL": "en_GB.UTF-8",
+        ])
+
+        XCTAssertEqual(environment["LANG"], "fr_CA.UTF-8")
+        XCTAssertEqual(environment["LC_CTYPE"], "en_US.UTF-8")
+        XCTAssertEqual(environment["LC_ALL"], "en_GB.UTF-8")
+    }
+
     func testSessionRunsCommandAndCapturesOutput() async throws {
         let state = TerminalSessionState(outputLimit: 16 * 1024)
         let session = TerminalSession(
@@ -80,5 +104,16 @@ final class TerminalSessionTests: XCTestCase {
     func testTerminalPasteMappingSanitizesUnsafeEscapesWithoutBracketedWrappers() {
         XCTAssertEqual(TerminalInputMapping.data(forPastedText: "echo hi\u{1B}\n"), Data("echo hi \r".utf8))
         XCTAssertNil(TerminalInputMapping.data(forPastedText: ""))
+    }
+
+    func testTerminalPasteMappingUsesBracketedWrappersOnlyWhenRequested() {
+        XCTAssertEqual(
+            TerminalInputMapping.data(forPastedText: "echo hi\u{1B}\n", bracketed: true),
+            Data("\u{1B}[200~echo hi \n\u{1B}[201~".utf8)
+        )
+        XCTAssertEqual(
+            TerminalInputMapping.data(forPastedText: "echo hi\u{1B}\n", bracketed: false),
+            Data("echo hi \r".utf8)
+        )
     }
 }

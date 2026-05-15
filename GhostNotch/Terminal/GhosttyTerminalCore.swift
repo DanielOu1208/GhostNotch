@@ -167,6 +167,7 @@ final class GhosttyTerminalCore {
             cursorStyle: TerminalCursorStyle(rawValue: meta.cursorStyle) ?? .bar,
             isAlternateScreen: meta.isAlternateScreen,
             hasMouseTracking: meta.hasMouseTracking,
+            isBracketedPasteMode: meta.bracketedPasteMode,
             totalRows: Int(meta.totalRows),
             scrollbackRows: Int(meta.scrollbackRows)
         )

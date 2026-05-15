@@ -107,8 +107,8 @@ enum TerminalInputMapping {
             .data(using: .utf8)
     }
 
-    static func data(forPastedText text: String) -> Data? {
-        GhosttyTerminalCore.encodePaste(text, bracketed: false)
+    static func data(forPastedText text: String, bracketed: Bool = false) -> Data? {
+        GhosttyTerminalCore.encodePaste(text, bracketed: bracketed)
     }
 
     static func data(forKeyCode keyCode: UInt16, characters: String?) -> Data? {

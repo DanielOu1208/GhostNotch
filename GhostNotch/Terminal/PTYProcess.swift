@@ -32,6 +32,7 @@ enum PTYProcessError: Error, LocalizedError, Equatable {
 
 final class PTYProcess: @unchecked Sendable {
     static let defaultTerminalType = "xterm-256color"
+    static let defaultUTF8Locale = "en_US.UTF-8"
 
     typealias OutputHandler = @MainActor @Sendable (Data) -> Void
     typealias TerminationHandler = @MainActor @Sendable () -> Void
@@ -283,6 +284,7 @@ final class PTYProcess: @unchecked Sendable {
     static func terminalEnvironment(from environment: [String: String]) -> [String: String] {
         var terminalEnvironment = environment
         terminalEnvironment["TERM"] = defaultTerminalType
+        terminalEnvironment.applyDefaultUTF8Locale()
         return terminalEnvironment
     }
 
@@ -302,6 +304,31 @@ final class PTYProcess: @unchecked Sendable {
 
         kill(process.processIdentifier, SIGKILL)
         process.waitUntilExit()
+    }
+}
+
+private extension Dictionary where Key == String, Value == String {
+    mutating func applyDefaultUTF8Locale() {
+        if shouldUseDefaultUTF8Locale(for: self["LANG"]) {
+            self["LANG"] = PTYProcess.defaultUTF8Locale
+        }
+
+        if shouldUseDefaultUTF8Locale(for: self["LC_CTYPE"]) {
+            self["LC_CTYPE"] = PTYProcess.defaultUTF8Locale
+        }
+
+        if shouldUseDefaultUTF8Locale(for: self["LC_ALL"]) {
+            removeValue(forKey: "LC_ALL")
+        }
+    }
+
+    private func shouldUseDefaultUTF8Locale(for value: String?) -> Bool {
+        guard let value else {
+            return true
+        }
+
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized.isEmpty || normalized == "c" || normalized == "posix"
     }
 }
 

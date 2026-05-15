@@ -154,6 +154,18 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertEqual(data, Data("\u{1B}[200~echo hi \n\u{1B}[201~".utf8))
     }
 
+    func testBracketedPasteModeTracksTerminalModeState() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+
+        XCTAssertFalse(core.snapshot.isBracketedPasteMode)
+
+        core.processOutput(Data("\u{1B}[?2004h".utf8))
+        XCTAssertTrue(core.snapshot.isBracketedPasteMode)
+
+        core.processOutput(Data("\u{1B}[?2004l".utf8))
+        XCTAssertFalse(core.snapshot.isBracketedPasteMode)
+    }
+
     func testFocusAndBlurEncoding() {
         let core = GhosttyTerminalCore()
 
@@ -258,6 +270,7 @@ final class GhosttyTerminalCoreTests: XCTestCase {
             cursorStyle: .bar,
             isAlternateScreen: false,
             hasMouseTracking: false,
+            isBracketedPasteMode: false,
             totalRows: 1,
             scrollbackRows: 0
         )

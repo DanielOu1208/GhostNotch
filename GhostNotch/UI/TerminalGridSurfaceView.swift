@@ -120,7 +120,7 @@ final class TerminalGridView: NSView {
 
     @objc func paste(_ sender: Any?) {
         guard let pastedText = NSPasteboard.general.string(forType: .string),
-              let input = TerminalInputMapping.data(forPastedText: pastedText) else {
+              let input = TerminalInputMapping.data(forPastedText: pastedText, bracketed: snapshot.isBracketedPasteMode) else {
             return
         }
 
