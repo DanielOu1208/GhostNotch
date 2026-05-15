@@ -183,6 +183,7 @@ final class GhosttyTerminalCore {
             isAlternateScreen: meta.isAlternateScreen,
             hasMouseTracking: meta.hasMouseTracking,
             isBracketedPasteMode: meta.bracketedPasteMode,
+            isFocusReportingMode: meta.focusEventMode,
             totalRows: Int(meta.totalRows),
             scrollbackRows: Int(meta.scrollbackRows)
         )

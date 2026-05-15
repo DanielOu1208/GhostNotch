@@ -184,11 +184,48 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertFalse(core.snapshot.isBracketedPasteMode)
     }
 
+    func testFocusReportingModeTracksTerminalModeState() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+
+        XCTAssertFalse(core.snapshot.isFocusReportingMode)
+
+        core.processOutput(Data("\u{1B}[?1004h".utf8))
+        XCTAssertTrue(core.snapshot.isFocusReportingMode)
+
+        core.processOutput(Data("\u{1B}[?1004l".utf8))
+        XCTAssertFalse(core.snapshot.isFocusReportingMode)
+    }
+
     func testFocusAndBlurEncoding() {
         let core = GhosttyTerminalCore()
 
         XCTAssertEqual(core.focusData(), Data("\u{1B}[I".utf8))
         XCTAssertEqual(core.blurData(), Data("\u{1B}[O".utf8))
+    }
+
+    func testEngineSendsFocusEventsOnlyWhenModeIsEnabled() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+        var writes: [Data] = []
+        let engine = GhosttyTerminalEngine(core: core) { _, data in
+            writes.append(data)
+        }
+
+        engine.focus()
+        engine.blur()
+        XCTAssertTrue(writes.isEmpty)
+
+        engine.processOutput(Data("\u{1B}[?1004h".utf8))
+        engine.focus()
+        engine.blur()
+        XCTAssertEqual(writes, [
+            Data("\u{1B}[I".utf8),
+            Data("\u{1B}[O".utf8),
+        ])
+
+        engine.processOutput(Data("\u{1B}[?1004l".utf8))
+        engine.focus()
+        engine.blur()
+        XCTAssertEqual(writes.count, 2)
     }
 
     func testGhosttyKeyEncodingHandlesEscapeAndArrows() {
@@ -289,6 +326,7 @@ final class GhosttyTerminalCoreTests: XCTestCase {
             isAlternateScreen: false,
             hasMouseTracking: false,
             isBracketedPasteMode: false,
+            isFocusReportingMode: false,
             totalRows: 1,
             scrollbackRows: 0
         )

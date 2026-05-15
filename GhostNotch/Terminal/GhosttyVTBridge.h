@@ -44,6 +44,7 @@ typedef struct {
     bool isAlternateScreen;
     bool hasMouseTracking;
     bool bracketedPasteMode;
+    bool focusEventMode;
     size_t totalRows;
     size_t scrollbackRows;
 } GNVTSnapshotMeta;

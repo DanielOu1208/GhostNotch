@@ -301,6 +301,7 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     bool hasCursorPosition = false;
     bool hasMouseTracking = false;
     bool bracketedPasteMode = false;
+    bool focusEventMode = false;
     size_t totalRows = 0;
     size_t scrollbackRows = 0;
     GhosttyRenderStateCursorVisualStyle cursorStyle = GHOSTTY_RENDER_STATE_CURSOR_VISUAL_STYLE_BAR;
@@ -321,6 +322,7 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_TOTAL_ROWS, &totalRows);
     ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_SCROLLBACK_ROWS, &scrollbackRows);
     ghostty_terminal_mode_get(terminal->terminal, GHOSTTY_MODE_BRACKETED_PASTE, &bracketedPasteMode);
+    ghostty_terminal_mode_get(terminal->terminal, GHOSTTY_MODE_FOCUS_EVENT, &focusEventMode);
 
     size_t required = (size_t)columns * (size_t)rows;
     if (cellCount < required) {
@@ -428,6 +430,7 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     meta->isAlternateScreen = activeScreen == GHOSTTY_TERMINAL_SCREEN_ALTERNATE;
     meta->hasMouseTracking = hasMouseTracking;
     meta->bracketedPasteMode = bracketedPasteMode;
+    meta->focusEventMode = focusEventMode;
     meta->totalRows = totalRows;
     meta->scrollbackRows = scrollbackRows;
     return !didOverflowGraphemes;

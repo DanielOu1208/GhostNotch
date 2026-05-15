@@ -89,6 +89,7 @@ struct TerminalRenderSnapshot: Equatable {
     let isAlternateScreen: Bool
     let hasMouseTracking: Bool
     let isBracketedPasteMode: Bool
+    let isFocusReportingMode: Bool
     let totalRows: Int
     let scrollbackRows: Int
 
@@ -105,6 +106,7 @@ struct TerminalRenderSnapshot: Equatable {
             isAlternateScreen: false,
             hasMouseTracking: false,
             isBracketedPasteMode: false,
+            isFocusReportingMode: false,
             totalRows: rows,
             scrollbackRows: 0
         )

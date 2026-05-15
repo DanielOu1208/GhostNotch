@@ -5,10 +5,17 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
     var onSnapshotChange: ((TerminalRenderSnapshot) -> Void)?
 
     private let core: GhosttyTerminalCore
+    private let sessionWriter: (TerminalSession?, Data) throws -> Void
     private weak var session: TerminalSession?
 
-    init(core: GhosttyTerminalCore = GhosttyTerminalCore()) {
+    init(
+        core: GhosttyTerminalCore = GhosttyTerminalCore(),
+        sessionWriter: @escaping (TerminalSession?, Data) throws -> Void = { session, data in
+            try session?.write(data)
+        }
+    ) {
         self.core = core
+        self.sessionWriter = sessionWriter
     }
 
     var snapshot: TerminalRenderSnapshot {
@@ -66,16 +73,28 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
     }
 
     func focus() {
+        guard core.snapshot.isFocusReportingMode else {
+            return
+        }
+
         writeToSession(core.focusData())
     }
 
     func blur() {
+        guard core.snapshot.isFocusReportingMode else {
+            return
+        }
+
         writeToSession(core.blurData())
     }
 
     private func writeToSession(_ data: Data) {
+        guard !data.isEmpty else {
+            return
+        }
+
         do {
-            try session?.write(data)
+            try sessionWriter(session, data)
         } catch {
             NSLog("GhostNotch failed to write terminal input: \(error.localizedDescription)")
         }
