@@ -10,6 +10,7 @@ struct IslandExpandedView: View {
     let onKeyEvent: (TerminalKeyEvent) -> Void
     let onScroll: (Int) -> Void
     let onResize: (Int, Int) -> Void
+    let onRestart: () -> Void
     let onCollapse: () -> Void
 
     var body: some View {
@@ -54,18 +55,28 @@ struct IslandExpandedView: View {
 
             Spacer()
 
-            Button(action: onCollapse) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.54))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            }
-            .buttonStyle(.plain)
+            headerButton(systemName: "arrow.clockwise", action: onRestart)
+                .accessibilityLabel("Restart terminal")
+                .help("Restart terminal")
+
+            headerButton(systemName: "xmark", action: onCollapse)
+                .accessibilityLabel("Collapse terminal")
+                .help("Collapse terminal")
         }
         .padding(.horizontal, 22)
         .frame(height: 44)
+    }
+
+    private func headerButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.54))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private var terminalSnapshot: TerminalRenderSnapshot {

@@ -54,17 +54,38 @@ final class TerminalSessionTests: XCTestCase {
         let marker = "GHOSTNOTCH_TEST_\(UUID().uuidString)"
         try session.write("printf '\\n\(marker)\\n'\n")
 
-        let deadline = Date().addingTimeInterval(3)
-        while Date() < deadline {
-            if state.outputText.contains(marker) {
-                XCTAssertTrue(session.isRunning)
-                return
-            }
+        try await waitForOutput(containing: marker, in: state)
+        XCTAssertTrue(session.isRunning)
+    }
 
-            try await Task.sleep(nanoseconds: 50_000_000)
+    func testRestartClearsOutputAndStartsFreshShell() async throws {
+        let state = TerminalSessionState(outputLimit: 16 * 1024)
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            workingDirectory: FileManager.default.homeDirectoryForCurrentUser.path,
+            state: state
+        )
+
+        try session.start(cols: 80, rows: 24)
+        defer {
+            session.stop()
         }
 
-        XCTFail("Terminal session did not capture command output. Output was: \(state.outputText)")
+        let firstMarker = "GHOSTNOTCH_BEFORE_RESTART_\(UUID().uuidString)"
+        try session.write("printf '\\n\(firstMarker)\\n'\n")
+        try await waitForOutput(containing: firstMarker, in: state)
+
+        try session.restart(cols: 72, rows: 20)
+
+        XCTAssertTrue(session.isRunning)
+        XCTAssertTrue(state.isRunning)
+        XCTAssertFalse(state.outputText.contains(firstMarker))
+
+        let secondMarker = "GHOSTNOTCH_AFTER_RESTART_\(UUID().uuidString)"
+        try session.write("printf '\\n\(secondMarker)\\n'\n")
+        try await waitForOutput(containing: secondMarker, in: state)
+
+        XCTAssertFalse(state.outputText.contains(firstMarker))
     }
 
     func testStoppingSessionMarksItStopped() throws {
@@ -115,5 +136,18 @@ final class TerminalSessionTests: XCTestCase {
             TerminalInputMapping.data(forPastedText: "echo hi\u{1B}\n", bracketed: false),
             Data("echo hi \r".utf8)
         )
+    }
+
+    private func waitForOutput(containing text: String, in state: TerminalSessionState) async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            if state.outputText.contains(text) {
+                return
+            }
+
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        XCTFail("Terminal session did not capture command output. Output was: \(state.outputText)")
     }
 }

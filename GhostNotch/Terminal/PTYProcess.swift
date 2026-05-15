@@ -45,6 +45,7 @@ final class PTYProcess: @unchecked Sendable {
     private var masterFileDescriptor: Int32 = -1
     private var process: Process?
     private var readSource: DispatchSourceRead?
+    private var generation = 0
 
     var isRunning: Bool {
         lock.withLock {
@@ -76,8 +77,10 @@ final class PTYProcess: @unchecked Sendable {
         let shellProcess: Process
         do {
             shellProcess = try makeProcess(shell: shell, workingDirectory: workingDirectory, slave: slave)
+            generation += 1
+            let processGeneration = generation
             shellProcess.terminationHandler = { [weak self] _ in
-                self?.handleProcessTermination()
+                self?.handleProcessTermination(generation: processGeneration)
             }
             try shellProcess.run()
         } catch {
@@ -89,7 +92,7 @@ final class PTYProcess: @unchecked Sendable {
         close(slave)
         masterFileDescriptor = master
         process = shellProcess
-        startReading(from: master)
+        startReading(from: master, generation: generation)
     }
 
     func write(_ data: Data) throws {
@@ -138,7 +141,8 @@ final class PTYProcess: @unchecked Sendable {
         }
     }
 
-    func stop() {
+    @discardableResult
+    func stop() -> Bool {
         let shellProcess: Process?
         let descriptor: Int32
         let source: DispatchSourceRead?
@@ -150,6 +154,7 @@ final class PTYProcess: @unchecked Sendable {
         process = nil
         masterFileDescriptor = -1
         readSource = nil
+        generation += 1
         lock.unlock()
 
         source?.cancel()
@@ -159,11 +164,12 @@ final class PTYProcess: @unchecked Sendable {
         }
 
         guard let shellProcess else {
-            return
+            return false
         }
 
         terminate(shellProcess)
         notifyTermination()
+        return true
     }
 
     deinit {
@@ -179,18 +185,24 @@ final class PTYProcess: @unchecked Sendable {
         return descriptor
     }
 
-    private func startReading(from descriptor: Int32) {
+    private func startReading(from descriptor: Int32, generation: Int) {
         let source = DispatchSource.makeReadSource(fileDescriptor: descriptor, queue: readQueue)
         source.setEventHandler { [weak self] in
-            self?.readAvailableOutput()
+            self?.readAvailableOutput(generation: generation)
         }
         source.resume()
 
         readSource = source
     }
 
-    private func readAvailableOutput() {
-        let descriptor = lock.withLock { masterFileDescriptor }
+    private func readAvailableOutput(generation eventGeneration: Int) {
+        let descriptor = lock.withLock {
+            guard eventGeneration == generation else {
+                return Int32(-1)
+            }
+
+            return masterFileDescriptor
+        }
         guard descriptor >= 0 else {
             return
         }
@@ -209,7 +221,7 @@ final class PTYProcess: @unchecked Sendable {
         }
 
         if bytesRead == 0 || errno != EINTR {
-            handleProcessTermination()
+            handleProcessTermination(generation: eventGeneration)
         }
     }
 
@@ -223,11 +235,16 @@ final class PTYProcess: @unchecked Sendable {
         }
     }
 
-    private func handleProcessTermination() {
+    private func handleProcessTermination(generation eventGeneration: Int) {
         let descriptor: Int32
         let source: DispatchSourceRead?
 
         lock.lock()
+        guard eventGeneration == generation else {
+            lock.unlock()
+            return
+        }
+
         guard process != nil || masterFileDescriptor >= 0 || readSource != nil else {
             lock.unlock()
             return
@@ -238,6 +255,7 @@ final class PTYProcess: @unchecked Sendable {
         process = nil
         masterFileDescriptor = -1
         readSource = nil
+        generation += 1
         lock.unlock()
 
         source?.cancel()

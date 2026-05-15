@@ -135,6 +135,24 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertEqual(snapshot.cell(row: 0, column: 2).character, "c")
     }
 
+    func testResetClearsVisibleCellsPreservesDimensionsAndWriteCallback() {
+        let core = GhosttyTerminalCore(columns: 5, rows: 2)
+        var written = Data()
+        core.onWriteToPTY = { data in
+            written.append(data)
+        }
+
+        core.processOutput(Data("abc".utf8))
+        core.reset(columns: 9, rows: 4)
+
+        XCTAssertEqual(core.snapshot.columns, 9)
+        XCTAssertEqual(core.snapshot.rows, 4)
+        XCTAssertFalse(core.snapshot.plainText.contains("abc"))
+
+        core.processOutput(Data("\u{1B}[c".utf8))
+        XCTAssertEqual(written, Data("\u{1B}[?62;22c".utf8))
+    }
+
     func testDeviceQueryWritesBackToPTY() {
         let core = GhosttyTerminalCore(columns: 10, rows: 2)
         var written = Data()

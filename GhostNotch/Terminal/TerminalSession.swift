@@ -8,6 +8,7 @@ final class TerminalSession {
     private let workingDirectory: String
     private let process: PTYProcess
     private var outputObservers: [@MainActor (Data) -> Void] = []
+    private var shouldIgnoreNextTermination = false
 
     init(
         shellResolver: ShellResolver = ShellResolver(),
@@ -26,7 +27,7 @@ final class TerminalSession {
         }
 
         process.onTermination = { [weak self] in
-            self?.state.markStopped()
+            self?.handleProcessTermination()
         }
     }
 
@@ -52,6 +53,26 @@ final class TerminalSession {
     func stop() {
         process.stop()
         state.markStopped()
+    }
+
+    func restart(cols: Int = 80, rows: Int = 24) throws {
+        state.clearOutput()
+        if process.stop() {
+            shouldIgnoreNextTermination = true
+        }
+
+        do {
+            try process.start(
+                shell: shellResolver.resolve(),
+                workingDirectory: workingDirectory,
+                cols: cols,
+                rows: rows
+            )
+            state.markRunning()
+        } catch {
+            state.recordError(error)
+            throw error
+        }
     }
 
     func write(_ data: Data) throws {
@@ -88,6 +109,15 @@ final class TerminalSession {
         for observer in outputObservers {
             observer(data)
         }
+    }
+
+    private func handleProcessTermination() {
+        guard !shouldIgnoreNextTermination else {
+            shouldIgnoreNextTermination = false
+            return
+        }
+
+        state.markStopped()
     }
 }
 

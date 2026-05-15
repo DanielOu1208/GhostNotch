@@ -116,6 +116,22 @@ final class IslandPanelController: ObservableObject {
         terminalEngine.resize(cols: max(cols, 2), rows: max(rows, 1))
     }
 
+    func restartTerminal() {
+        let cols = max(terminalSnapshot.columns, 2)
+        let rows = max(terminalSnapshot.rows, 1)
+
+        terminalEngine.reset(cols: cols, rows: rows)
+
+        do {
+            try terminalSession.restart(cols: cols, rows: rows)
+            terminalEngine.focus()
+        } catch {
+            NSLog("GhostNotch failed to restart terminal session: \(error.localizedDescription)")
+        }
+
+        requestTerminalFocus()
+    }
+
     private func startHoverMonitoring() {
         guard localMouseMonitor == nil, globalMouseMonitor == nil else {
             return

@@ -49,6 +49,21 @@ final class GhosttyTerminalCore {
         refreshSnapshot()
     }
 
+    func reset(columns newColumns: Int = 80, rows newRows: Int = 18) {
+        GNVTTerminalDestroy(terminal)
+        columns = max(newColumns, 2)
+        rows = max(newRows, 1)
+        cachedSnapshot = .empty(columns: columns, rows: rows)
+
+        terminal = GNVTTerminalCreate(
+            UInt16(columns),
+            UInt16(rows),
+            ghosttyTerminalWriteCallback,
+            Unmanaged.passUnretained(self).toOpaque()
+        )
+        refreshSnapshot()
+    }
+
     func scrollViewport(deltaRows: Int) {
         GNVTTerminalScrollViewport(terminal, deltaRows)
         refreshSnapshot()

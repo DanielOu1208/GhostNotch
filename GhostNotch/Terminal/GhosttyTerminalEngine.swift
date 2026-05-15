@@ -60,6 +60,11 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         }
     }
 
+    func reset(cols: Int, rows: Int) {
+        core.reset(columns: cols, rows: rows)
+        publishSnapshot()
+    }
+
     func focus() {
         writeToSession(core.focusData())
     }
