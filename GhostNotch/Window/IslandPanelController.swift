@@ -221,7 +221,7 @@ final class IslandPanelController: ObservableObject {
         let frame = WindowPositioner.frame(for: newState)
 
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = newState == .expanded ? 0.16 : 0.12
+            context.duration = newState == .expanded ? 0.18 : 0.16
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             panel.animator().setFrame(frame, display: true)
         }

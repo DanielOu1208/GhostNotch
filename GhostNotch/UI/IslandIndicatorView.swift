@@ -23,7 +23,7 @@ struct IslandIndicatorView: View {
                 .frame(width: collapsedSideExtensionWidth, height: collapsedIndicatorHeight)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .animation(.easeInOut(duration: 0.12), value: isHovering)
+        .animation(.easeInOut(duration: 0.2), value: isHovering)
     }
 
     private var collapsedStatusDot: some View {
@@ -103,7 +103,7 @@ struct IslandIndicatorView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .padding(.bottom, 15)
-        .animation(.easeInOut(duration: 0.12), value: isHovering)
+        .animation(.easeInOut(duration: 0.2), value: isHovering)
     }
 }
 
