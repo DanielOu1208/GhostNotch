@@ -28,9 +28,9 @@ struct IslandIndicatorView: View {
 
     private var collapsedStatusDot: some View {
         Circle()
-            .fill(Color.green)
+            .fill(Color.white)
             .frame(width: 6, height: 6)
-            .shadow(color: .green.opacity(0.62), radius: 5)
+            .shadow(color: .white.opacity(0.62), radius: 5)
     }
 
     private var collapsedGhosttyLogo: some View {
@@ -87,9 +87,9 @@ struct IslandIndicatorView: View {
 
             HStack(alignment: .center, spacing: 9) {
                 Circle()
-                    .fill(Color.green)
+                    .fill(Color.white)
                     .frame(width: 7, height: 7)
-                    .shadow(color: .green.opacity(0.58), radius: 5)
+                    .shadow(color: .white.opacity(0.58), radius: 5)
 
                 Text(">_")
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
