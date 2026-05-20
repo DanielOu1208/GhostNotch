@@ -7,6 +7,8 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
     private let core: GhosttyTerminalCore
     private let sessionWriter: (TerminalSession?, Data) throws -> Void
     private weak var session: TerminalSession?
+    private var cellWidthPixels = 8
+    private var cellHeightPixels = 16
 
     init(
         core: GhosttyTerminalCore = GhosttyTerminalCore(),
@@ -52,8 +54,15 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         publishSnapshot()
     }
 
-    func resize(cols: Int, rows: Int) {
-        core.resize(columns: cols, rows: rows)
+    func resize(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int) {
+        self.cellWidthPixels = max(cellWidthPixels, 1)
+        self.cellHeightPixels = max(cellHeightPixels, 1)
+        core.resize(
+            columns: cols,
+            rows: rows,
+            cellWidthPixels: self.cellWidthPixels,
+            cellHeightPixels: self.cellHeightPixels
+        )
         publishSnapshot()
 
         guard session?.isRunning == true else {
@@ -69,6 +78,12 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
 
     func reset(cols: Int, rows: Int) {
         core.reset(columns: cols, rows: rows)
+        core.resize(
+            columns: cols,
+            rows: rows,
+            cellWidthPixels: cellWidthPixels,
+            cellHeightPixels: cellHeightPixels
+        )
         publishSnapshot()
     }
 

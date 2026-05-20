@@ -112,8 +112,13 @@ final class IslandPanelController: ObservableObject {
         terminalEngine.scrollViewport(deltaRows: deltaRows)
     }
 
-    func resizeTerminal(cols: Int, rows: Int) {
-        terminalEngine.resize(cols: max(cols, 2), rows: max(rows, 1))
+    func resizeTerminal(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int) {
+        terminalEngine.resize(
+            cols: max(cols, 2),
+            rows: max(rows, 1),
+            cellWidthPixels: max(cellWidthPixels, 1),
+            cellHeightPixels: max(cellHeightPixels, 1)
+        )
     }
 
     func restartTerminal() {

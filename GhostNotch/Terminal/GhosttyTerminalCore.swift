@@ -42,10 +42,21 @@ final class GhosttyTerminalCore {
         refreshSnapshot()
     }
 
-    func resize(columns newColumns: Int, rows newRows: Int) {
+    func resize(
+        columns newColumns: Int,
+        rows newRows: Int,
+        cellWidthPixels: Int = 8,
+        cellHeightPixels: Int = 16
+    ) {
         columns = max(newColumns, 2)
         rows = max(newRows, 1)
-        GNVTTerminalResize(terminal, UInt16(columns), UInt16(rows), 8, 16)
+        GNVTTerminalResize(
+            terminal,
+            UInt16(columns),
+            UInt16(rows),
+            UInt32(max(cellWidthPixels, 1)),
+            UInt32(max(cellHeightPixels, 1))
+        )
         refreshSnapshot()
     }
 

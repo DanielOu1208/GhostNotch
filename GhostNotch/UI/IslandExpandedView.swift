@@ -9,7 +9,7 @@ struct IslandExpandedView: View {
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
     let onScroll: (Int) -> Void
-    let onResize: (Int, Int) -> Void
+    let onResize: (Int, Int, Int, Int) -> Void
     let onRestart: () -> Void
     let onCollapse: () -> Void
 
@@ -31,9 +31,9 @@ struct IslandExpandedView: View {
                 onResize: onResize
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-            .padding(.bottom, 14)
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 10)
         }
         .foregroundStyle(.white)
     }

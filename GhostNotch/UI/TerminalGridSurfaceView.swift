@@ -8,7 +8,7 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
     let onScroll: (Int) -> Void
-    let onResize: (Int, Int) -> Void
+    let onResize: (Int, Int, Int, Int) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -56,10 +56,10 @@ final class TerminalGridView: NSView {
     var onInput: ((Data) -> Void)?
     var onKeyEvent: ((TerminalKeyEvent) -> Void)?
     var onScroll: ((Int) -> Void)?
-    var onResize: ((Int, Int) -> Void)?
+    var onResize: ((Int, Int, Int, Int) -> Void)?
 
-    private let typography = TerminalGridTypography(size: 11)
-    private var lastReportedSize: NSSize = .zero
+    private let typography = TerminalGridTypography(size: TerminalGridMetrics.fontSize)
+    private var lastReportedResize: TerminalGridResize?
     private var selection: TerminalSelection?
 
     override var acceptsFirstResponder: Bool {
@@ -206,26 +206,43 @@ final class TerminalGridView: NSView {
             return
         }
 
-        guard abs(visibleSize.width - lastReportedSize.width) >= 8 ||
-              abs(visibleSize.height - lastReportedSize.height) >= 8 else {
+        let cellSize = measuredCellSize
+        let inset = TerminalGridMetrics.contentInset
+        let cols = Int(max(2, floor((visibleSize.width - inset * 2) / cellSize.width)))
+        let rows = Int(max(1, floor((visibleSize.height - inset * 2) / cellSize.height)))
+        let cellPixelSize = measuredCellPixelSize
+        let resize = TerminalGridResize(
+            columns: cols,
+            rows: rows,
+            cellWidthPixels: cellPixelSize.width,
+            cellHeightPixels: cellPixelSize.height
+        )
+
+        guard resize != lastReportedResize else {
             return
         }
 
-        lastReportedSize = visibleSize
-        let cellSize = measuredCellSize
-        let cols = Int(max(2, floor((visibleSize.width - 8) / cellSize.width)))
-        let rows = Int(max(1, floor((visibleSize.height - 8) / cellSize.height)))
-        onResize?(cols, rows)
+        lastReportedResize = resize
+        onResize?(cols, rows, cellPixelSize.width, cellPixelSize.height)
     }
 
     private var measuredCellSize: NSSize {
         typography.cellSize
     }
 
+    private var measuredCellPixelSize: (width: Int, height: Int) {
+        let scale = window?.backingScaleFactor ?? layer?.contentsScale ?? NSScreen.main?.backingScaleFactor ?? 1
+        return (
+            width: max(1, Int((measuredCellSize.width * scale).rounded())),
+            height: max(1, Int((measuredCellSize.height * scale).rounded()))
+        )
+    }
+
     private func drawCell(_ cell: TerminalCell, row: Int, column: Int, cellSize: NSSize) {
+        let inset = TerminalGridMetrics.contentInset
         let rect = NSRect(
-            x: CGFloat(column) * cellSize.width + 4,
-            y: CGFloat(row) * cellSize.height + 4,
+            x: CGFloat(column) * cellSize.width + inset,
+            y: CGFloat(row) * cellSize.height + inset,
             width: cellSize.width,
             height: cellSize.height
         )
@@ -253,10 +270,19 @@ final class TerminalGridView: NSView {
             return
         }
 
+        let resolvedForeground = foreground.nsColor.withAlphaComponent(0.92)
+        if TerminalBlockElementRenderer.draw(cell.character, foreground: resolvedForeground, in: textRect) {
+            return
+        }
+
+        if TerminalBoxDrawingRenderer.draw(cell.character, foreground: resolvedForeground, in: textRect) {
+            return
+        }
+
         typography.draw(
             cell.character,
             style: style,
-            foreground: foreground.nsColor.withAlphaComponent(0.92),
+            foreground: resolvedForeground,
             in: textRect,
             viewHeight: bounds.height
         )
@@ -271,22 +297,22 @@ final class TerminalGridView: NSView {
         switch snapshot.cursorStyle {
         case .bar:
             rect = NSRect(
-                x: CGFloat(snapshot.cursorColumn) * cellSize.width + 4,
-                y: CGFloat(snapshot.cursorRow) * cellSize.height + 4,
+                x: CGFloat(snapshot.cursorColumn) * cellSize.width + TerminalGridMetrics.contentInset,
+                y: CGFloat(snapshot.cursorRow) * cellSize.height + TerminalGridMetrics.contentInset,
                 width: 1.5,
                 height: cellSize.height
             )
         case .block, .hollowBlock:
             rect = NSRect(
-                x: CGFloat(snapshot.cursorColumn) * cellSize.width + 4,
-                y: CGFloat(snapshot.cursorRow) * cellSize.height + 4,
+                x: CGFloat(snapshot.cursorColumn) * cellSize.width + TerminalGridMetrics.contentInset,
+                y: CGFloat(snapshot.cursorRow) * cellSize.height + TerminalGridMetrics.contentInset,
                 width: cellSize.width,
                 height: cellSize.height
             )
         case .underline:
             rect = NSRect(
-                x: CGFloat(snapshot.cursorColumn) * cellSize.width + 4,
-                y: CGFloat(snapshot.cursorRow + 1) * cellSize.height + 2,
+                x: CGFloat(snapshot.cursorColumn) * cellSize.width + TerminalGridMetrics.contentInset,
+                y: CGFloat(snapshot.cursorRow + 1) * cellSize.height + TerminalGridMetrics.contentInset - 2,
                 width: cellSize.width,
                 height: 1.5
             )
@@ -302,14 +328,252 @@ final class TerminalGridView: NSView {
 
     private func gridPoint(at point: NSPoint) -> TerminalGridPoint? {
         let cellSize = measuredCellSize
-        let column = Int(floor((point.x - 4) / cellSize.width))
-        let row = Int(floor((point.y - 4) / cellSize.height))
+        let inset = TerminalGridMetrics.contentInset
+        let column = Int(floor((point.x - inset) / cellSize.width))
+        let row = Int(floor((point.y - inset) / cellSize.height))
         guard row >= 0, row < snapshot.rows, column >= 0, column < snapshot.columns else {
             return nil
         }
 
         return TerminalGridPoint(row: row, column: column)
     }
+}
+
+private enum TerminalGridMetrics {
+    static let fontSize: CGFloat = 10.5
+    static let contentInset: CGFloat = 3
+}
+
+private struct TerminalGridResize: Equatable {
+    let columns: Int
+    let rows: Int
+    let cellWidthPixels: Int
+    let cellHeightPixels: Int
+}
+
+private enum TerminalBlockElementRenderer {
+    private struct Fill {
+        let xRange: ClosedRange<Int>
+        let yRange: ClosedRange<Int>
+        let alpha: CGFloat
+
+        init(xRange: ClosedRange<Int>, yRange: ClosedRange<Int>, alpha: CGFloat = 1) {
+            self.xRange = xRange
+            self.yRange = yRange
+            self.alpha = alpha
+        }
+    }
+
+    static func draw(_ text: String, foreground: NSColor, in rect: NSRect) -> Bool {
+        guard text.count == 1,
+              let character = text.first,
+              let fills = fills[character] else {
+            return false
+        }
+
+        for fill in fills {
+            foreground.withAlphaComponent(foreground.alphaComponent * fill.alpha).setFill()
+            quadrantRect(xRange: fill.xRange, yRange: fill.yRange, in: rect).fill()
+        }
+
+        return true
+    }
+
+    private static func quadrantRect(xRange: ClosedRange<Int>, yRange: ClosedRange<Int>, in rect: NSRect) -> NSRect {
+        let xUnit = rect.width / 2
+        let yUnit = rect.height / 2
+        let minX = rect.minX + CGFloat(xRange.lowerBound) * xUnit
+        let maxX = rect.minX + CGFloat(xRange.upperBound + 1) * xUnit
+        let minY = rect.minY + CGFloat(yRange.lowerBound) * yUnit
+        let maxY = rect.minY + CGFloat(yRange.upperBound + 1) * yUnit
+
+        return NSRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
+
+    private static let full = Fill(xRange: 0...1, yRange: 0...1)
+    private static let top = Fill(xRange: 0...1, yRange: 0...0)
+    private static let bottom = Fill(xRange: 0...1, yRange: 1...1)
+    private static let left = Fill(xRange: 0...0, yRange: 0...1)
+    private static let right = Fill(xRange: 1...1, yRange: 0...1)
+    private static let topLeft = Fill(xRange: 0...0, yRange: 0...0)
+    private static let topRight = Fill(xRange: 1...1, yRange: 0...0)
+    private static let bottomLeft = Fill(xRange: 0...0, yRange: 1...1)
+    private static let bottomRight = Fill(xRange: 1...1, yRange: 1...1)
+
+    private static let fills: [Character: [Fill]] = [
+        "█": [full],
+        "■": [full],
+        "▓": [Fill(xRange: 0...1, yRange: 0...1, alpha: 0.78)],
+        "▒": [Fill(xRange: 0...1, yRange: 0...1, alpha: 0.5)],
+        "░": [Fill(xRange: 0...1, yRange: 0...1, alpha: 0.28)],
+        "▀": [top],
+        "▄": [bottom],
+        "▌": [left],
+        "▐": [right],
+        "▖": [bottomLeft],
+        "▗": [bottomRight],
+        "▘": [topLeft],
+        "▝": [topRight],
+        "▙": [topLeft, bottomLeft, bottomRight],
+        "▚": [topLeft, bottomRight],
+        "▛": [topLeft, topRight, bottomLeft],
+        "▜": [topLeft, topRight, bottomRight],
+        "▞": [topRight, bottomLeft],
+        "▟": [topRight, bottomLeft, bottomRight],
+    ]
+}
+
+private enum TerminalBoxDrawingRenderer {
+    private enum Stroke {
+        case light
+        case heavy
+        case double
+    }
+
+    private struct Glyph {
+        let up: Stroke?
+        let right: Stroke?
+        let down: Stroke?
+        let left: Stroke?
+
+        init(up: Stroke? = nil, right: Stroke? = nil, down: Stroke? = nil, left: Stroke? = nil) {
+            self.up = up
+            self.right = right
+            self.down = down
+            self.left = left
+        }
+    }
+
+    static func draw(_ text: String, foreground: NSColor, in rect: NSRect) -> Bool {
+        guard text.count == 1,
+              let character = text.first,
+              let glyph = glyphs[character] else {
+            return false
+        }
+
+        foreground.setFill()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+
+        if let left = glyph.left {
+            drawHorizontal(left, from: rect.minX, to: center.x, y: center.y)
+        }
+        if let right = glyph.right {
+            drawHorizontal(right, from: center.x, to: rect.maxX, y: center.y)
+        }
+        if let up = glyph.up {
+            drawVertical(up, x: center.x, from: rect.minY, to: center.y)
+        }
+        if let down = glyph.down {
+            drawVertical(down, x: center.x, from: center.y, to: rect.maxY)
+        }
+
+        return true
+    }
+
+    private static func drawHorizontal(_ stroke: Stroke, from startX: CGFloat, to endX: CGFloat, y: CGFloat) {
+        guard endX > startX else {
+            return
+        }
+
+        switch stroke {
+        case .light:
+            NSRect(x: startX, y: y - 0.5, width: endX - startX, height: 1).fill()
+        case .heavy:
+            NSRect(x: startX, y: y - 0.8, width: endX - startX, height: 1.6).fill()
+        case .double:
+            NSRect(x: startX, y: y - 1.8, width: endX - startX, height: 1).fill()
+            NSRect(x: startX, y: y + 0.8, width: endX - startX, height: 1).fill()
+        }
+    }
+
+    private static func drawVertical(_ stroke: Stroke, x: CGFloat, from startY: CGFloat, to endY: CGFloat) {
+        guard endY > startY else {
+            return
+        }
+
+        switch stroke {
+        case .light:
+            NSRect(x: x - 0.5, y: startY, width: 1, height: endY - startY).fill()
+        case .heavy:
+            NSRect(x: x - 0.8, y: startY, width: 1.6, height: endY - startY).fill()
+        case .double:
+            NSRect(x: x - 1.8, y: startY, width: 1, height: endY - startY).fill()
+            NSRect(x: x + 0.8, y: startY, width: 1, height: endY - startY).fill()
+        }
+    }
+
+    private static let glyphs: [Character: Glyph] = [
+        "─": Glyph(right: .light, left: .light),
+        "━": Glyph(right: .heavy, left: .heavy),
+        "│": Glyph(up: .light, down: .light),
+        "┃": Glyph(up: .heavy, down: .heavy),
+        "┌": Glyph(right: .light, down: .light),
+        "┍": Glyph(right: .heavy, down: .light),
+        "┎": Glyph(right: .light, down: .heavy),
+        "┏": Glyph(right: .heavy, down: .heavy),
+        "┐": Glyph(down: .light, left: .light),
+        "┑": Glyph(down: .light, left: .heavy),
+        "┒": Glyph(down: .heavy, left: .light),
+        "┓": Glyph(down: .heavy, left: .heavy),
+        "└": Glyph(up: .light, right: .light),
+        "┕": Glyph(up: .light, right: .heavy),
+        "┖": Glyph(up: .heavy, right: .light),
+        "┗": Glyph(up: .heavy, right: .heavy),
+        "┘": Glyph(up: .light, left: .light),
+        "┙": Glyph(up: .light, left: .heavy),
+        "┚": Glyph(up: .heavy, left: .light),
+        "┛": Glyph(up: .heavy, left: .heavy),
+        "├": Glyph(up: .light, right: .light, down: .light),
+        "┝": Glyph(up: .light, right: .heavy, down: .light),
+        "┠": Glyph(up: .heavy, right: .light, down: .heavy),
+        "┣": Glyph(up: .heavy, right: .heavy, down: .heavy),
+        "┤": Glyph(up: .light, down: .light, left: .light),
+        "┥": Glyph(up: .light, down: .light, left: .heavy),
+        "┨": Glyph(up: .heavy, down: .heavy, left: .light),
+        "┫": Glyph(up: .heavy, down: .heavy, left: .heavy),
+        "┬": Glyph(right: .light, down: .light, left: .light),
+        "┯": Glyph(right: .light, down: .heavy, left: .light),
+        "┳": Glyph(right: .heavy, down: .heavy, left: .heavy),
+        "┴": Glyph(up: .light, right: .light, left: .light),
+        "┷": Glyph(up: .heavy, right: .light, left: .light),
+        "┻": Glyph(up: .heavy, right: .heavy, left: .heavy),
+        "┼": Glyph(up: .light, right: .light, down: .light, left: .light),
+        "╂": Glyph(up: .heavy, right: .light, down: .heavy, left: .light),
+        "╋": Glyph(up: .heavy, right: .heavy, down: .heavy, left: .heavy),
+        "╭": Glyph(right: .light, down: .light),
+        "╮": Glyph(down: .light, left: .light),
+        "╰": Glyph(up: .light, right: .light),
+        "╯": Glyph(up: .light, left: .light),
+        "═": Glyph(right: .double, left: .double),
+        "║": Glyph(up: .double, down: .double),
+        "╔": Glyph(right: .double, down: .double),
+        "╗": Glyph(down: .double, left: .double),
+        "╚": Glyph(up: .double, right: .double),
+        "╝": Glyph(up: .double, left: .double),
+        "╠": Glyph(up: .double, right: .double, down: .double),
+        "╣": Glyph(up: .double, down: .double, left: .double),
+        "╦": Glyph(right: .double, down: .double, left: .double),
+        "╩": Glyph(up: .double, right: .double, left: .double),
+        "╬": Glyph(up: .double, right: .double, down: .double, left: .double),
+        "╒": Glyph(right: .double, down: .light),
+        "╓": Glyph(right: .light, down: .double),
+        "╕": Glyph(down: .light, left: .double),
+        "╖": Glyph(down: .double, left: .light),
+        "╘": Glyph(up: .light, right: .double),
+        "╙": Glyph(up: .double, right: .light),
+        "╛": Glyph(up: .light, left: .double),
+        "╜": Glyph(up: .double, left: .light),
+        "╞": Glyph(up: .light, right: .double, down: .light),
+        "╟": Glyph(up: .double, right: .light, down: .double),
+        "╡": Glyph(up: .light, down: .light, left: .double),
+        "╢": Glyph(up: .double, down: .double, left: .light),
+        "╤": Glyph(right: .double, down: .light, left: .double),
+        "╥": Glyph(right: .light, down: .double, left: .light),
+        "╧": Glyph(up: .light, right: .double, left: .double),
+        "╨": Glyph(up: .double, right: .light, left: .light),
+        "╪": Glyph(up: .light, right: .double, down: .light, left: .double),
+        "╫": Glyph(up: .double, right: .light, down: .double, left: .light),
+    ]
 }
 
 private struct TerminalGridTypography {
@@ -323,11 +587,11 @@ private struct TerminalGridTypography {
         boldFont = Self.makeFont(size: size, weight: .semibold, matching: regularFont)
         let regularCTFont = regularFont as CTFont
         let advance = CTFontGetAdvancesForGlyphs(regularCTFont, .horizontal, [Self.measurementGlyph(for: regularCTFont)], nil, 1)
-        let width = ceil(advance) + 1
+        let width = ceil(advance)
         let ascent = ceil(CTFontGetAscent(regularCTFont))
         let descent = ceil(CTFontGetDescent(regularCTFont))
         let leading = ceil(CTFontGetLeading(regularCTFont))
-        cellSize = NSSize(width: max(width, 7), height: max(ascent + descent + leading + 2, 15))
+        cellSize = NSSize(width: max(width, 7), height: max(ascent + descent + leading + 1, 14))
         baselineOffset = max(1, floor((cellSize.height - ascent - descent) / 2)) + ascent
     }
 
