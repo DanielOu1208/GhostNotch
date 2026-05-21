@@ -31,6 +31,8 @@
 		1A0001260000000000000001 /* TerminalPixelGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000230000000000000001 /* TerminalPixelGrid.swift */; };
 		1A0001270000000000000001 /* TerminalGridTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000240000000000000001 /* TerminalGridTypography.swift */; };
 		1A0001280000000000000001 /* TerminalKeyEvent+AppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000250000000000000001 /* TerminalKeyEvent+AppKit.swift */; };
+		1A0001290000000000000001 /* TerminalChromePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000260000000000000001 /* TerminalChromePresentation.swift */; };
+		1A0001300000000000000001 /* IslandTerminalSurfacePhase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000270000000000000001 /* IslandTerminalSurfacePhase.swift */; };
 		1A00011E0000000000000001 /* GhosttyVTBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000190000000000000001 /* GhosttyVTBridge.c */; };
 		1A00011F0000000000000001 /* GhosttyVT.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00001B0000000000000001 /* GhosttyVT.xcframework */; };
 		1A00010F0000000000000001 /* ShellResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000B0000000000000001 /* ShellResolver.swift */; };
@@ -75,6 +77,8 @@
 		1A0000230000000000000001 /* TerminalPixelGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPixelGrid.swift; sourceTree = "<group>"; };
 		1A0000240000000000000001 /* TerminalGridTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalGridTypography.swift; sourceTree = "<group>"; };
 		1A0000250000000000000001 /* TerminalKeyEvent+AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalKeyEvent+AppKit.swift"; sourceTree = "<group>"; };
+		1A0000260000000000000001 /* TerminalChromePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalChromePresentation.swift; sourceTree = "<group>"; };
+		1A0000270000000000000001 /* IslandTerminalSurfacePhase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandTerminalSurfacePhase.swift; sourceTree = "<group>"; };
 		1A0000180000000000000001 /* GhostNotch-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "GhostNotch-Bridging-Header.h"; sourceTree = "<group>"; };
 		1A0000190000000000000001 /* GhosttyVTBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = GhosttyVTBridge.c; sourceTree = "<group>"; };
 		1A00001A0000000000000001 /* GhosttyVTBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GhosttyVTBridge.h; sourceTree = "<group>"; };
@@ -144,6 +148,7 @@
 				1A0000040000000000000001 /* IslandPanelController.swift */,
 				1A0000050000000000000001 /* WindowPositioner.swift */,
 				1A0000060000000000000001 /* OutsideClickMonitor.swift */,
+				1A0000270000000000000001 /* IslandTerminalSurfacePhase.swift */,
 			);
 			path = Window;
 			sourceTree = "<group>";
@@ -161,6 +166,7 @@
 				1A0000230000000000000001 /* TerminalPixelGrid.swift */,
 				1A0000240000000000000001 /* TerminalGridTypography.swift */,
 				1A0000250000000000000001 /* TerminalKeyEvent+AppKit.swift */,
+				1A0000260000000000000001 /* TerminalChromePresentation.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -321,6 +327,8 @@
 				1A0001260000000000000001 /* TerminalPixelGrid.swift in Sources */,
 				1A0001270000000000000001 /* TerminalGridTypography.swift in Sources */,
 				1A0001280000000000000001 /* TerminalKeyEvent+AppKit.swift in Sources */,
+				1A0001290000000000000001 /* TerminalChromePresentation.swift in Sources */,
+				1A0001300000000000000001 /* IslandTerminalSurfacePhase.swift in Sources */,
 				1A00011E0000000000000001 /* GhosttyVTBridge.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
