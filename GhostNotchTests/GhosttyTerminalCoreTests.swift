@@ -286,6 +286,23 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertEqual(core.blurData(), Data("\u{1B}[O".utf8))
     }
 
+    func testEngineRefreshDisplayRepublishesSnapshot() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+        let engine = GhosttyTerminalEngine(core: core)
+        var publishedSnapshots = 0
+        engine.onSnapshotChange = { _ in
+            publishedSnapshots += 1
+        }
+
+        engine.processOutput(Data("hi".utf8))
+        publishedSnapshots = 0
+
+        engine.refreshDisplay()
+
+        XCTAssertEqual(publishedSnapshots, 1)
+        XCTAssertTrue(engine.snapshot.plainText.contains("hi"))
+    }
+
     func testEngineSendsFocusEventsOnlyWhenModeIsEnabled() {
         let core = GhosttyTerminalCore(columns: 8, rows: 2)
         var writes: [Data] = []

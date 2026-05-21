@@ -6,6 +6,7 @@ struct IslandExpandedView: View {
 
     let snapshot: TerminalRenderSnapshot
     let initialLastReportedResize: TerminalGridResize?
+    let allowsResizeReporting: Bool
     let focusRequestID: Int
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
@@ -26,6 +27,7 @@ struct IslandExpandedView: View {
             TerminalGridSurfaceView(
                 snapshot: terminalSnapshot,
                 initialLastReportedResize: initialLastReportedResize,
+                allowsResizeReporting: allowsResizeReporting,
                 focusRequestID: focusRequestID,
                 onInput: onInput,
                 onKeyEvent: onKeyEvent,
@@ -86,11 +88,19 @@ struct IslandExpandedView: View {
             return .message("GhostNotch terminal error:\n\(lastError)\n")
         }
 
-        if sessionState.outputText.isEmpty {
-            return .message(sessionState.phase == .starting ? "Starting shell...\n" : "Shell stopped.\n")
+        switch sessionState.phase {
+        case .running:
+            return snapshot
+        case .starting:
+            if sessionState.outputText.isEmpty {
+                return .message("Starting shell...\n")
+            }
+            return snapshot
+        case .stopped:
+            return .message("Shell stopped.\n")
+        case .failed:
+            return .message("Shell stopped.\n")
         }
-
-        return snapshot
     }
 
     private var statusColor: Color {

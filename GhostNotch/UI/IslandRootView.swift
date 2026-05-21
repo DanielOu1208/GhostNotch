@@ -17,6 +17,7 @@ struct IslandRootView: View {
                     sessionState: controller.terminalState,
                     snapshot: controller.terminalSnapshot,
                     initialLastReportedResize: controller.lastAppliedGridResize,
+                    allowsResizeReporting: controller.allowsGridResizeReporting,
                     focusRequestID: controller.terminalFocusRequestID,
                     onInput: controller.writeToTerminal,
                     onKeyEvent: controller.sendTerminalKeyEvent,

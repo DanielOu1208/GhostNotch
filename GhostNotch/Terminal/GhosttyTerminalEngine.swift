@@ -124,6 +124,10 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         writeToSession(core.blurData())
     }
 
+    func refreshDisplay() {
+        publishSnapshot()
+    }
+
     private func writeToSession(_ data: Data) {
         guard !data.isEmpty else {
             return

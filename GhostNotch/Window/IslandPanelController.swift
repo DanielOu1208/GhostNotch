@@ -7,6 +7,7 @@ final class IslandPanelController: ObservableObject {
     @Published private(set) var notchFillMode: NotchFillMode = .black
     @Published private(set) var terminalFocusRequestID = 0
     @Published private(set) var terminalSnapshot = TerminalRenderSnapshot.empty()
+    @Published private(set) var allowsGridResizeReporting = true
 
     private let panel: IslandPanel
     private let terminalSession: TerminalSession
@@ -82,10 +83,12 @@ final class IslandPanelController: ObservableObject {
         panel.styleMask.remove(.nonactivatingPanel)
         NSApp.activate()
         startTerminalIfNeeded()
+        allowsGridResizeReporting = false
         transition(to: .expanded)
         panel.makeKeyAndOrderFront(nil)
         requestTerminalFocus()
         terminalEngine.focus()
+        terminalEngine.refreshDisplay()
     }
 
     func collapse() {
@@ -96,7 +99,10 @@ final class IslandPanelController: ObservableObject {
         panel.shouldAcceptKeyFocus = false
         panel.resignKey()
         panel.styleMask.insert(.nonactivatingPanel)
-        terminalEngine.blur()
+        if shouldSendBlurOnCollapse() {
+            terminalEngine.blur()
+        }
+        allowsGridResizeReporting = true
         transition(to: .collapsed)
     }
 
@@ -239,8 +245,19 @@ final class IslandPanelController: ObservableObject {
                 return
             }
             Task { @MainActor in
-                self.requestTerminalFocus()
+                self.finishExpandPanelAnimation()
             }
         })
+    }
+
+    private func finishExpandPanelAnimation() {
+        allowsGridResizeReporting = true
+        requestTerminalFocus()
+        terminalEngine.focus()
+        terminalEngine.refreshDisplay()
+    }
+
+    private func shouldSendBlurOnCollapse() -> Bool {
+        !terminalSnapshot.isAlternateScreen
     }
 }

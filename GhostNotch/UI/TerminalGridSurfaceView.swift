@@ -5,6 +5,7 @@ import SwiftUI
 struct TerminalGridSurfaceView: NSViewRepresentable {
     let snapshot: TerminalRenderSnapshot
     let initialLastReportedResize: TerminalGridResize?
+    let allowsResizeReporting: Bool
     let focusRequestID: Int
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
@@ -23,6 +24,7 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
         view.onKeyEvent = onKeyEvent
         view.onScroll = onScroll
         view.onResize = onResize
+        view.allowsResizeReporting = allowsResizeReporting
         view.onMovedToWindow = { [weak view, weak coordinator = context.coordinator] in
             guard let view, let coordinator, coordinator.shouldRetryFocusOnWindowAttach else {
                 return
@@ -39,8 +41,11 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
         view.onKeyEvent = onKeyEvent
         view.onScroll = onScroll
         view.onResize = onResize
+        view.allowsResizeReporting = allowsResizeReporting
         view.needsDisplay = true
-        view.reportSizeIfNeeded()
+        if allowsResizeReporting {
+            view.reportSizeIfNeeded()
+        }
 
         guard context.coordinator.lastFocusRequestID != focusRequestID else {
             return
@@ -86,6 +91,7 @@ final class TerminalGridView: NSView {
     var onScroll: ((Int) -> Void)?
     var onResize: ((Int, Int, Int, Int) -> Void)?
     var onMovedToWindow: (() -> Void)?
+    var allowsResizeReporting = true
 
     private let typography = TerminalGridTypography(size: TerminalGridMetrics.fontSize)
     var lastReportedResize: TerminalGridResize?
@@ -233,6 +239,10 @@ final class TerminalGridView: NSView {
     }
 
     func reportSizeIfNeeded() {
+        guard allowsResizeReporting else {
+            return
+        }
+
         let visibleSize = bounds.size
         guard visibleSize.width > 0, visibleSize.height > 0 else {
             return
