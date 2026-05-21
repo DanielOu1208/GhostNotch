@@ -23,6 +23,10 @@ final class IslandPanelController: ObservableObject {
         terminalSession.state
     }
 
+    var lastAppliedGridResize: TerminalGridResize? {
+        terminalEngine.lastAppliedGridResize
+    }
+
     init(
         terminalSession: TerminalSession = TerminalSession(),
         terminalEngine: TerminalRenderingEngine = GhosttyTerminalEngine()

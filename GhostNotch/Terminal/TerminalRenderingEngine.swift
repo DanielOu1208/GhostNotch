@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 protocol TerminalRenderingEngine: AnyObject {
     var snapshot: TerminalRenderSnapshot { get }
+    var lastAppliedGridResize: TerminalGridResize? { get }
     var onSnapshotChange: ((TerminalRenderSnapshot) -> Void)? { get set }
 
     func start(session: TerminalSession)

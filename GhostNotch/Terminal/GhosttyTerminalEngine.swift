@@ -9,6 +9,7 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
     private weak var session: TerminalSession?
     private var cellWidthPixels = 8
     private var cellHeightPixels = 16
+    private(set) var lastAppliedGridResize: TerminalGridResize?
 
     init(
         core: GhosttyTerminalCore = GhosttyTerminalCore(),
@@ -55,13 +56,24 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
     }
 
     func resize(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int) {
-        self.cellWidthPixels = max(cellWidthPixels, 1)
-        self.cellHeightPixels = max(cellHeightPixels, 1)
+        let requested = TerminalGridResize(
+            columns: max(cols, 2),
+            rows: max(rows, 1),
+            cellWidthPixels: max(cellWidthPixels, 1),
+            cellHeightPixels: max(cellHeightPixels, 1)
+        )
+        if requested == lastAppliedGridResize {
+            return
+        }
+
+        lastAppliedGridResize = requested
+        self.cellWidthPixels = requested.cellWidthPixels
+        self.cellHeightPixels = requested.cellHeightPixels
         core.resize(
-            columns: cols,
-            rows: rows,
-            cellWidthPixels: self.cellWidthPixels,
-            cellHeightPixels: self.cellHeightPixels
+            columns: requested.columns,
+            rows: requested.rows,
+            cellWidthPixels: requested.cellWidthPixels,
+            cellHeightPixels: requested.cellHeightPixels
         )
         publishSnapshot()
 
@@ -70,17 +82,26 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         }
 
         do {
-            try session?.resize(cols: max(cols, 2), rows: max(rows, 1))
+            try session?.resize(cols: requested.columns, rows: requested.rows)
         } catch {
             NSLog("GhostNotch failed to resize terminal: \(error.localizedDescription)")
         }
     }
 
     func reset(cols: Int, rows: Int) {
-        core.reset(columns: cols, rows: rows)
+        lastAppliedGridResize = nil
+        let columns = max(cols, 2)
+        let rowCount = max(rows, 1)
+        core.reset(columns: columns, rows: rowCount)
         core.resize(
-            columns: cols,
-            rows: rows,
+            columns: columns,
+            rows: rowCount,
+            cellWidthPixels: cellWidthPixels,
+            cellHeightPixels: cellHeightPixels
+        )
+        lastAppliedGridResize = TerminalGridResize(
+            columns: columns,
+            rows: rowCount,
             cellWidthPixels: cellWidthPixels,
             cellHeightPixels: cellHeightPixels
         )

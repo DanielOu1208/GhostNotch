@@ -4,6 +4,7 @@ import SwiftUI
 
 struct TerminalGridSurfaceView: NSViewRepresentable {
     let snapshot: TerminalRenderSnapshot
+    let initialLastReportedResize: TerminalGridResize?
     let focusRequestID: Int
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
@@ -16,6 +17,7 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> TerminalGridView {
         let view = TerminalGridView()
+        view.lastReportedResize = initialLastReportedResize
         view.snapshot = snapshot
         view.onInput = onInput
         view.onKeyEvent = onKeyEvent
@@ -59,7 +61,7 @@ final class TerminalGridView: NSView {
     var onResize: ((Int, Int, Int, Int) -> Void)?
 
     private let typography = TerminalGridTypography(size: TerminalGridMetrics.fontSize)
-    private var lastReportedResize: TerminalGridResize?
+    var lastReportedResize: TerminalGridResize?
     private var selection: TerminalSelection?
 
     override var acceptsFirstResponder: Bool {
@@ -357,13 +359,6 @@ final class TerminalGridView: NSView {
 private enum TerminalGridMetrics {
     static let fontSize: CGFloat = 10.5
     static let contentInset: CGFloat = 3
-}
-
-private struct TerminalGridResize: Equatable {
-    let columns: Int
-    let rows: Int
-    let cellWidthPixels: Int
-    let cellHeightPixels: Int
 }
 
 struct TerminalGlyphFill: Equatable {

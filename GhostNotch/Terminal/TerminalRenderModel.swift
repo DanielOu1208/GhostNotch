@@ -213,6 +213,13 @@ private extension String {
     }
 }
 
+struct TerminalGridResize: Equatable {
+    let columns: Int
+    let rows: Int
+    let cellWidthPixels: Int
+    let cellHeightPixels: Int
+}
+
 struct TerminalGridPoint: Equatable, Comparable {
     let row: Int
     let column: Int

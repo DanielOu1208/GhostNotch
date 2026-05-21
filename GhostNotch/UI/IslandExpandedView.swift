@@ -5,6 +5,7 @@ struct IslandExpandedView: View {
     @ObservedObject var sessionState: TerminalSessionState
 
     let snapshot: TerminalRenderSnapshot
+    let initialLastReportedResize: TerminalGridResize?
     let focusRequestID: Int
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
@@ -24,6 +25,7 @@ struct IslandExpandedView: View {
 
             TerminalGridSurfaceView(
                 snapshot: terminalSnapshot,
+                initialLastReportedResize: initialLastReportedResize,
                 focusRequestID: focusRequestID,
                 onInput: onInput,
                 onKeyEvent: onKeyEvent,

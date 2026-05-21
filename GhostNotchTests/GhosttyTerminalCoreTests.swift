@@ -189,6 +189,35 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertEqual(snapshot.cell(row: 0, column: 2).character, "c")
     }
 
+    func testResizeWithUnchangedDimensionsPreservesScrollbackViewport() {
+        let core = GhosttyTerminalCore(columns: 12, rows: 3)
+        core.processOutput(Data((0..<12).map { "line\($0)" }.joined(separator: "\n").utf8))
+        core.scrollViewport(deltaRows: -2)
+        let scrolledText = core.snapshot.plainText
+
+        core.resize(columns: 12, rows: 3, cellWidthPixels: 8, cellHeightPixels: 16)
+
+        XCTAssertEqual(core.snapshot.plainText, scrolledText)
+        XCTAssertGreaterThan(core.snapshot.scrollbackRows, 0)
+    }
+
+    func testEngineSkipsDuplicateResizeAndPreservesScrollbackViewport() {
+        let core = GhosttyTerminalCore(columns: 12, rows: 3)
+        let engine = GhosttyTerminalEngine(core: core)
+        engine.processOutput(Data((0..<12).map { "line\($0)" }.joined(separator: "\n").utf8))
+        engine.resize(cols: 12, rows: 3, cellWidthPixels: 8, cellHeightPixels: 16)
+        engine.scrollViewport(deltaRows: -2)
+        let scrolledText = core.snapshot.plainText
+
+        engine.resize(cols: 12, rows: 3, cellWidthPixels: 8, cellHeightPixels: 16)
+
+        XCTAssertEqual(
+            engine.lastAppliedGridResize,
+            TerminalGridResize(columns: 12, rows: 3, cellWidthPixels: 8, cellHeightPixels: 16)
+        )
+        XCTAssertEqual(core.snapshot.plainText, scrolledText)
+    }
+
     func testResetClearsVisibleCellsPreservesDimensionsAndWriteCallback() {
         let core = GhosttyTerminalCore(columns: 5, rows: 2)
         var written = Data()
