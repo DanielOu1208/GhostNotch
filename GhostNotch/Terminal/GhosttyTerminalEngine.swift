@@ -56,11 +56,11 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
     }
 
     func resize(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int) {
-        let requested = TerminalGridResize(
-            columns: max(cols, 2),
-            rows: max(rows, 1),
-            cellWidthPixels: max(cellWidthPixels, 1),
-            cellHeightPixels: max(cellHeightPixels, 1)
+        let requested = TerminalGridResize.normalized(
+            columns: cols,
+            rows: rows,
+            cellWidthPixels: cellWidthPixels,
+            cellHeightPixels: cellHeightPixels
         )
         if requested == lastAppliedGridResize {
             return
@@ -90,21 +90,20 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
 
     func reset(cols: Int, rows: Int) {
         lastAppliedGridResize = nil
-        let columns = max(cols, 2)
-        let rowCount = max(rows, 1)
-        core.reset(columns: columns, rows: rowCount)
+        let requested = TerminalGridResize.normalized(
+            columns: cols,
+            rows: rows,
+            cellWidthPixels: cellWidthPixels,
+            cellHeightPixels: cellHeightPixels
+        )
+        core.reset(columns: requested.columns, rows: requested.rows)
         core.resize(
-            columns: columns,
-            rows: rowCount,
-            cellWidthPixels: cellWidthPixels,
-            cellHeightPixels: cellHeightPixels
+            columns: requested.columns,
+            rows: requested.rows,
+            cellWidthPixels: requested.cellWidthPixels,
+            cellHeightPixels: requested.cellHeightPixels
         )
-        lastAppliedGridResize = TerminalGridResize(
-            columns: columns,
-            rows: rowCount,
-            cellWidthPixels: cellWidthPixels,
-            cellHeightPixels: cellHeightPixels
-        )
+        lastAppliedGridResize = requested
         publishSnapshot()
     }
 
@@ -122,10 +121,6 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         }
 
         writeToSession(core.blurData())
-    }
-
-    func refreshDisplay() {
-        publishSnapshot()
     }
 
     private func writeToSession(_ data: Data) {

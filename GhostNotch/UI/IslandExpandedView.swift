@@ -2,11 +2,11 @@ import AppKit
 import SwiftUI
 
 struct IslandExpandedView: View {
+    @EnvironmentObject private var controller: IslandPanelController
     @ObservedObject var sessionState: TerminalSessionState
 
     let snapshot: TerminalRenderSnapshot
     let initialLastReportedResize: TerminalGridResize?
-    let allowsResizeReporting: Bool
     let focusRequestID: Int
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
@@ -14,6 +14,10 @@ struct IslandExpandedView: View {
     let onResize: (Int, Int, Int, Int) -> Void
     let onRestart: () -> Void
     let onCollapse: () -> Void
+
+    private var chrome: TerminalChromePresentation {
+        TerminalChromePresentation.make(sessionState: sessionState, snapshot: snapshot)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,9 +29,9 @@ struct IslandExpandedView: View {
                 .frame(height: 1)
 
             TerminalGridSurfaceView(
-                snapshot: terminalSnapshot,
+                snapshot: chrome.gridSnapshot,
                 initialLastReportedResize: initialLastReportedResize,
-                allowsResizeReporting: allowsResizeReporting,
+                allowsResizeReporting: controller.allowsGridResizeReporting,
                 focusRequestID: focusRequestID,
                 onInput: onInput,
                 onKeyEvent: onKeyEvent,
@@ -45,15 +49,15 @@ struct IslandExpandedView: View {
     private var header: some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(statusColor)
+                .fill(chrome.statusColor)
                 .frame(width: 8, height: 8)
-                .shadow(color: statusColor.opacity(0.45), radius: 5)
+                .shadow(color: chrome.statusColor.opacity(0.45), radius: 5)
 
             Text("GhostNotch")
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.88))
 
-            Text(statusText)
+            Text(chrome.statusText)
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.44))
 
@@ -81,46 +85,5 @@ struct IslandExpandedView: View {
                 .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
-    }
-
-    private var terminalSnapshot: TerminalRenderSnapshot {
-        if let lastError = sessionState.lastError {
-            return .message("GhostNotch terminal error:\n\(lastError)\n")
-        }
-
-        switch sessionState.phase {
-        case .running:
-            return snapshot
-        case .starting:
-            if sessionState.outputText.isEmpty {
-                return .message("Starting shell...\n")
-            }
-            return snapshot
-        case .stopped:
-            return .message("Shell stopped.\n")
-        case .failed:
-            return .message("Shell stopped.\n")
-        }
-    }
-
-    private var statusColor: Color {
-        sessionState.phase == .running ? .green : .orange
-    }
-
-    private var statusText: String {
-        if sessionState.lastError != nil {
-            return "terminal error"
-        }
-
-        switch sessionState.phase {
-        case .stopped:
-            return "shell stopped"
-        case .starting:
-            return "starting shell"
-        case .running:
-            return "default shell"
-        case .failed:
-            return "terminal error"
-        }
     }
 }

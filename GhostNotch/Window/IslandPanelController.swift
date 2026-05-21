@@ -7,7 +7,11 @@ final class IslandPanelController: ObservableObject {
     @Published private(set) var notchFillMode: NotchFillMode = .black
     @Published private(set) var terminalFocusRequestID = 0
     @Published private(set) var terminalSnapshot = TerminalRenderSnapshot.empty()
-    @Published private(set) var allowsGridResizeReporting = true
+    @Published private(set) var terminalSurfacePhase: IslandTerminalSurfacePhase = .idle
+
+    var allowsGridResizeReporting: Bool {
+        terminalSurfacePhase == .ready
+    }
 
     private let panel: IslandPanel
     private let terminalSession: TerminalSession
@@ -75,20 +79,17 @@ final class IslandPanelController: ObservableObject {
 
     func expand() {
         if state == .expanded {
-            requestTerminalFocus()
+            activateTerminalSurface()
             return
         }
 
+        terminalSurfacePhase = .expanding
         panel.shouldAcceptKeyFocus = true
         panel.styleMask.remove(.nonactivatingPanel)
         NSApp.activate()
         startTerminalIfNeeded()
-        allowsGridResizeReporting = false
         transition(to: .expanded)
         panel.makeKeyAndOrderFront(nil)
-        requestTerminalFocus()
-        terminalEngine.focus()
-        terminalEngine.refreshDisplay()
     }
 
     func collapse() {
@@ -96,13 +97,13 @@ final class IslandPanelController: ObservableObject {
             return
         }
 
+        terminalSurfacePhase = .idle
         panel.shouldAcceptKeyFocus = false
         panel.resignKey()
         panel.styleMask.insert(.nonactivatingPanel)
         if shouldSendBlurOnCollapse() {
             terminalEngine.blur()
         }
-        allowsGridResizeReporting = true
         transition(to: .collapsed)
     }
 
@@ -123,28 +124,37 @@ final class IslandPanelController: ObservableObject {
     }
 
     func resizeTerminal(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int) {
+        let resize = TerminalGridResize.normalized(
+            columns: cols,
+            rows: rows,
+            cellWidthPixels: cellWidthPixels,
+            cellHeightPixels: cellHeightPixels
+        )
         terminalEngine.resize(
-            cols: max(cols, 2),
-            rows: max(rows, 1),
-            cellWidthPixels: max(cellWidthPixels, 1),
-            cellHeightPixels: max(cellHeightPixels, 1)
+            cols: resize.columns,
+            rows: resize.rows,
+            cellWidthPixels: resize.cellWidthPixels,
+            cellHeightPixels: resize.cellHeightPixels
         )
     }
 
     func restartTerminal() {
-        let cols = max(terminalSnapshot.columns, 2)
-        let rows = max(terminalSnapshot.rows, 1)
+        let resize = TerminalGridResize.normalized(
+            columns: terminalSnapshot.columns,
+            rows: terminalSnapshot.rows,
+            cellWidthPixels: 8,
+            cellHeightPixels: 16
+        )
 
-        terminalEngine.reset(cols: cols, rows: rows)
+        terminalEngine.reset(cols: resize.columns, rows: resize.rows)
 
         do {
-            try terminalSession.restart(cols: cols, rows: rows)
-            terminalEngine.focus()
+            try terminalSession.restart(cols: resize.columns, rows: resize.rows)
         } catch {
             NSLog("GhostNotch failed to restart terminal session: \(error.localizedDescription)")
         }
 
-        requestTerminalFocus()
+        activateTerminalSurface()
     }
 
     private func startHoverMonitoring() {
@@ -223,6 +233,12 @@ final class IslandPanelController: ObservableObject {
         }
     }
 
+    private func activateTerminalSurface() {
+        requestTerminalFocus()
+        terminalEngine.focus()
+        terminalSnapshot = terminalEngine.snapshot
+    }
+
     private func requestTerminalFocus() {
         terminalFocusRequestID += 1
     }
@@ -234,14 +250,14 @@ final class IslandPanelController: ObservableObject {
 
     private func animatePanel(to newState: IslandState) {
         let frame = WindowPositioner.frame(for: newState)
-        let shouldRefocusAfterExpand = newState == .expanded
+        let shouldFinishExpandAfterAnimation = newState == .expanded
 
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = newState == .expanded ? 0.18 : 0.16
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             panel.animator().setFrame(frame, display: true)
         }, completionHandler: {
-            guard shouldRefocusAfterExpand else {
+            guard shouldFinishExpandAfterAnimation else {
                 return
             }
             Task { @MainActor in
@@ -251,10 +267,12 @@ final class IslandPanelController: ObservableObject {
     }
 
     private func finishExpandPanelAnimation() {
-        allowsGridResizeReporting = true
-        requestTerminalFocus()
-        terminalEngine.focus()
-        terminalEngine.refreshDisplay()
+        guard state == .expanded else {
+            return
+        }
+
+        terminalSurfacePhase = .ready
+        activateTerminalSurface()
     }
 
     private func shouldSendBlurOnCollapse() -> Bool {

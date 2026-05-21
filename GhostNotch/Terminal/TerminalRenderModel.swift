@@ -218,6 +218,20 @@ struct TerminalGridResize: Equatable {
     let rows: Int
     let cellWidthPixels: Int
     let cellHeightPixels: Int
+
+    static func normalized(
+        columns: Int,
+        rows: Int,
+        cellWidthPixels: Int,
+        cellHeightPixels: Int
+    ) -> TerminalGridResize {
+        TerminalGridResize(
+            columns: max(columns, 2),
+            rows: max(rows, 1),
+            cellWidthPixels: max(cellWidthPixels, 1),
+            cellHeightPixels: max(cellHeightPixels, 1)
+        )
+    }
 }
 
 struct TerminalGridPoint: Equatable, Comparable {

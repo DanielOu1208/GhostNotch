@@ -15,5 +15,4 @@ protocol TerminalRenderingEngine: AnyObject {
     func reset(cols: Int, rows: Int)
     func focus()
     func blur()
-    func refreshDisplay()
 }

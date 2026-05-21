@@ -48,14 +48,14 @@ final class GhosttyTerminalCore {
         cellWidthPixels: Int = 8,
         cellHeightPixels: Int = 16
     ) {
-        columns = max(newColumns, 2)
-        rows = max(newRows, 1)
+        columns = newColumns
+        rows = newRows
         GNVTTerminalResize(
             terminal,
             UInt16(columns),
             UInt16(rows),
-            UInt32(max(cellWidthPixels, 1)),
-            UInt32(max(cellHeightPixels, 1))
+            UInt32(cellWidthPixels),
+            UInt32(cellHeightPixels)
         )
         refreshSnapshot()
     }
