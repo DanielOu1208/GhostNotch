@@ -29,8 +29,22 @@ struct IslandRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.all)
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onClick)
+        .modifier(CollapsedIslandTapToExpand(onClick: onClick, isEnabled: controller.state != .expanded))
+    }
+}
+
+private struct CollapsedIslandTapToExpand: ViewModifier {
+    let onClick: () -> Void
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onClick)
+        } else {
+            content
+        }
     }
 }
 

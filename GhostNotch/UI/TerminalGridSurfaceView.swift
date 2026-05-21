@@ -23,6 +23,12 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
         view.onKeyEvent = onKeyEvent
         view.onScroll = onScroll
         view.onResize = onResize
+        view.onMovedToWindow = { [weak view, weak coordinator = context.coordinator] in
+            guard let view, let coordinator, coordinator.shouldRetryFocusOnWindowAttach else {
+                return
+            }
+            Self.applyFocus(to: view, coordinator: coordinator)
+        }
         context.coordinator.view = view
         return view
     }
@@ -41,8 +47,27 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
         }
 
         context.coordinator.lastFocusRequestID = focusRequestID
+        Self.applyFocus(to: view, coordinator: context.coordinator)
+    }
+
+    private static func applyFocus(to view: TerminalGridView, coordinator: Coordinator) {
+        let attempt: () -> Bool = {
+            guard let window = view.window else {
+                return false
+            }
+            return window.makeFirstResponder(view)
+        }
+
+        if attempt() {
+            coordinator.shouldRetryFocusOnWindowAttach = false
+            return
+        }
+
+        coordinator.shouldRetryFocusOnWindowAttach = true
         DispatchQueue.main.async {
-            view.window?.makeFirstResponder(view)
+            if attempt() {
+                coordinator.shouldRetryFocusOnWindowAttach = false
+            }
         }
     }
 
@@ -50,6 +75,7 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
     final class Coordinator {
         weak var view: TerminalGridView?
         var lastFocusRequestID = 0
+        var shouldRetryFocusOnWindowAttach = false
     }
 }
 
@@ -59,6 +85,7 @@ final class TerminalGridView: NSView {
     var onKeyEvent: ((TerminalKeyEvent) -> Void)?
     var onScroll: ((Int) -> Void)?
     var onResize: ((Int, Int, Int, Int) -> Void)?
+    var onMovedToWindow: (() -> Void)?
 
     private let typography = TerminalGridTypography(size: TerminalGridMetrics.fontSize)
     var lastReportedResize: TerminalGridResize?
@@ -160,6 +187,8 @@ final class TerminalGridView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+
         guard !snapshot.hasMouseTracking else {
             super.mouseDown(with: event)
             return
@@ -200,6 +229,7 @@ final class TerminalGridView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         reportSizeIfNeeded()
+        onMovedToWindow?()
     }
 
     func reportSizeIfNeeded() {
