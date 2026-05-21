@@ -30,17 +30,15 @@ enum PTYProcessError: Error, LocalizedError, Equatable {
     }
 }
 
-final class PTYProcess: @unchecked Sendable {
+final class PTYProcess: TerminalProcess, @unchecked Sendable {
     static let defaultTerminalType = "xterm-256color"
     static let defaultUTF8Locale = "en_US.UTF-8"
 
-    typealias OutputHandler = @MainActor @Sendable (Data) -> Void
-    typealias TerminationHandler = @MainActor @Sendable () -> Void
-
-    var onOutput: OutputHandler?
-    var onTermination: TerminationHandler?
+    var onOutput: TerminalOutputHandler?
+    var onTermination: TerminalTerminationHandler?
 
     private let readQueue = DispatchQueue(label: "com.ghostnotch.terminal.pty.read")
+    private let terminationQueue = DispatchQueue(label: "com.ghostnotch.terminal.pty.terminate")
     private let lock = NSLock()
     private var masterFileDescriptor: Int32 = -1
     private var process: Process?
@@ -167,8 +165,10 @@ final class PTYProcess: @unchecked Sendable {
             return false
         }
 
-        terminate(shellProcess)
-        notifyTermination()
+        let request = ProcessTerminationRequest(process: shellProcess)
+        terminationQueue.async {
+            Self.terminate(request.process)
+        }
         return true
     }
 
@@ -306,7 +306,7 @@ final class PTYProcess: @unchecked Sendable {
         return terminalEnvironment
     }
 
-    private func terminate(_ process: Process) {
+    private static func terminate(_ process: Process) {
         guard process.isRunning else {
             return
         }
@@ -321,8 +321,20 @@ final class PTYProcess: @unchecked Sendable {
         }
 
         kill(process.processIdentifier, SIGKILL)
-        process.waitUntilExit()
+
+        for _ in 0..<50 {
+            if !process.isRunning {
+                return
+            }
+            usleep(10_000)
+        }
+
+        NSLog("GhostNotch terminal child process did not exit promptly after SIGKILL: \(process.processIdentifier)")
     }
+}
+
+private struct ProcessTerminationRequest: @unchecked Sendable {
+    let process: Process
 }
 
 private extension Dictionary where Key == String, Value == String {

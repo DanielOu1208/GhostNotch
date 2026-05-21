@@ -87,14 +87,14 @@ struct IslandExpandedView: View {
         }
 
         if sessionState.outputText.isEmpty {
-            return .message(sessionState.isRunning ? "Starting shell...\n" : "Shell stopped.\n")
+            return .message(sessionState.phase == .starting ? "Starting shell...\n" : "Shell stopped.\n")
         }
 
         return snapshot
     }
 
     private var statusColor: Color {
-        sessionState.lastError == nil && sessionState.isRunning ? .green : .orange
+        sessionState.phase == .running ? .green : .orange
     }
 
     private var statusText: String {
@@ -102,6 +102,15 @@ struct IslandExpandedView: View {
             return "terminal error"
         }
 
-        return sessionState.isRunning ? "default shell" : "starting shell"
+        switch sessionState.phase {
+        case .stopped:
+            return "shell stopped"
+        case .starting:
+            return "starting shell"
+        case .running:
+            return "default shell"
+        case .failed:
+            return "terminal error"
+        }
     }
 }

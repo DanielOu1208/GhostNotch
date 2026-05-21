@@ -115,6 +115,7 @@ See the MVP spec for the detailed work packages.
 ## Documentation
 
 - [MVP specification](docs/ghostnotch_mvp_spec.md) is the implementation source of truth.
+- [Xcode debugging runbook](docs/xcode_debugging_runbook.md) covers LLDB task-port attach failures and terminal startup hangs.
 - [MacBook notch geometry research](docs/notch_geometry_research.md) records the notch sizing and positioning assumptions.
 - [Ghostty VT vendor notes](vendor/ghostty-vt/README.md) describe the vendored terminal artifact.
 

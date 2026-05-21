@@ -240,8 +240,8 @@ The embedded terminal surface currently:
 
 - `ShellResolver` uses the `SHELL` environment variable when it points to an executable file and falls back to `/bin/zsh`.
 - `PTYProcess` opens a native pseudo-terminal, launches the resolved shell in the user's home directory, reads output, writes input, resizes the PTY, and cleans up the child process.
-- `TerminalSession` is the app-facing facade for start, stop, write, resize, and output state.
-- `TerminalSessionState` stores running status, recent output data, decoded output text, and the latest error.
+- `TerminalSession` is the app-facing facade for start, stop, write, resize, output state, startup timeout handling, and stale termination suppression.
+- `TerminalSessionState` stores process-running status, startup phase, recent output data, decoded output text, and the latest error.
 - `TerminalInputMapping` provides paste and legacy text mapping helpers.
 - `TerminalKeyEvent` is the app-facing keyboard event model for Ghostty-backed key encoding.
 - `GhosttyVTBridge` is the C boundary over the vendored `libghostty-vt` API. It creates and resizes Ghostty terminals, writes PTY output into Ghostty's VT parser, snapshots visible cells and cursor/scroll metadata, exposes paste/focus/key encoding, maps default colors, scrolls the viewport, and forwards Ghostty write-back effects to the PTY path.

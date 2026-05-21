@@ -1,9 +1,17 @@
 import Combine
 import Foundation
 
+enum TerminalSessionPhase: Equatable {
+    case stopped
+    case starting
+    case running
+    case failed
+}
+
 @MainActor
 final class TerminalSessionState: ObservableObject {
     @Published private(set) var isRunning = false
+    @Published private(set) var phase: TerminalSessionPhase = .stopped
     @Published private(set) var outputData = Data()
     @Published private(set) var lastError: String?
 
@@ -17,18 +25,31 @@ final class TerminalSessionState: ObservableObject {
         String(decoding: outputData, as: UTF8.self)
     }
 
+    func markStarting() {
+        isRunning = true
+        phase = .starting
+        lastError = nil
+    }
+
     func markRunning() {
         isRunning = true
+        phase = .running
         lastError = nil
     }
 
     func markStopped() {
         isRunning = false
+        phase = .stopped
     }
 
     func recordError(_ error: Error) {
-        lastError = error.localizedDescription
+        recordError(error.localizedDescription)
+    }
+
+    func recordError(_ message: String) {
+        lastError = message
         isRunning = false
+        phase = .failed
     }
 
     func appendOutput(_ data: Data) {
