@@ -33,9 +33,9 @@ struct IslandExpandedView: View {
                 onResize: onResize
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, 10)
-            .padding(.top, 8)
-            .padding(.bottom, 10)
+            .padding(.horizontal, 5)
+            .padding(.top, 4)
+            .padding(.bottom, 5)
         }
         .foregroundStyle(.white)
     }
