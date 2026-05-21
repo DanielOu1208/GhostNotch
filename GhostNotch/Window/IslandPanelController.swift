@@ -228,11 +228,19 @@ final class IslandPanelController: ObservableObject {
 
     private func animatePanel(to newState: IslandState) {
         let frame = WindowPositioner.frame(for: newState)
+        let shouldRefocusAfterExpand = newState == .expanded
 
-        NSAnimationContext.runAnimationGroup { context in
+        NSAnimationContext.runAnimationGroup({ context in
             context.duration = newState == .expanded ? 0.18 : 0.16
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             panel.animator().setFrame(frame, display: true)
-        }
+        }, completionHandler: {
+            guard shouldRefocusAfterExpand else {
+                return
+            }
+            Task { @MainActor in
+                self.requestTerminalFocus()
+            }
+        })
     }
 }
