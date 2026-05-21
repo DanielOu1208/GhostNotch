@@ -248,7 +248,7 @@ The embedded terminal surface currently:
 - `PTYProcess` opens a native pseudo-terminal, launches the resolved shell in the user's home directory, reads output, writes input, resizes the PTY, and cleans up the child process.
 - `TerminalSession` is the app-facing facade for start, stop, write, resize, output state, startup timeout handling, and stale termination suppression.
 - `TerminalSessionState` stores process-running status, startup phase, recent output data, decoded output text, and the latest error.
-- `TerminalInputMapping` provides paste and legacy text mapping helpers.
+- `TerminalInputMapping` provides paste and legacy text mapping helpers; keys use `TerminalKeyEvent` and the engine.
 - `TerminalKeyEvent` is the app-facing keyboard event model for Ghostty-backed key encoding.
 - `GhosttyVTBridge` is the C boundary over the vendored `libghostty-vt` API. It creates and resizes Ghostty terminals, writes PTY output into Ghostty's VT parser, snapshots visible cells and cursor/scroll metadata, exposes paste/focus/key encoding, maps default colors, scrolls the viewport, and forwards Ghostty write-back effects to the PTY path.
 - `GhosttyTerminalCore` is the Swift app-facing wrapper around `GhosttyVTBridge` for VT parsing, terminal state, snapshots, paste/focus/key encoding, scrollback viewport control, and PTY write-back callbacks.
@@ -388,7 +388,7 @@ Responsibilities:
 - `GhosttyTerminalCore`: Swift wrapper over the C bridge.
 - `GhosttyTerminalEngine`: renderer/session coordination.
 - `TerminalSessionState`: observable state needed by the UI.
-- `TerminalInputMapping`: paste and legacy text mapping helpers, currently colocated in `TerminalSession.swift`.
+- `TerminalInputMapping`: paste and legacy text mapping helpers in `Terminal/TerminalInputMapping.swift`.
 - `TerminalKeyEvent`: app-facing keyboard event model used by the Ghostty key encoder path.
 
 Future rendering work should extend the existing bridge/wrapper boundary rather than changing SwiftUI or panel ownership.
