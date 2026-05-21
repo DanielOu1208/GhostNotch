@@ -2,3 +2,4 @@
 xcuserdata/
 *.xcuserstate
 vendor/ghostty-vt/_build/
+build/
