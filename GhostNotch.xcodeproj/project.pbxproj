@@ -25,6 +25,12 @@
 		1A0001170000000000000001 /* GhosttyTerminalCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000140000000000000001 /* GhosttyTerminalCore.swift */; };
 		1A0001180000000000000001 /* GhosttyTerminalEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000150000000000000001 /* GhosttyTerminalEngine.swift */; };
 		1A0001190000000000000001 /* TerminalGridSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000160000000000000001 /* TerminalGridSurfaceView.swift */; };
+		1A0001230000000000000001 /* TerminalGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000200000000000000001 /* TerminalGridView.swift */; };
+		1A0001240000000000000001 /* TerminalCellGlyphRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000210000000000000001 /* TerminalCellGlyphRenderer.swift */; };
+		1A0001250000000000000001 /* TerminalTextDecorationRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000220000000000000001 /* TerminalTextDecorationRenderer.swift */; };
+		1A0001260000000000000001 /* TerminalPixelGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000230000000000000001 /* TerminalPixelGrid.swift */; };
+		1A0001270000000000000001 /* TerminalGridTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000240000000000000001 /* TerminalGridTypography.swift */; };
+		1A0001280000000000000001 /* TerminalKeyEvent+AppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000250000000000000001 /* TerminalKeyEvent+AppKit.swift */; };
 		1A00011E0000000000000001 /* GhosttyVTBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000190000000000000001 /* GhosttyVTBridge.c */; };
 		1A00011F0000000000000001 /* GhosttyVT.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00001B0000000000000001 /* GhosttyVT.xcframework */; };
 		1A00010F0000000000000001 /* ShellResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000B0000000000000001 /* ShellResolver.swift */; };
@@ -63,6 +69,12 @@
 		1A0000140000000000000001 /* GhosttyTerminalCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalCore.swift; sourceTree = "<group>"; };
 		1A0000150000000000000001 /* GhosttyTerminalEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalEngine.swift; sourceTree = "<group>"; };
 		1A0000160000000000000001 /* TerminalGridSurfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalGridSurfaceView.swift; sourceTree = "<group>"; };
+		1A0000200000000000000001 /* TerminalGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalGridView.swift; sourceTree = "<group>"; };
+		1A0000210000000000000001 /* TerminalCellGlyphRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalCellGlyphRenderer.swift; sourceTree = "<group>"; };
+		1A0000220000000000000001 /* TerminalTextDecorationRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalTextDecorationRenderer.swift; sourceTree = "<group>"; };
+		1A0000230000000000000001 /* TerminalPixelGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPixelGrid.swift; sourceTree = "<group>"; };
+		1A0000240000000000000001 /* TerminalGridTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalGridTypography.swift; sourceTree = "<group>"; };
+		1A0000250000000000000001 /* TerminalKeyEvent+AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalKeyEvent+AppKit.swift"; sourceTree = "<group>"; };
 		1A0000180000000000000001 /* GhostNotch-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "GhostNotch-Bridging-Header.h"; sourceTree = "<group>"; };
 		1A0000190000000000000001 /* GhosttyVTBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = GhosttyVTBridge.c; sourceTree = "<group>"; };
 		1A00001A0000000000000001 /* GhosttyVTBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GhosttyVTBridge.h; sourceTree = "<group>"; };
@@ -143,6 +155,12 @@
 				1A0000080000000000000001 /* IslandIndicatorView.swift */,
 				1A0000090000000000000001 /* IslandExpandedView.swift */,
 				1A0000160000000000000001 /* TerminalGridSurfaceView.swift */,
+				1A0000200000000000000001 /* TerminalGridView.swift */,
+				1A0000210000000000000001 /* TerminalCellGlyphRenderer.swift */,
+				1A0000220000000000000001 /* TerminalTextDecorationRenderer.swift */,
+				1A0000230000000000000001 /* TerminalPixelGrid.swift */,
+				1A0000240000000000000001 /* TerminalGridTypography.swift */,
+				1A0000250000000000000001 /* TerminalKeyEvent+AppKit.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -297,6 +315,12 @@
 				1A0001170000000000000001 /* GhosttyTerminalCore.swift in Sources */,
 				1A0001180000000000000001 /* GhosttyTerminalEngine.swift in Sources */,
 				1A0001190000000000000001 /* TerminalGridSurfaceView.swift in Sources */,
+				1A0001230000000000000001 /* TerminalGridView.swift in Sources */,
+				1A0001240000000000000001 /* TerminalCellGlyphRenderer.swift in Sources */,
+				1A0001250000000000000001 /* TerminalTextDecorationRenderer.swift in Sources */,
+				1A0001260000000000000001 /* TerminalPixelGrid.swift in Sources */,
+				1A0001270000000000000001 /* TerminalGridTypography.swift in Sources */,
+				1A0001280000000000000001 /* TerminalKeyEvent+AppKit.swift in Sources */,
 				1A00011E0000000000000001 /* GhosttyVTBridge.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

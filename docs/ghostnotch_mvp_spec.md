@@ -111,7 +111,13 @@ GhostNotch/
     ├── IslandRootView.swift
     ├── IslandIndicatorView.swift
     ├── IslandExpandedView.swift
-    └── TerminalGridSurfaceView.swift
+    ├── TerminalGridSurfaceView.swift
+    ├── TerminalGridView.swift
+    ├── TerminalCellGlyphRenderer.swift
+    ├── TerminalTextDecorationRenderer.swift
+    ├── TerminalPixelGrid.swift
+    ├── TerminalGridTypography.swift
+    └── TerminalKeyEvent+AppKit.swift
 ```
 
 ### App Shell
