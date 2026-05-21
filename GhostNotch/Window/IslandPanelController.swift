@@ -124,22 +124,32 @@ final class IslandPanelController: ObservableObject {
     }
 
     func resizeTerminal(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int) {
+        let resize = TerminalGridResize.normalized(
+            columns: cols,
+            rows: rows,
+            cellWidthPixels: cellWidthPixels,
+            cellHeightPixels: cellHeightPixels
+        )
         terminalEngine.resize(
-            cols: max(cols, 2),
-            rows: max(rows, 1),
-            cellWidthPixels: max(cellWidthPixels, 1),
-            cellHeightPixels: max(cellHeightPixels, 1)
+            cols: resize.columns,
+            rows: resize.rows,
+            cellWidthPixels: resize.cellWidthPixels,
+            cellHeightPixels: resize.cellHeightPixels
         )
     }
 
     func restartTerminal() {
-        let cols = max(terminalSnapshot.columns, 2)
-        let rows = max(terminalSnapshot.rows, 1)
+        let resize = TerminalGridResize.normalized(
+            columns: terminalSnapshot.columns,
+            rows: terminalSnapshot.rows,
+            cellWidthPixels: 8,
+            cellHeightPixels: 16
+        )
 
-        terminalEngine.reset(cols: cols, rows: rows)
+        terminalEngine.reset(cols: resize.columns, rows: resize.rows)
 
         do {
-            try terminalSession.restart(cols: cols, rows: rows)
+            try terminalSession.restart(cols: resize.columns, rows: resize.rows)
         } catch {
             NSLog("GhostNotch failed to restart terminal session: \(error.localizedDescription)")
         }
@@ -226,7 +236,7 @@ final class IslandPanelController: ObservableObject {
     private func activateTerminalSurface() {
         requestTerminalFocus()
         terminalEngine.focus()
-        terminalEngine.refreshDisplay()
+        terminalSnapshot = terminalEngine.snapshot
     }
 
     private func requestTerminalFocus() {

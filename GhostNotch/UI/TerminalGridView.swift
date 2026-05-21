@@ -166,12 +166,12 @@ final class TerminalGridView: NSView {
 
         let cellSize = measuredCellSize
         let inset = TerminalGridMetrics.contentInset
-        let cols = Int(max(2, floor((visibleSize.width - inset * 2) / cellSize.width)))
-        let rows = Int(max(1, floor((visibleSize.height - inset * 2) / cellSize.height)))
+        let measuredColumns = Int(floor((visibleSize.width - inset * 2) / cellSize.width))
+        let measuredRows = Int(floor((visibleSize.height - inset * 2) / cellSize.height))
         let cellPixelSize = measuredCellPixelSize
-        let resize = TerminalGridResize(
-            columns: cols,
-            rows: rows,
+        let resize = TerminalGridResize.normalized(
+            columns: measuredColumns,
+            rows: measuredRows,
             cellWidthPixels: cellPixelSize.width,
             cellHeightPixels: cellPixelSize.height
         )
@@ -181,7 +181,7 @@ final class TerminalGridView: NSView {
         }
 
         lastReportedResize = resize
-        onResize?(cols, rows, cellPixelSize.width, cellPixelSize.height)
+        onResize?(resize.columns, resize.rows, resize.cellWidthPixels, resize.cellHeightPixels)
     }
 
     private var measuredCellSize: NSSize {
