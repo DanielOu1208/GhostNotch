@@ -399,9 +399,17 @@ private extension GNVTCell {
             widthRole: 0,
             foreground: GNVTColor(red: 220, green: 224, blue: 232),
             background: GNVTColor(red: 0, green: 0, blue: 0),
+            underlineColor: GNVTColor(red: 220, green: 224, blue: 232),
             bold: false,
             italic: false,
-            inverse: false
+            faint: false,
+            blink: false,
+            inverse: false,
+            invisible: false,
+            strikethrough: false,
+            overline: false,
+            hasUnderlineColor: false,
+            underlineStyle: 0
         )
     }
 }
@@ -415,9 +423,16 @@ private extension TerminalCell {
             style: TerminalCellStyle(
                 foreground: TerminalColor(ghosttyColor: ghosttyCell.foreground),
                 background: TerminalColor(ghosttyColor: ghosttyCell.background),
+                underlineColor: ghosttyCell.hasUnderlineColor ? TerminalColor(ghosttyColor: ghosttyCell.underlineColor) : nil,
                 isBold: ghosttyCell.bold,
                 isItalic: ghosttyCell.italic,
-                isInverse: ghosttyCell.inverse
+                isFaint: ghosttyCell.faint,
+                isBlinking: ghosttyCell.blink,
+                isInverse: ghosttyCell.inverse,
+                isInvisible: ghosttyCell.invisible,
+                isStrikethrough: ghosttyCell.strikethrough,
+                isOverline: ghosttyCell.overline,
+                underlineStyle: TerminalUnderlineStyle(rawValue: ghosttyCell.underlineStyle) ?? .none
             ),
             widthRole: TerminalCellWidthRole(rawValue: ghosttyCell.widthRole) ?? .narrow
         )

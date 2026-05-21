@@ -71,6 +71,42 @@ static GNVTColor GNVTColorFromGhostty(GhosttyColorRgb color) {
     return result;
 }
 
+static GNVTColor GNVTColorFromPaletteIndex(GhosttyColorPaletteIndex index) {
+    if (index < 16) {
+        return GNVTAnsiPalette16[index];
+    }
+
+    if (index < 232) {
+        int cubeIndex = index - 16;
+        return (GNVTColor){
+            GNVTXtermColorLevel((cubeIndex / 36) % 6),
+            GNVTXtermColorLevel((cubeIndex / 6) % 6),
+            GNVTXtermColorLevel(cubeIndex % 6),
+        };
+    }
+
+    uint8_t value = (uint8_t)(8 + ((index - 232) * 10));
+    return (GNVTColor){value, value, value};
+}
+
+static bool GNVTColorFromStyleColor(GhosttyStyleColor color, GNVTColor *result) {
+    if (result == NULL) {
+        return false;
+    }
+
+    switch (color.tag) {
+        case GHOSTTY_STYLE_COLOR_RGB:
+            *result = GNVTColorFromGhostty(color.value.rgb);
+            return true;
+        case GHOSTTY_STYLE_COLOR_PALETTE:
+            *result = GNVTColorFromPaletteIndex(color.value.palette);
+            return true;
+        case GHOSTTY_STYLE_COLOR_NONE:
+        default:
+            return false;
+    }
+}
+
 static GNVTCellWidthRole GNVTWidthRoleFromGhosttyWide(GhosttyCellWide wide) {
     switch (wide) {
         case GHOSTTY_CELL_WIDE_WIDE:
@@ -339,9 +375,17 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
         cells[index].widthRole = GNVT_CELL_WIDTH_NARROW;
         cells[index].foreground = GNVTDefaultForeground;
         cells[index].background = GNVTDefaultBackground;
+        cells[index].underlineColor = GNVTDefaultForeground;
         cells[index].bold = false;
         cells[index].italic = false;
+        cells[index].faint = false;
+        cells[index].blink = false;
         cells[index].inverse = false;
+        cells[index].invisible = false;
+        cells[index].strikethrough = false;
+        cells[index].overline = false;
+        cells[index].hasUnderlineColor = false;
+        cells[index].underlineStyle = GHOSTTY_SGR_UNDERLINE_NONE;
     }
 
     if (ghostty_render_state_get(terminal->renderState,
@@ -400,7 +444,14 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
                                                    &style) == GHOSTTY_SUCCESS) {
                 cell->bold = style.bold;
                 cell->italic = style.italic;
+                cell->faint = style.faint;
+                cell->blink = style.blink;
                 cell->inverse = style.inverse;
+                cell->invisible = style.invisible;
+                cell->strikethrough = style.strikethrough;
+                cell->overline = style.overline;
+                cell->underlineStyle = style.underline;
+                cell->hasUnderlineColor = GNVTColorFromStyleColor(style.underline_color, &cell->underlineColor);
             }
 
             GhosttyColorRgb foreground;

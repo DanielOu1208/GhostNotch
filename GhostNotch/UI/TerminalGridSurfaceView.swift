@@ -231,11 +231,15 @@ final class TerminalGridView: NSView {
     }
 
     private var measuredCellPixelSize: (width: Int, height: Int) {
-        let scale = window?.backingScaleFactor ?? layer?.contentsScale ?? NSScreen.main?.backingScaleFactor ?? 1
+        let scale = backingScale
         return (
             width: max(1, Int((measuredCellSize.width * scale).rounded())),
             height: max(1, Int((measuredCellSize.height * scale).rounded()))
         )
+    }
+
+    private var backingScale: CGFloat {
+        window?.backingScaleFactor ?? layer?.contentsScale ?? NSScreen.main?.backingScaleFactor ?? 1
     }
 
     private func drawCell(_ cell: TerminalCell, row: Int, column: Int, cellSize: NSSize) {
@@ -265,26 +269,37 @@ final class TerminalGridView: NSView {
             rect.fill()
         }
 
-        guard !cell.widthRole.isSpacer,
-              !cell.character.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard !cell.widthRole.isSpacer, !style.isInvisible else {
             return
         }
 
-        let resolvedForeground = foreground.nsColor.withAlphaComponent(0.92)
-        if TerminalBlockElementRenderer.draw(cell.character, foreground: resolvedForeground, in: textRect) {
-            return
+        let resolvedForeground = foreground.nsColor.withAlphaComponent(style.isFaint ? 0.5 : 0.92)
+        let hasVisibleGlyph = !cell.character.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if hasVisibleGlyph {
+            let didDrawTerminalGlyph = TerminalCellGlyphRenderer.draw(
+                cell.character,
+                foreground: resolvedForeground,
+                in: textRect,
+                scale: backingScale,
+                fontSupportsText: typography.supports(cell.character)
+            )
+
+            if !didDrawTerminalGlyph {
+                typography.draw(
+                    cell.character,
+                    style: style,
+                    foreground: resolvedForeground,
+                    in: textRect,
+                    viewHeight: bounds.height
+                )
+            }
         }
 
-        if TerminalBoxDrawingRenderer.draw(cell.character, foreground: resolvedForeground, in: textRect) {
-            return
-        }
-
-        typography.draw(
-            cell.character,
+        TerminalTextDecorationRenderer.draw(
             style: style,
             foreground: resolvedForeground,
             in: textRect,
-            viewHeight: bounds.height
+            scale: backingScale
         )
     }
 
@@ -351,79 +366,220 @@ private struct TerminalGridResize: Equatable {
     let cellHeightPixels: Int
 }
 
-private enum TerminalBlockElementRenderer {
-    private struct Fill {
-        let xRange: ClosedRange<Int>
-        let yRange: ClosedRange<Int>
+struct TerminalGlyphFill: Equatable {
+    let rect: NSRect
+    let alpha: CGFloat
+}
+
+enum TerminalCellGlyphRenderer {
+    private struct FractionalFill {
+        let xStart: CGFloat
+        let xEnd: CGFloat
+        let yStart: CGFloat
+        let yEnd: CGFloat
         let alpha: CGFloat
 
-        init(xRange: ClosedRange<Int>, yRange: ClosedRange<Int>, alpha: CGFloat = 1) {
-            self.xRange = xRange
-            self.yRange = yRange
+        init(xStart: CGFloat, xEnd: CGFloat, yStart: CGFloat, yEnd: CGFloat, alpha: CGFloat = 1) {
+            self.xStart = xStart
+            self.xEnd = xEnd
+            self.yStart = yStart
+            self.yEnd = yEnd
             self.alpha = alpha
         }
     }
 
-    static func draw(_ text: String, foreground: NSColor, in rect: NSRect) -> Bool {
+    static func draw(_ text: String, foreground: NSColor, in rect: NSRect, scale: CGFloat, fontSupportsText: Bool) -> Bool {
         guard text.count == 1,
-              let character = text.first,
-              let fills = fills[character] else {
+              let character = text.first else {
             return false
         }
 
-        for fill in fills {
-            foreground.withAlphaComponent(foreground.alphaComponent * fill.alpha).setFill()
-            quadrantRect(xRange: fill.xRange, yRange: fill.yRange, in: rect).fill()
+        if let fills = blockFillRects(for: character, in: rect, scale: scale) {
+            for fill in fills {
+                foreground.withAlphaComponent(foreground.alphaComponent * fill.alpha).setFill()
+                fill.rect.fill()
+            }
+            return true
+        }
+
+        if drawBox(character, foreground: foreground, in: rect, scale: scale) {
+            return true
+        }
+
+        if !fontSupportsText, drawPowerline(character, foreground: foreground, in: rect, scale: scale) {
+            return true
+        }
+
+        return false
+    }
+
+    static func blockFillRects(for character: Character, in rect: NSRect, scale: CGFloat) -> [TerminalGlyphFill]? {
+        guard let fills = blockFills[character] else {
+            return nil
+        }
+
+        return fills.map { fill in
+            TerminalGlyphFill(
+                rect: TerminalPixelGrid.align(
+                    NSRect(
+                        x: rect.minX + rect.width * fill.xStart,
+                        y: rect.minY + rect.height * fill.yStart,
+                        width: rect.width * (fill.xEnd - fill.xStart),
+                        height: rect.height * (fill.yEnd - fill.yStart)
+                    ),
+                    scale: scale
+                ),
+                alpha: fill.alpha
+            )
+        }
+    }
+
+    static func boxStrokeRects(for character: Character, in rect: NSRect, scale: CGFloat) -> [NSRect]? {
+        guard let glyph = boxGlyphs[character] else {
+            return nil
+        }
+
+        var rects: [NSRect] = []
+        let center = CGPoint(
+            x: TerminalPixelGrid.align(rect.midX, scale: scale),
+            y: TerminalPixelGrid.align(rect.midY, scale: scale)
+        )
+
+        if let left = glyph.left {
+            rects.append(contentsOf: horizontalStrokeRects(left, from: rect.minX, to: center.x, y: center.y, scale: scale))
+        }
+        if let right = glyph.right {
+            rects.append(contentsOf: horizontalStrokeRects(right, from: center.x, to: rect.maxX, y: center.y, scale: scale))
+        }
+        if let up = glyph.up {
+            rects.append(contentsOf: verticalStrokeRects(up, x: center.x, from: rect.minY, to: center.y, scale: scale))
+        }
+        if let down = glyph.down {
+            rects.append(contentsOf: verticalStrokeRects(down, x: center.x, from: center.y, to: rect.maxY, scale: scale))
+        }
+
+        return rects
+    }
+
+    static func powerlineFallbackCharacters() -> Set<Character> {
+        ["\u{E0B0}", "\u{E0B1}", "\u{E0B2}", "\u{E0B3}"]
+    }
+
+    private static func drawBox(_ character: Character, foreground: NSColor, in rect: NSRect, scale: CGFloat) -> Bool {
+        guard let strokeRects = boxStrokeRects(for: character, in: rect, scale: scale) else {
+            return false
+        }
+
+        foreground.setFill()
+        for rect in strokeRects {
+            rect.fill()
+        }
+
+        if diagonalBoxCharacters.contains(character) {
+            drawDiagonal(character, foreground: foreground, in: rect, scale: scale)
         }
 
         return true
     }
 
-    private static func quadrantRect(xRange: ClosedRange<Int>, yRange: ClosedRange<Int>, in rect: NSRect) -> NSRect {
-        let xUnit = rect.width / 2
-        let yUnit = rect.height / 2
-        let minX = rect.minX + CGFloat(xRange.lowerBound) * xUnit
-        let maxX = rect.minX + CGFloat(xRange.upperBound + 1) * xUnit
-        let minY = rect.minY + CGFloat(yRange.lowerBound) * yUnit
-        let maxY = rect.minY + CGFloat(yRange.upperBound + 1) * yUnit
+    private static func drawPowerline(_ character: Character, foreground: NSColor, in rect: NSRect, scale: CGFloat) -> Bool {
+        guard powerlineFallbackCharacters().contains(character) else {
+            return false
+        }
 
-        return NSRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        foreground.setFill()
+        let path = NSBezierPath()
+        switch character {
+        case "\u{E0B0}":
+            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            path.line(to: CGPoint(x: rect.maxX, y: rect.midY))
+            path.line(to: CGPoint(x: rect.minX, y: rect.maxY))
+            path.close()
+            path.fill()
+        case "\u{E0B2}":
+            path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.line(to: CGPoint(x: rect.minX, y: rect.midY))
+            path.line(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.close()
+            path.fill()
+        case "\u{E0B1}", "\u{E0B3}":
+            let startX = character == "\u{E0B1}" ? rect.minX : rect.maxX
+            let endX = character == "\u{E0B1}" ? rect.maxX : rect.minX
+            let line = NSBezierPath()
+            line.lineWidth = max(1 / max(scale, 1), 1)
+            line.move(to: CGPoint(x: startX, y: rect.minY))
+            line.line(to: CGPoint(x: endX, y: rect.maxY))
+            foreground.setStroke()
+            line.stroke()
+        default:
+            return false
+        }
+        return true
     }
 
-    private static let full = Fill(xRange: 0...1, yRange: 0...1)
-    private static let top = Fill(xRange: 0...1, yRange: 0...0)
-    private static let bottom = Fill(xRange: 0...1, yRange: 1...1)
-    private static let left = Fill(xRange: 0...0, yRange: 0...1)
-    private static let right = Fill(xRange: 1...1, yRange: 0...1)
-    private static let topLeft = Fill(xRange: 0...0, yRange: 0...0)
-    private static let topRight = Fill(xRange: 1...1, yRange: 0...0)
-    private static let bottomLeft = Fill(xRange: 0...0, yRange: 1...1)
-    private static let bottomRight = Fill(xRange: 1...1, yRange: 1...1)
+    private static func drawDiagonal(_ character: Character, foreground: NSColor, in rect: NSRect, scale: CGFloat) {
+        let path = NSBezierPath()
+        path.lineWidth = TerminalPixelGrid.alignSize(1.2, scale: scale)
+        foreground.setStroke()
 
-    private static let fills: [Character: [Fill]] = [
-        "█": [full],
-        "■": [full],
-        "▓": [Fill(xRange: 0...1, yRange: 0...1, alpha: 0.78)],
-        "▒": [Fill(xRange: 0...1, yRange: 0...1, alpha: 0.5)],
-        "░": [Fill(xRange: 0...1, yRange: 0...1, alpha: 0.28)],
-        "▀": [top],
-        "▄": [bottom],
-        "▌": [left],
-        "▐": [right],
-        "▖": [bottomLeft],
-        "▗": [bottomRight],
-        "▘": [topLeft],
-        "▝": [topRight],
-        "▙": [topLeft, bottomLeft, bottomRight],
-        "▚": [topLeft, bottomRight],
-        "▛": [topLeft, topRight, bottomLeft],
-        "▜": [topLeft, topRight, bottomRight],
-        "▞": [topRight, bottomLeft],
-        "▟": [topRight, bottomLeft, bottomRight],
-    ]
-}
+        switch character {
+        case "╱":
+            path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+            path.line(to: CGPoint(x: rect.maxX, y: rect.minY))
+        case "╲":
+            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            path.line(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        case "╳":
+            path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+            path.line(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            path.line(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        default:
+            return
+        }
+        path.stroke()
+    }
 
-private enum TerminalBoxDrawingRenderer {
+    private static func horizontalStrokeRects(_ stroke: Stroke, from startX: CGFloat, to endX: CGFloat, y: CGFloat, scale: CGFloat) -> [NSRect] {
+        guard endX > startX else {
+            return []
+        }
+
+        let width = endX - startX
+        switch stroke {
+        case .light:
+            return [TerminalPixelGrid.strokeRect(x: startX, y: y, width: width, height: 1, axis: .horizontal, scale: scale)]
+        case .heavy:
+            return [TerminalPixelGrid.strokeRect(x: startX, y: y, width: width, height: 1.8, axis: .horizontal, scale: scale)]
+        case .double:
+            let offset = TerminalPixelGrid.alignSize(1.5, scale: scale)
+            return [
+                TerminalPixelGrid.strokeRect(x: startX, y: y - offset, width: width, height: 1, axis: .horizontal, scale: scale),
+                TerminalPixelGrid.strokeRect(x: startX, y: y + offset, width: width, height: 1, axis: .horizontal, scale: scale),
+            ]
+        }
+    }
+
+    private static func verticalStrokeRects(_ stroke: Stroke, x: CGFloat, from startY: CGFloat, to endY: CGFloat, scale: CGFloat) -> [NSRect] {
+        guard endY > startY else {
+            return []
+        }
+
+        let height = endY - startY
+        switch stroke {
+        case .light:
+            return [TerminalPixelGrid.strokeRect(x: x, y: startY, width: 1, height: height, axis: .vertical, scale: scale)]
+        case .heavy:
+            return [TerminalPixelGrid.strokeRect(x: x, y: startY, width: 1.8, height: height, axis: .vertical, scale: scale)]
+        case .double:
+            let offset = TerminalPixelGrid.alignSize(1.5, scale: scale)
+            return [
+                TerminalPixelGrid.strokeRect(x: x - offset, y: startY, width: 1, height: height, axis: .vertical, scale: scale),
+                TerminalPixelGrid.strokeRect(x: x + offset, y: startY, width: 1, height: height, axis: .vertical, scale: scale),
+            ]
+        }
+    }
+
     private enum Stroke {
         case light
         case heavy
@@ -444,69 +600,68 @@ private enum TerminalBoxDrawingRenderer {
         }
     }
 
-    static func draw(_ text: String, foreground: NSColor, in rect: NSRect) -> Bool {
-        guard text.count == 1,
-              let character = text.first,
-              let glyph = glyphs[character] else {
-            return false
-        }
+    private static let full = FractionalFill(xStart: 0, xEnd: 1, yStart: 0, yEnd: 1)
+    private static let top = FractionalFill(xStart: 0, xEnd: 1, yStart: 0, yEnd: 0.5)
+    private static let bottom = FractionalFill(xStart: 0, xEnd: 1, yStart: 0.5, yEnd: 1)
+    private static let left = FractionalFill(xStart: 0, xEnd: 0.5, yStart: 0, yEnd: 1)
+    private static let right = FractionalFill(xStart: 0.5, xEnd: 1, yStart: 0, yEnd: 1)
+    private static let topLeft = FractionalFill(xStart: 0, xEnd: 0.5, yStart: 0, yEnd: 0.5)
+    private static let topRight = FractionalFill(xStart: 0.5, xEnd: 1, yStart: 0, yEnd: 0.5)
+    private static let bottomLeft = FractionalFill(xStart: 0, xEnd: 0.5, yStart: 0.5, yEnd: 1)
+    private static let bottomRight = FractionalFill(xStart: 0.5, xEnd: 1, yStart: 0.5, yEnd: 1)
 
-        foreground.setFill()
-        let center = CGPoint(x: rect.midX, y: rect.midY)
+    private static let blockFills: [Character: [FractionalFill]] = [
+        "█": [full],
+        "■": [full],
+        "▓": [FractionalFill(xStart: 0, xEnd: 1, yStart: 0, yEnd: 1, alpha: 0.78)],
+        "▒": [FractionalFill(xStart: 0, xEnd: 1, yStart: 0, yEnd: 1, alpha: 0.5)],
+        "░": [FractionalFill(xStart: 0, xEnd: 1, yStart: 0, yEnd: 1, alpha: 0.28)],
+        "▔": [FractionalFill(xStart: 0, xEnd: 1, yStart: 0, yEnd: 0.125)],
+        "▀": [top],
+        "▄": [bottom],
+        "▁": [FractionalFill(xStart: 0, xEnd: 1, yStart: 0.875, yEnd: 1)],
+        "▂": [FractionalFill(xStart: 0, xEnd: 1, yStart: 0.75, yEnd: 1)],
+        "▃": [FractionalFill(xStart: 0, xEnd: 1, yStart: 0.625, yEnd: 1)],
+        "▅": [FractionalFill(xStart: 0, xEnd: 1, yStart: 0.375, yEnd: 1)],
+        "▆": [FractionalFill(xStart: 0, xEnd: 1, yStart: 0.25, yEnd: 1)],
+        "▇": [FractionalFill(xStart: 0, xEnd: 1, yStart: 0.125, yEnd: 1)],
+        "▏": [FractionalFill(xStart: 0, xEnd: 0.125, yStart: 0, yEnd: 1)],
+        "▎": [FractionalFill(xStart: 0, xEnd: 0.25, yStart: 0, yEnd: 1)],
+        "▍": [FractionalFill(xStart: 0, xEnd: 0.375, yStart: 0, yEnd: 1)],
+        "▌": [left],
+        "▋": [FractionalFill(xStart: 0, xEnd: 0.625, yStart: 0, yEnd: 1)],
+        "▊": [FractionalFill(xStart: 0, xEnd: 0.75, yStart: 0, yEnd: 1)],
+        "▉": [FractionalFill(xStart: 0, xEnd: 0.875, yStart: 0, yEnd: 1)],
+        "▐": [right],
+        "▖": [bottomLeft],
+        "▗": [bottomRight],
+        "▘": [topLeft],
+        "▝": [topRight],
+        "▙": [topLeft, bottomLeft, bottomRight],
+        "▚": [topLeft, bottomRight],
+        "▛": [topLeft, topRight, bottomLeft],
+        "▜": [topLeft, topRight, bottomRight],
+        "▞": [topRight, bottomLeft],
+        "▟": [topRight, bottomLeft, bottomRight],
+    ]
+}
 
-        if let left = glyph.left {
-            drawHorizontal(left, from: rect.minX, to: center.x, y: center.y)
-        }
-        if let right = glyph.right {
-            drawHorizontal(right, from: center.x, to: rect.maxX, y: center.y)
-        }
-        if let up = glyph.up {
-            drawVertical(up, x: center.x, from: rect.minY, to: center.y)
-        }
-        if let down = glyph.down {
-            drawVertical(down, x: center.x, from: center.y, to: rect.maxY)
-        }
+private extension TerminalCellGlyphRenderer {
+    private static let diagonalBoxCharacters: Set<Character> = ["╱", "╲", "╳"]
 
-        return true
-    }
-
-    private static func drawHorizontal(_ stroke: Stroke, from startX: CGFloat, to endX: CGFloat, y: CGFloat) {
-        guard endX > startX else {
-            return
-        }
-
-        switch stroke {
-        case .light:
-            NSRect(x: startX, y: y - 0.5, width: endX - startX, height: 1).fill()
-        case .heavy:
-            NSRect(x: startX, y: y - 0.8, width: endX - startX, height: 1.6).fill()
-        case .double:
-            NSRect(x: startX, y: y - 1.8, width: endX - startX, height: 1).fill()
-            NSRect(x: startX, y: y + 0.8, width: endX - startX, height: 1).fill()
-        }
-    }
-
-    private static func drawVertical(_ stroke: Stroke, x: CGFloat, from startY: CGFloat, to endY: CGFloat) {
-        guard endY > startY else {
-            return
-        }
-
-        switch stroke {
-        case .light:
-            NSRect(x: x - 0.5, y: startY, width: 1, height: endY - startY).fill()
-        case .heavy:
-            NSRect(x: x - 0.8, y: startY, width: 1.6, height: endY - startY).fill()
-        case .double:
-            NSRect(x: x - 1.8, y: startY, width: 1, height: endY - startY).fill()
-            NSRect(x: x + 0.8, y: startY, width: 1, height: endY - startY).fill()
-        }
-    }
-
-    private static let glyphs: [Character: Glyph] = [
+    private static let boxGlyphs: [Character: Glyph] = [
         "─": Glyph(right: .light, left: .light),
         "━": Glyph(right: .heavy, left: .heavy),
+        "┄": Glyph(right: .light, left: .light),
+        "┅": Glyph(right: .heavy, left: .heavy),
+        "┈": Glyph(right: .light, left: .light),
+        "┉": Glyph(right: .heavy, left: .heavy),
         "│": Glyph(up: .light, down: .light),
         "┃": Glyph(up: .heavy, down: .heavy),
+        "┆": Glyph(up: .light, down: .light),
+        "┇": Glyph(up: .heavy, down: .heavy),
+        "┊": Glyph(up: .light, down: .light),
+        "┋": Glyph(up: .heavy, down: .heavy),
         "┌": Glyph(right: .light, down: .light),
         "┍": Glyph(right: .heavy, down: .light),
         "┎": Glyph(right: .light, down: .heavy),
@@ -525,20 +680,51 @@ private enum TerminalBoxDrawingRenderer {
         "┛": Glyph(up: .heavy, left: .heavy),
         "├": Glyph(up: .light, right: .light, down: .light),
         "┝": Glyph(up: .light, right: .heavy, down: .light),
+        "┞": Glyph(up: .heavy, right: .light, down: .light),
+        "┟": Glyph(up: .light, right: .light, down: .heavy),
         "┠": Glyph(up: .heavy, right: .light, down: .heavy),
+        "┡": Glyph(up: .heavy, right: .heavy, down: .light),
+        "┢": Glyph(up: .light, right: .heavy, down: .heavy),
         "┣": Glyph(up: .heavy, right: .heavy, down: .heavy),
         "┤": Glyph(up: .light, down: .light, left: .light),
         "┥": Glyph(up: .light, down: .light, left: .heavy),
+        "┦": Glyph(up: .heavy, down: .light, left: .light),
+        "┧": Glyph(up: .light, down: .heavy, left: .light),
         "┨": Glyph(up: .heavy, down: .heavy, left: .light),
+        "┩": Glyph(up: .heavy, down: .light, left: .heavy),
+        "┪": Glyph(up: .light, down: .heavy, left: .heavy),
         "┫": Glyph(up: .heavy, down: .heavy, left: .heavy),
         "┬": Glyph(right: .light, down: .light, left: .light),
+        "┭": Glyph(right: .heavy, down: .light, left: .light),
+        "┮": Glyph(right: .light, down: .light, left: .heavy),
         "┯": Glyph(right: .light, down: .heavy, left: .light),
+        "┰": Glyph(right: .heavy, down: .heavy, left: .light),
+        "┱": Glyph(right: .light, down: .heavy, left: .heavy),
+        "┲": Glyph(right: .heavy, down: .light, left: .heavy),
         "┳": Glyph(right: .heavy, down: .heavy, left: .heavy),
         "┴": Glyph(up: .light, right: .light, left: .light),
+        "┵": Glyph(up: .light, right: .heavy, left: .light),
+        "┶": Glyph(up: .light, right: .light, left: .heavy),
         "┷": Glyph(up: .heavy, right: .light, left: .light),
+        "┸": Glyph(up: .heavy, right: .heavy, left: .light),
+        "┹": Glyph(up: .heavy, right: .light, left: .heavy),
+        "┺": Glyph(up: .light, right: .heavy, left: .heavy),
         "┻": Glyph(up: .heavy, right: .heavy, left: .heavy),
         "┼": Glyph(up: .light, right: .light, down: .light, left: .light),
+        "┽": Glyph(up: .light, right: .heavy, down: .light, left: .light),
+        "┾": Glyph(up: .heavy, right: .light, down: .light, left: .light),
+        "┿": Glyph(up: .light, right: .light, down: .heavy, left: .light),
+        "╀": Glyph(up: .light, right: .light, down: .light, left: .heavy),
+        "╁": Glyph(up: .heavy, right: .heavy, down: .light, left: .light),
         "╂": Glyph(up: .heavy, right: .light, down: .heavy, left: .light),
+        "╃": Glyph(up: .light, right: .heavy, down: .heavy, left: .light),
+        "╄": Glyph(up: .light, right: .light, down: .heavy, left: .heavy),
+        "╅": Glyph(up: .heavy, right: .light, down: .light, left: .heavy),
+        "╆": Glyph(up: .light, right: .heavy, down: .light, left: .heavy),
+        "╇": Glyph(up: .heavy, right: .light, down: .heavy, left: .heavy),
+        "╈": Glyph(up: .light, right: .heavy, down: .heavy, left: .heavy),
+        "╉": Glyph(up: .heavy, right: .heavy, down: .light, left: .heavy),
+        "╊": Glyph(up: .heavy, right: .heavy, down: .heavy, left: .light),
         "╋": Glyph(up: .heavy, right: .heavy, down: .heavy, left: .heavy),
         "╭": Glyph(right: .light, down: .light),
         "╮": Glyph(down: .light, left: .light),
@@ -574,6 +760,140 @@ private enum TerminalBoxDrawingRenderer {
         "╪": Glyph(up: .light, right: .double, down: .light, left: .double),
         "╫": Glyph(up: .double, right: .light, down: .double, left: .light),
     ]
+}
+
+enum TerminalTextDecorationRenderer {
+    static func draw(style: TerminalCellStyle, foreground: NSColor, in rect: NSRect, scale: CGFloat) {
+        let color = (style.underlineColor?.nsColor ?? foreground).withAlphaComponent(foreground.alphaComponent)
+        color.setFill()
+
+        for decorationRect in decorationRects(style: style, in: rect, scale: scale) {
+            decorationRect.fill()
+        }
+
+        if style.underlineStyle == .curly {
+            drawCurlyUnderline(color: color, in: rect, scale: scale)
+        }
+    }
+
+    static func decorationRects(style: TerminalCellStyle, in rect: NSRect, scale: CGFloat) -> [NSRect] {
+        var rects: [NSRect] = []
+
+        switch style.underlineStyle {
+        case .none, .curly:
+            break
+        case .single:
+            rects.append(lineRect(y: rect.maxY - 2, in: rect, scale: scale))
+        case .double:
+            rects.append(lineRect(y: rect.maxY - 3, in: rect, scale: scale))
+            rects.append(lineRect(y: rect.maxY - 1, in: rect, scale: scale))
+        case .dotted:
+            rects.append(contentsOf: segmentedLineRects(y: rect.maxY - 2, in: rect, scale: scale, segment: 1, gap: 2))
+        case .dashed:
+            rects.append(contentsOf: segmentedLineRects(y: rect.maxY - 2, in: rect, scale: scale, segment: 4, gap: 2))
+        }
+
+        if style.isStrikethrough {
+            rects.append(lineRect(y: rect.midY, in: rect, scale: scale))
+        }
+
+        if style.isOverline {
+            rects.append(lineRect(y: rect.minY + 1, in: rect, scale: scale))
+        }
+
+        return rects
+    }
+
+    private static func drawCurlyUnderline(color: NSColor, in rect: NSRect, scale: CGFloat) {
+        color.setStroke()
+        let path = NSBezierPath()
+        path.lineWidth = TerminalPixelGrid.alignSize(1, scale: scale)
+        let amplitude = TerminalPixelGrid.alignSize(1.5, scale: scale)
+        let baseline = TerminalPixelGrid.align(rect.maxY - 2, scale: scale)
+        let wavelength = max(TerminalPixelGrid.alignSize(4, scale: scale), 2)
+
+        var x = rect.minX
+        path.move(to: CGPoint(x: x, y: baseline))
+        while x < rect.maxX {
+            let midX = min(x + wavelength / 2, rect.maxX)
+            let endX = min(x + wavelength, rect.maxX)
+            path.curve(
+                to: CGPoint(x: endX, y: baseline),
+                controlPoint1: CGPoint(x: x + wavelength / 4, y: baseline - amplitude),
+                controlPoint2: CGPoint(x: midX + wavelength / 4, y: baseline + amplitude)
+            )
+            x += wavelength
+        }
+        path.stroke()
+    }
+
+    private static func lineRect(y: CGFloat, in rect: NSRect, scale: CGFloat) -> NSRect {
+        TerminalPixelGrid.strokeRect(
+            x: rect.minX,
+            y: y,
+            width: rect.width,
+            height: 1,
+            axis: .horizontal,
+            scale: scale
+        )
+    }
+
+    private static func segmentedLineRects(y: CGFloat, in rect: NSRect, scale: CGFloat, segment: CGFloat, gap: CGFloat) -> [NSRect] {
+        var rects: [NSRect] = []
+        var x = rect.minX
+        while x < rect.maxX {
+            let endX = min(x + segment, rect.maxX)
+            rects.append(
+                TerminalPixelGrid.strokeRect(
+                    x: x,
+                    y: y,
+                    width: endX - x,
+                    height: 1,
+                    axis: .horizontal,
+                    scale: scale
+                )
+            )
+            x += segment + gap
+        }
+        return rects
+    }
+}
+
+enum TerminalPixelGrid {
+    enum Axis {
+        case horizontal
+        case vertical
+    }
+
+    static func align(_ value: CGFloat, scale: CGFloat) -> CGFloat {
+        guard scale > 0 else {
+            return value.rounded()
+        }
+        return (value * scale).rounded() / scale
+    }
+
+    static func alignSize(_ value: CGFloat, scale: CGFloat) -> CGFloat {
+        max(1 / max(scale, 1), align(value, scale: scale))
+    }
+
+    static func align(_ rect: NSRect, scale: CGFloat) -> NSRect {
+        let minX = align(rect.minX, scale: scale)
+        let minY = align(rect.minY, scale: scale)
+        let maxX = align(rect.maxX, scale: scale)
+        let maxY = align(rect.maxY, scale: scale)
+        return NSRect(x: minX, y: minY, width: max(maxX - minX, 1 / max(scale, 1)), height: max(maxY - minY, 1 / max(scale, 1)))
+    }
+
+    static func strokeRect(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat, axis: Axis, scale: CGFloat) -> NSRect {
+        let alignedWidth = axis == .vertical ? alignSize(width, scale: scale) : width
+        let alignedHeight = axis == .horizontal ? alignSize(height, scale: scale) : height
+        switch axis {
+        case .horizontal:
+            return align(NSRect(x: x, y: y - alignedHeight / 2, width: width, height: alignedHeight), scale: scale)
+        case .vertical:
+            return align(NSRect(x: x - alignedWidth / 2, y: y, width: alignedWidth, height: height), scale: scale)
+        }
+    }
 }
 
 private struct TerminalGridTypography {
@@ -621,6 +941,10 @@ private struct TerminalGridTypography {
         context.restoreGState()
     }
 
+    func supports(_ text: String) -> Bool {
+        Self.supports(text, font: regularFont as CTFont)
+    }
+
     private static func makeFont(size: CGFloat, weight: NSFont.Weight, matching baseFont: NSFont? = nil) -> NSFont {
         if let baseFont,
            let weightedFont = NSFont(
@@ -647,19 +971,35 @@ private struct TerminalGridTypography {
             return baseCTFont
         }
 
-        let codeUnits = Array(text.utf16).map { UniChar($0) }
-        var glyphs = Array(repeating: CGGlyph(), count: codeUnits.count)
-        let supportsText = codeUnits.withUnsafeBufferPointer { codeUnitBuffer in
-            glyphs.withUnsafeMutableBufferPointer { glyphBuffer in
-                CTFontGetGlyphsForCharacters(baseCTFont, codeUnitBuffer.baseAddress!, glyphBuffer.baseAddress!, codeUnitBuffer.count)
-            }
-        }
-
-        guard !supportsText else {
+        guard !supports(text, font: baseCTFont) else {
             return baseCTFont
         }
 
+        for name in preferredInstalledFontNames {
+            guard let fallbackFont = NSFont(name: name, size: baseFont.pointSize) else {
+                continue
+            }
+            let fallbackCTFont = fallbackFont as CTFont
+            if supports(text, font: fallbackCTFont) {
+                return fallbackCTFont
+            }
+        }
+
         return CTFontCreateForString(baseCTFont, text as CFString, CFRange(location: 0, length: text.utf16.count))
+    }
+
+    private static func supports(_ text: String, font: CTFont) -> Bool {
+        guard !text.isEmpty else {
+            return true
+        }
+
+        let codeUnits = Array(text.utf16).map { UniChar($0) }
+        var glyphs = Array(repeating: CGGlyph(), count: codeUnits.count)
+        return codeUnits.withUnsafeBufferPointer { codeUnitBuffer in
+            glyphs.withUnsafeMutableBufferPointer { glyphBuffer in
+                CTFontGetGlyphsForCharacters(font, codeUnitBuffer.baseAddress!, glyphBuffer.baseAddress!, codeUnitBuffer.count)
+            }
+        }
     }
 
     private static func measurementGlyph(for font: CTFont) -> CGGlyph {

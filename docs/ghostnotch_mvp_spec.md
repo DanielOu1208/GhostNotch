@@ -560,17 +560,32 @@ Run this suite in the expanded GhostNotch terminal before moving to shell integr
 
 | Area | Manual check | Result | Notes |
 | --- | --- | --- | --- |
-| ANSI/style rendering | Run the ANSI `printf` command below and inspect foreground color plus bold reset behavior. | Follow-up | Baseline fixture coverage exists; manual app pass still required. |
+| ANSI/style rendering | Run the ANSI/style `printf` commands below and inspect color, bold, faint, underline, strike, overline, inverse, and decoration reset behavior. | Follow-up | Baseline fixture coverage exists; manual app pass still required. |
 | Unicode/graphemes | Run the unicode `printf` command below and inspect combining marks, emoji, CJK, and private-use prompt glyphs. | Follow-up | Baseline fixture coverage exists; PTY locale now defaults to UTF-8 for input echo, but manual app retest is required. Powerline glyph quality depends on installed compatible fonts. |
 | CJK/wide-cell copy | Run the wide-column command below, select/copy the line, and confirm wide spacer cells are not duplicated. | Follow-up | Baseline fixture coverage exists; manual grid selection pass still required. |
+| Box/block TUI glyphs | Run the box/block stress command below and inspect line joins, partial blocks, and shaded fills. | Follow-up | Baseline geometry coverage exists for synthetic glyph helpers; manual app pass still required for actual display output. |
 | TUI/editor rendering | Open `top`, `less`, and `vim` or `nano`; inspect alternate-screen rendering, cursor position, and status lines. | Follow-up | Manual app pass required; paste-specific issues become R5 follow-ups. |
 | Resize/collapse/Escape | Resize through the expanded island, collapse/reopen, and confirm focused Escape reaches the foreground terminal program. | Follow-up | Manual app pass required because this crosses AppKit focus, layout, and session persistence. |
 
 ```sh
 printf 'plain\n  indented\nred: \033[31mred\033[0m bold: \033[1mbold\033[0m\n'
+printf 'style: \033[2mfaint\033[0m \033[4munder\033[0m \033[4:2mdouble\033[0m \033[4:3mcurly\033[0m \033[4:4mdotted\033[0m \033[4:5mdashed\033[0m \033[9mstrike\033[0m \033[53mover\033[0m \033[7minverse\033[0m\n'
+printf 'color: \033[38;5;196mansi256-fg\033[0m \033[48;5;24mansi256-bg\033[0m \033[38;2;1;180;255mtruecolor-fg\033[0m \033[48;2;64;32;96mtruecolor-bg\033[0m\n'
 printf 'unicode: é 🙂 界 \n'
+printf 'powerline:    \n'
+printf 'box: ┌─┬─┐ ╔═╦═╗ ╭─╮ ╱╲╳\n     │ ┼ │ ╠═╬═╣ ╰─╯ ┃┋┊\n     └─┴─┘ ╚═╩═╝\n'
+printf 'blocks: ▁▂▃▄▅▆▇█ ▏▎▍▌▋▊▉█ ▖▗▘▝▚▞▙▛▜▟ ░▒▓█\n'
 printf 'wide columns: |界|x|  copy this line and verify no duplicate wide spacer\n'
 CLICOLOR=1 ls -G
+python3 - <<'PY'
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    Console().print(Panel.fit("rich border sample", border_style="cyan"))
+except Exception:
+    print("rich not installed; skip rich border sample")
+PY
+command -v gum >/dev/null && gum style --border rounded --padding '0 1' 'gum border sample' || true
 top
 less docs/ghostnotch_mvp_spec.md
 vim docs/ghostnotch_mvp_spec.md # or nano if vim is unavailable

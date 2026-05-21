@@ -35,6 +35,7 @@
 		1A00011A0000000000000001 /* TerminalRenderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000130000000000000001 /* TerminalRenderModel.swift */; };
 		1A00011B0000000000000001 /* GhosttyTerminalCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000140000000000000001 /* GhosttyTerminalCore.swift */; };
 		1A00011C0000000000000001 /* GhosttyTerminalEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000150000000000000001 /* GhosttyTerminalEngine.swift */; };
+		1A0001220000000000000001 /* TerminalGridSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000160000000000000001 /* TerminalGridSurfaceView.swift */; };
 		1A0001200000000000000001 /* GhosttyVTBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000190000000000000001 /* GhosttyVTBridge.c */; };
 		1A0001210000000000000001 /* GhosttyVT.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00001B0000000000000001 /* GhosttyVT.xcframework */; };
 		1A0001140000000000000001 /* ShellResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000110000000000000001 /* ShellResolverTests.swift */; };
@@ -312,6 +313,7 @@
 				1A00011A0000000000000001 /* TerminalRenderModel.swift in Sources */,
 				1A00011B0000000000000001 /* GhosttyTerminalCore.swift in Sources */,
 				1A00011C0000000000000001 /* GhosttyTerminalEngine.swift in Sources */,
+				1A0001220000000000000001 /* TerminalGridSurfaceView.swift in Sources */,
 				1A0001200000000000000001 /* GhosttyVTBridge.c in Sources */,
 				1A0001140000000000000001 /* ShellResolverTests.swift in Sources */,
 				1A0001150000000000000001 /* TerminalSessionTests.swift in Sources */,

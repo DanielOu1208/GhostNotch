@@ -38,17 +38,40 @@ struct TerminalColor: Equatable {
 struct TerminalCellStyle: Equatable {
     var foreground: TerminalColor
     var background: TerminalColor
+    var underlineColor: TerminalColor?
     var isBold: Bool
     var isItalic: Bool
+    var isFaint: Bool
+    var isBlinking: Bool
     var isInverse: Bool
+    var isInvisible: Bool
+    var isStrikethrough: Bool
+    var isOverline: Bool
+    var underlineStyle: TerminalUnderlineStyle
 
     static let `default` = TerminalCellStyle(
         foreground: .foreground,
         background: .background,
+        underlineColor: nil,
         isBold: false,
         isItalic: false,
-        isInverse: false
+        isFaint: false,
+        isBlinking: false,
+        isInverse: false,
+        isInvisible: false,
+        isStrikethrough: false,
+        isOverline: false,
+        underlineStyle: .none
     )
+}
+
+enum TerminalUnderlineStyle: Int32, Equatable {
+    case none = 0
+    case single = 1
+    case double = 2
+    case curly = 3
+    case dotted = 4
+    case dashed = 5
 }
 
 struct TerminalCell: Equatable {

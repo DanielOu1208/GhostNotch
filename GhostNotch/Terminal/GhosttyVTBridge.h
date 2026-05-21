@@ -21,9 +21,17 @@ typedef struct {
     uint8_t widthRole;
     GNVTColor foreground;
     GNVTColor background;
+    GNVTColor underlineColor;
     bool bold;
     bool italic;
+    bool faint;
+    bool blink;
     bool inverse;
+    bool invisible;
+    bool strikethrough;
+    bool overline;
+    bool hasUnderlineColor;
+    int underlineStyle;
 } GNVTCell;
 
 typedef enum {

@@ -1,4 +1,5 @@
 import XCTest
+import AppKit
 
 @MainActor
 final class GhosttyTerminalCoreTests: XCTestCase {
@@ -17,6 +18,59 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertEqual(plain.character, "p")
         XCTAssertFalse(plain.style.isBold)
         XCTAssertEqual(plain.style.foreground, .foreground)
+    }
+
+    func testExtendedSgrStyleMetadataRendering() {
+        let core = GhosttyTerminalCore(columns: 48, rows: 2)
+
+        core.processOutput(Data("\u{1B}[2;5;8;9;53;4:3;58:2:12:34:56mstyled".utf8))
+
+        let style = core.snapshot.cell(row: 0, column: 0).style
+        XCTAssertTrue(style.isFaint)
+        XCTAssertTrue(style.isBlinking)
+        XCTAssertTrue(style.isInvisible)
+        XCTAssertTrue(style.isStrikethrough)
+        XCTAssertTrue(style.isOverline)
+        XCTAssertEqual(style.underlineStyle, .curly)
+        XCTAssertEqual(style.underlineColor, TerminalColor(red: 12, green: 34, blue: 56))
+    }
+
+    func testUnderlineStyleVariantsArePreserved() {
+        let streams: [(String, TerminalUnderlineStyle)] = [
+            ("\u{1B}[4mA", .single),
+            ("\u{1B}[4:2mA", .double),
+            ("\u{1B}[4:3mA", .curly),
+            ("\u{1B}[4:4mA", .dotted),
+            ("\u{1B}[4:5mA", .dashed),
+        ]
+
+        for (stream, expectedStyle) in streams {
+            let snapshot = renderFixture(stream, columns: 4, rows: 1)
+            XCTAssertEqual(snapshot.cell(row: 0, column: 0).style.underlineStyle, expectedStyle)
+        }
+    }
+
+    func testColorFidelityPreservesAnsi256AndTruecolorCells() {
+        let snapshot = renderFixture(
+            "\u{1B}[38;5;196;48;5;24mA\u{1B}[38;2;1;2;3;48;2;4;5;6mB",
+            columns: 4,
+            rows: 1
+        )
+
+        XCTAssertEqual(snapshot.cell(row: 0, column: 0).style.foreground, TerminalColor(red: 255, green: 0, blue: 0))
+        XCTAssertEqual(snapshot.cell(row: 0, column: 0).style.background, TerminalColor(red: 0, green: 95, blue: 135))
+        XCTAssertEqual(snapshot.cell(row: 0, column: 1).style.foreground, TerminalColor(red: 1, green: 2, blue: 3))
+        XCTAssertEqual(snapshot.cell(row: 0, column: 1).style.background, TerminalColor(red: 4, green: 5, blue: 6))
+    }
+
+    func testInversePreservesExtendedDecorations() {
+        let snapshot = renderFixture("\u{1B}[7;9;53;4:2mA", columns: 4, rows: 1)
+        let style = snapshot.cell(row: 0, column: 0).style
+
+        XCTAssertTrue(style.isInverse)
+        XCTAssertTrue(style.isStrikethrough)
+        XCTAssertTrue(style.isOverline)
+        XCTAssertEqual(style.underlineStyle, .double)
     }
 
     func testCursorPositioningAndLineClearing() {
@@ -308,6 +362,77 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         scrollback.scrollViewport(deltaRows: -2)
         XCTAssertGreaterThan(scrollback.snapshot.scrollbackRows, 0)
         XCTAssertNotEqual(scrollback.snapshot.plainText, bottomText)
+    }
+
+    func testBlockElementFillRectsUseExpectedFractions() {
+        let rect = NSRect(x: 0, y: 0, width: 16, height: 16)
+
+        XCTAssertEqual(
+            TerminalCellGlyphRenderer.blockFillRects(for: "▃", in: rect, scale: 2),
+            [TerminalGlyphFill(rect: NSRect(x: 0, y: 10, width: 16, height: 6), alpha: 1)]
+        )
+        XCTAssertEqual(
+            TerminalCellGlyphRenderer.blockFillRects(for: "▊", in: rect, scale: 2),
+            [TerminalGlyphFill(rect: NSRect(x: 0, y: 0, width: 12, height: 16), alpha: 1)]
+        )
+        XCTAssertEqual(
+            TerminalCellGlyphRenderer.blockFillRects(for: "▚", in: rect, scale: 2),
+            [
+                TerminalGlyphFill(rect: NSRect(x: 0, y: 0, width: 8, height: 8), alpha: 1),
+                TerminalGlyphFill(rect: NSRect(x: 8, y: 8, width: 8, height: 8), alpha: 1),
+            ]
+        )
+    }
+
+    func testBoxDrawingStrokesTouchCellEdgesAndAlignToPixels() {
+        let rect = NSRect(x: 0, y: 0, width: 14, height: 14)
+
+        let lightHorizontal = TerminalCellGlyphRenderer.boxStrokeRects(for: "─", in: rect, scale: 2)
+        XCTAssertEqual(lightHorizontal?.first?.minX, 0)
+        XCTAssertEqual(lightHorizontal?.last?.maxX, 14)
+        XCTAssertEqual(lightHorizontal?.first?.height, 1)
+
+        let corner = TerminalCellGlyphRenderer.boxStrokeRects(for: "┌", in: rect, scale: 2) ?? []
+        XCTAssertTrue(corner.contains { rect in
+            rect.minX == 6.5 && rect.minY == 7 && rect.maxY == 14
+        })
+        XCTAssertTrue(corner.contains { rect in
+            rect.minX == 7 && rect.maxX == 14 && rect.minY == 6.5
+        })
+    }
+
+    func testDecorationRectsArePixelAlignedAtOneAndTwoXScale() {
+        let rect = NSRect(x: 0, y: 0, width: 12, height: 14)
+        let style = TerminalCellStyle(
+            foreground: .foreground,
+            background: .background,
+            underlineColor: nil,
+            isBold: false,
+            isItalic: false,
+            isFaint: false,
+            isBlinking: false,
+            isInverse: false,
+            isInvisible: false,
+            isStrikethrough: true,
+            isOverline: true,
+            underlineStyle: .double
+        )
+
+        for scale in [CGFloat(1), CGFloat(2)] {
+            let rects = TerminalTextDecorationRenderer.decorationRects(style: style, in: rect, scale: scale)
+            XCTAssertEqual(rects.count, 4)
+            for decorationRect in rects {
+                XCTAssertEqual((decorationRect.minY * scale).rounded(), decorationRect.minY * scale)
+                XCTAssertEqual((decorationRect.height * scale).rounded(), decorationRect.height * scale)
+            }
+        }
+    }
+
+    func testPowerlineFallbackScopeIsLimitedToCommonSeparators() {
+        XCTAssertEqual(
+            TerminalCellGlyphRenderer.powerlineFallbackCharacters(),
+            Set(["\u{E0B0}", "\u{E0B1}", "\u{E0B2}", "\u{E0B3}"])
+        )
     }
 
     private func makeSnapshot(rowText: String, columns: Int) -> TerminalRenderSnapshot {
