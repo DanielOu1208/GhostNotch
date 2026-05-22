@@ -26,7 +26,7 @@ The duplicate project/source copy has been removed. Future implementation work s
 ## Product Goal
 
 Build a tiny floating terminal island for macOS that:
-
+![alt text](image.png)
 - Sits visually at the MacBook notch.
 - Extends subtly beyond the physical notch so users can tell the app is active.
 - Expands on hover for a preview state.

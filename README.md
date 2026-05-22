@@ -4,6 +4,8 @@ GhostNotch is an early experimental macOS app that turns the MacBook notch into 
 
 It sits flush with the top of the display, looks like an extension of the hardware notch, and expands into a compact terminal when you need to run quick shell commands. The goal is not to replace a full terminal app. The goal is a fast, notch-native utility for short terminal interactions that can stay alive quietly in the background.
 
+![GhostNotch expanded terminal island](docs/image.png)
+
 ## Status
 
 GhostNotch is a prototype-stage project. It is usable for local development and experimentation, but it is not packaged, signed, or documented as a normal end-user install yet.
