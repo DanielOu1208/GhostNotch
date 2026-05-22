@@ -33,6 +33,14 @@ enum PTYProcessError: Error, LocalizedError, Equatable {
 final class PTYProcess: TerminalProcess, @unchecked Sendable {
     static let defaultTerminalType = "xterm-256color"
     static let defaultUTF8Locale = "en_US.UTF-8"
+    fileprivate static let defaultExecutableSearchPath = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/usr/bin",
+        "/bin",
+        "/usr/sbin",
+        "/sbin",
+    ]
 
     var onOutput: TerminalOutputHandler?
     var onTermination: TerminalTerminationHandler?
@@ -303,6 +311,7 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         var terminalEnvironment = environment
         terminalEnvironment["TERM"] = defaultTerminalType
         terminalEnvironment.applyDefaultUTF8Locale()
+        terminalEnvironment.applyDefaultExecutableSearchPath()
         return terminalEnvironment
     }
 
@@ -338,6 +347,22 @@ private struct ProcessTerminationRequest: @unchecked Sendable {
 }
 
 private extension Dictionary where Key == String, Value == String {
+    mutating func applyDefaultExecutableSearchPath() {
+        let inheritedPaths = self["PATH"]?
+            .split(separator: ":", omittingEmptySubsequences: true)
+            .map(String.init) ?? []
+        let inheritedUniquePaths = inheritedPaths.uniqued()
+
+        guard !inheritedUniquePaths.isEmpty else {
+            self["PATH"] = PTYProcess.defaultExecutableSearchPath.joined(separator: ":")
+            return
+        }
+
+        let inheritedPathSet = Set(inheritedUniquePaths)
+        let missingDefaultPaths = PTYProcess.defaultExecutableSearchPath.filter { !inheritedPathSet.contains($0) }
+        self["PATH"] = (missingDefaultPaths + inheritedUniquePaths).joined(separator: ":")
+    }
+
     mutating func applyDefaultUTF8Locale() {
         if shouldUseDefaultUTF8Locale(for: self["LANG"]) {
             self["LANG"] = PTYProcess.defaultUTF8Locale
@@ -359,6 +384,13 @@ private extension Dictionary where Key == String, Value == String {
 
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return normalized.isEmpty || normalized == "c" || normalized == "posix"
+    }
+}
+
+private extension Array where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
     }
 }
 

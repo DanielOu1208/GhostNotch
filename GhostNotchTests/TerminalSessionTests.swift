@@ -11,7 +11,52 @@ final class TerminalSessionTests: XCTestCase {
 
         XCTAssertEqual(environment["TERM"], PTYProcess.defaultTerminalType)
         XCTAssertEqual(environment["SHELL"], "/bin/sh")
-        XCTAssertEqual(environment["PATH"], "/usr/bin:/bin")
+        XCTAssertEqual(
+            environment["PATH"],
+            "/opt/homebrew/bin:/usr/local/bin:/usr/sbin:/sbin:/usr/bin:/bin"
+        )
+    }
+
+    func testPTYEnvironmentAddsDeveloperPathsAndPreservesInheritedPathOrder() {
+        let environment = PTYProcess.terminalEnvironment(from: [
+            "PATH": "/Users/danielou/.npm-global/bin:/custom/bin:/usr/bin",
+        ])
+
+        XCTAssertEqual(
+            environment["PATH"],
+            "/opt/homebrew/bin:/usr/local/bin:/bin:/usr/sbin:/sbin:/Users/danielou/.npm-global/bin:/custom/bin:/usr/bin"
+        )
+    }
+
+    func testPTYEnvironmentRemovesDuplicatePathEntries() {
+        let environment = PTYProcess.terminalEnvironment(from: [
+            "PATH": "/usr/local/bin:/custom/bin:/usr/local/bin:/custom/bin:/bin",
+        ])
+
+        XCTAssertEqual(
+            environment["PATH"],
+            "/opt/homebrew/bin:/usr/bin:/usr/sbin:/sbin:/usr/local/bin:/custom/bin:/bin"
+        )
+    }
+
+    func testPTYEnvironmentDefaultsPathWhenInheritedPathIsBlank() {
+        let environment = PTYProcess.terminalEnvironment(from: [
+            "PATH": "::",
+        ])
+
+        XCTAssertEqual(
+            environment["PATH"],
+            "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        )
+    }
+
+    func testPTYEnvironmentDefaultsPathWhenInheritedPathIsMissing() {
+        let environment = PTYProcess.terminalEnvironment(from: [:])
+
+        XCTAssertEqual(
+            environment["PATH"],
+            "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        )
     }
 
     func testPTYEnvironmentDefaultsToUTF8LocaleWhenInheritedLocaleIsC() {
