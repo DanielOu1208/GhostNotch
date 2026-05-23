@@ -36,29 +36,20 @@ struct IslandIndicatorView: View {
     private var collapsedGhosttyLogo: some View {
         ZStack(alignment: .bottom) {
             GhosttyMarkShape()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.72, green: 0.84, blue: 1.0),
-                            Color(red: 0.44, green: 0.55, blue: 0.96)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(.white)
                 .overlay {
                     GhosttyMarkShape()
                         .stroke(.white.opacity(0.72), lineWidth: 0.7)
                 }
-                .shadow(color: Color(red: 0.44, green: 0.55, blue: 0.96).opacity(0.45), radius: 4)
+                .shadow(color: .white.opacity(0.28), radius: 4)
 
             HStack(spacing: 3) {
                 Circle()
-                    .fill(.black.opacity(0.74))
+                    .fill(.black.opacity(0.82))
                     .frame(width: 2.4, height: 2.4)
 
                 Circle()
-                    .fill(.black.opacity(0.74))
+                    .fill(.black.opacity(0.82))
                     .frame(width: 2.4, height: 2.4)
             }
             .padding(.bottom, 6.2)
