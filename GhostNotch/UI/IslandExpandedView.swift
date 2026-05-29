@@ -10,7 +10,7 @@ struct IslandExpandedView: View {
     let focusRequestID: Int
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
-    let onScroll: (Int) -> Void
+    let onScroll: (TerminalScrollEvent) -> Void
     let onResize: (Int, Int, Int, Int) -> Void
     let onRestart: () -> Void
     let onCollapse: () -> Void

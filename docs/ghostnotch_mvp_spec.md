@@ -96,6 +96,7 @@ GhostNotch/
 │   ├── TerminalSessionState.swift
 │   ├── TerminalRenderingEngine.swift
 │   ├── TerminalRenderModel.swift
+│   ├── TerminalSurfaceCoordinator.swift
 │   ├── GhosttyTerminalCore.swift
 │   ├── GhosttyTerminalEngine.swift
 │   ├── GhosttyVTBridge.h
@@ -247,15 +248,16 @@ The embedded terminal surface currently:
 - `ShellResolver` uses the `SHELL` environment variable when it points to an executable file and falls back to `/bin/zsh`.
 - `PTYProcess` opens a native pseudo-terminal, launches the resolved shell in the user's home directory, reads output, writes input, resizes the PTY, and cleans up the child process.
 - `TerminalSession` is the app-facing facade for start, stop, write, resize, output state, startup timeout handling, and stale termination suppression.
-- `TerminalSessionState` stores process-running status, startup phase, recent output data, decoded output text, and the latest error.
-- `TerminalInputMapping` provides paste and legacy text mapping helpers; keys use `TerminalKeyEvent` and the engine.
+- `TerminalSessionState` stores process-running status, startup phase, output-received state, optional debug/test output capture, and the latest error.
+- `TerminalInputMapping` provides paste mapping helpers; keys use `TerminalKeyEvent` and the engine.
 - `TerminalKeyEvent` is the app-facing keyboard event model for Ghostty-backed key encoding.
-- `GhosttyVTBridge` is the C boundary over the vendored `libghostty-vt` API. It creates and resizes Ghostty terminals, writes PTY output into Ghostty's VT parser, snapshots visible cells and cursor/scroll metadata, exposes paste/focus/key encoding, maps default colors, scrolls the viewport, and forwards Ghostty write-back effects to the PTY path.
-- `GhosttyTerminalCore` is the Swift app-facing wrapper around `GhosttyVTBridge` for VT parsing, terminal state, snapshots, paste/focus/key encoding, scrollback viewport control, and PTY write-back callbacks.
-- `GhosttyTerminalEngine` is the app-facing renderer engine that consumes PTY output bytes, updates render snapshots, forwards input, and coordinates terminal resize.
+- `GhosttyVTBridge` is the C boundary over the vendored `libghostty-vt` API. It creates and resizes Ghostty terminals, writes PTY output into Ghostty's VT parser, snapshots visible cells and cursor/scroll/dirty metadata, exposes paste/focus/key/mouse-wheel encoding, maps default colors, scrolls the viewport, and forwards Ghostty write-back effects to the PTY path.
+- `GhosttyTerminalCore` is the Swift app-facing wrapper around `GhosttyVTBridge` for VT parsing, terminal state, snapshots, paste/focus/key/mouse-wheel encoding, scrollback viewport control, and PTY write-back callbacks.
+- `GhosttyTerminalEngine` is the app-facing renderer engine that consumes coalesced PTY output bytes, updates render snapshots, forwards input, coordinates terminal resize, and applies primary/alternate-screen wheel policy.
 - `TerminalRenderingEngine` defines the rendering/input boundary.
+- `TerminalSurfaceCoordinator` owns the session/engine pair, batches PTY output, publishes snapshots, and keeps terminal lifecycle policy out of the panel controller.
 
-The terminal backend is intentionally not owned by SwiftUI views. `IslandPanelController` owns the single app-lifecycle `TerminalSession` and `TerminalRenderingEngine`, starts the shell on first expand, forwards input and resize requests, and stops the session during teardown. PTY process details stay inside the terminal module.
+The terminal backend is intentionally not owned by SwiftUI views. `IslandPanelController` owns the panel/window behavior, while `TerminalSurfaceCoordinator` owns the single app-lifecycle `TerminalSession` and `TerminalRenderingEngine`, starts the shell on first expand, forwards input/resize/scroll requests, and stops the session during teardown. PTY process details stay inside the terminal module.
 
 ## MVP User Experience
 
@@ -315,8 +317,9 @@ protocol TerminalRenderingEngine {
     func processOutput(_ data: Data)
     func sendInput(_ input: Data)
     func sendKeyEvent(_ event: TerminalKeyEvent)
-    func scrollViewport(deltaRows: Int)
-    func resize(cols: Int, rows: Int)
+    func handleScrollWheel(_ event: TerminalScrollEvent)
+    func resize(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int)
+    func reset(cols: Int, rows: Int)
     func focus()
     func blur()
 }
@@ -333,7 +336,7 @@ Rendering fidelity work required before the terminal feels close to Ghostty is n
 - **R5 — Bracketed paste and full-screen app paste behavior, code baseline done.** GhostNotch tracks Ghostty's bracketed-paste mode state through the bridge and encodes paste with bracketed wrappers only when mode 2004 is active. Manual verification in shell prompts, `vim`/`nano`, `less`, and `top` remains tracked below.
 - **R6 — Font features and ligature pass.** Audit whether the current CoreText drawing path enables the same developer-font features users expect from Ghostty: ligatures where appropriate, private-use/powerline glyph stability, bold/italic synthesis, fallback-family choices, baseline alignment, and line-height consistency. Acceptance means common prompts and editor text render without clipped glyphs, drifting cursor positions, or inconsistent fallback sizing.
 - **R7 — Color/style presentation pass.** Compare ANSI 16-color, 256-color, truecolor, bold, dim, italic, underline, inverse, and cursor rendering against Ghostty-like expectations. Acceptance means common CLI output, prompt themes, and editor statuslines are legible and visually stable in the compact island.
-- **R8 — Mouse, selection, and alternate-screen behavior hardening.** Continue hardening mouse reporting, scroll behavior in primary versus alternate screen, formatter-backed selection, and selection clearing. Acceptance means scrollback works in the shell, wheel/key behavior does not fight `less`/`vim`/`top`, and copy remains predictable.
+- **R8 — Mouse, selection, and alternate-screen behavior hardening, partially done.** Primary scrollback, alternate-screen wheel-to-key fallback, and mouse-tracking wheel encoding are implemented. Continue hardening full mouse press/release/drag reporting, formatter-backed selection, and selection clearing. Acceptance means scrollback works in the shell, wheel/key behavior does not fight `less`/`vim`/`top`, and copy remains predictable.
 - **R9 — Hyperlinks and graphics protocols, after text fidelity.** Add OSC 8 hyperlink detection/click behavior and image/graphics protocol support only after R4-R8 are usable. Acceptance for MVP-adjacent work is hyperlinks first; Kitty graphics/images remain a post-MVP feature unless needed by the acceptance suite.
 
 ### Shell Integration
@@ -370,6 +373,7 @@ GhostNotch/Terminal/
 ├── ShellResolver.swift
 ├── TerminalRenderingEngine.swift
 ├── TerminalRenderModel.swift
+├── TerminalSurfaceCoordinator.swift
 ├── GhosttyTerminalCore.swift
 ├── GhosttyTerminalEngine.swift
 ├── GhosttyVTBridge.h
@@ -384,11 +388,12 @@ Responsibilities:
 - `ShellResolver`: default shell lookup and validation.
 - `TerminalRenderingEngine`: rendering/input abstraction.
 - `TerminalRenderModel`: snapshot, cell, style, and color data consumed by the grid renderer.
+- `TerminalSurfaceCoordinator`: session/engine lifecycle, output batching, restart, focus, resize, and scroll policy.
 - `GhosttyVTBridge`: direct C bridge over `libghostty-vt`.
 - `GhosttyTerminalCore`: Swift wrapper over the C bridge.
 - `GhosttyTerminalEngine`: renderer/session coordination.
 - `TerminalSessionState`: observable state needed by the UI.
-- `TerminalInputMapping`: paste and legacy text mapping helpers in `Terminal/TerminalInputMapping.swift`.
+- `TerminalInputMapping`: paste mapping helpers in `Terminal/TerminalInputMapping.swift`.
 - `TerminalKeyEvent`: app-facing keyboard event model used by the Ghostty key encoder path.
 
 Future rendering work should extend the existing bridge/wrapper boundary rather than changing SwiftUI or panel ownership.
@@ -555,7 +560,7 @@ Still required for full MVP:
 
 - Runtime notch measurement/fallback behavior.
 - Public-build cleanup of the debug notch color control.
-- R6-R8 renderer follow-through: ligature/font-feature audit, ANSI color/style polish, mouse/selection/alternate-screen hardening.
+- R6-R8 renderer follow-through: ligature/font-feature audit, ANSI color/style polish, and remaining mouse/selection/alternate-screen hardening after the hybrid wheel baseline.
 - Manual app acceptance for R4/R5 behavior: renderer checks and paste behavior in shell prompts, `vim` or `nano`, `less`, and `top`.
 - S1-S6 shell integration basics: terminal metadata environment, terminfo policy, shell integration resource path, working-directory reporting, SSH behavior, and common-shell setup guidance.
 - G1-G5 Ghostty/libghostty alignment scaffolding: replaceable renderer boundary, durable bridge expansion, Ghostty comparison fixtures, vendor capability tracking, and honest parity claims.

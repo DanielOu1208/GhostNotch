@@ -206,7 +206,7 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         let engine = GhosttyTerminalEngine(core: core)
         engine.processOutput(Data((0..<12).map { "line\($0)" }.joined(separator: "\n").utf8))
         engine.resize(cols: 12, rows: 3, cellWidthPixels: 8, cellHeightPixels: 16)
-        engine.scrollViewport(deltaRows: -2)
+        engine.handleScrollWheel(TerminalScrollEvent(deltaRows: -2, row: 0, column: 0))
         let scrolledText = core.snapshot.plainText
 
         engine.resize(cols: 12, rows: 3, cellWidthPixels: 8, cellHeightPixels: 16)
@@ -216,6 +216,20 @@ final class GhosttyTerminalCoreTests: XCTestCase {
             TerminalGridResize(columns: 12, rows: 3, cellWidthPixels: 8, cellHeightPixels: 16)
         )
         XCTAssertEqual(core.snapshot.plainText, scrolledText)
+    }
+
+    func testDirtyRowsAreSurfacedFromRenderState() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+
+        core.processOutput(Data("abc".utf8))
+
+        XCTAssertNotEqual(core.snapshot.dirtyState, .clean)
+        XCTAssertFalse(core.snapshot.dirtyRows.isEmpty)
+
+        _ = core.snapshot
+        core.processOutput(Data())
+
+        XCTAssertEqual(core.snapshot.dirtyState, .clean)
     }
 
     func testResetClearsVisibleCellsPreservesDimensionsAndWriteCallback() {
@@ -309,6 +323,43 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         engine.focus()
         engine.blur()
         XCTAssertEqual(writes.count, 2)
+    }
+
+    func testAlternateScreenWheelWithoutMouseTrackingSendsNavigationKeys() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+        var writes: [Data] = []
+        let engine = GhosttyTerminalEngine(core: core) { _, data in
+            writes.append(data)
+        }
+
+        engine.processOutput(Data("\u{1B}[?1049h".utf8))
+        XCTAssertTrue(core.snapshot.isAlternateScreen)
+        XCTAssertFalse(core.snapshot.hasMouseTracking)
+
+        engine.handleScrollWheel(TerminalScrollEvent(deltaRows: -2, row: 0, column: 0))
+
+        XCTAssertEqual(writes, [
+            Data("\u{1B}[A".utf8),
+            Data("\u{1B}[A".utf8),
+        ])
+    }
+
+    func testMouseTrackingWheelUsesGhosttyMouseEncoder() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+        var writes: [Data] = []
+        let engine = GhosttyTerminalEngine(core: core) { _, data in
+            writes.append(data)
+        }
+
+        engine.processOutput(Data("\u{1B}[?1049h\u{1B}[?1000h\u{1B}[?1006h".utf8))
+        XCTAssertTrue(core.snapshot.isAlternateScreen)
+        XCTAssertTrue(core.snapshot.hasMouseTracking)
+
+        engine.handleScrollWheel(TerminalScrollEvent(deltaRows: -1, row: 0, column: 0))
+
+        XCTAssertEqual(writes.count, 1)
+        XCTAssertFalse(writes[0].isEmpty)
+        XCTAssertNotEqual(writes[0], Data("\u{1B}[A".utf8))
     }
 
     func testGhosttyKeyEncodingHandlesEscapeAndArrows() {
@@ -482,7 +533,9 @@ final class GhosttyTerminalCoreTests: XCTestCase {
             isBracketedPasteMode: false,
             isFocusReportingMode: false,
             totalRows: 1,
-            scrollbackRows: 0
+            scrollbackRows: 0,
+            dirtyState: .full,
+            dirtyRows: [0]
         )
     }
 

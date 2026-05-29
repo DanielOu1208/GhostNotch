@@ -27,10 +27,10 @@ struct TerminalChromePresentation {
             )
         case .starting:
             let gridSnapshot: TerminalRenderSnapshot
-            if sessionState.outputText.isEmpty {
-                gridSnapshot = .message("Starting shell...\n")
-            } else {
+            if sessionState.hasReceivedOutput {
                 gridSnapshot = snapshot
+            } else {
+                gridSnapshot = .message("Starting shell...\n")
             }
             return TerminalChromePresentation(
                 gridSnapshot: gridSnapshot,

@@ -10,8 +10,13 @@ struct GNVTTerminal {
     GhosttyRenderStateRowIterator rowIterator;
     GhosttyRenderStateRowCells rowCells;
     GhosttyKeyEncoder keyEncoder;
+    GhosttyMouseEncoder mouseEncoder;
     GNVTWriteCallback writeCallback;
     void *userdata;
+    uint16_t columns;
+    uint16_t rows;
+    uint32_t cellWidth;
+    uint32_t cellHeight;
 };
 
 static const GNVTColor GNVTDefaultForeground = {220, 224, 232};
@@ -249,19 +254,26 @@ GNVTTerminal *GNVTTerminalCreate(uint16_t columns,
         ghostty_render_state_new(NULL, &wrapper->renderState) != GHOSTTY_SUCCESS ||
         ghostty_render_state_row_iterator_new(NULL, &wrapper->rowIterator) != GHOSTTY_SUCCESS ||
         ghostty_render_state_row_cells_new(NULL, &wrapper->rowCells) != GHOSTTY_SUCCESS ||
-        ghostty_key_encoder_new(NULL, &wrapper->keyEncoder) != GHOSTTY_SUCCESS) {
+        ghostty_key_encoder_new(NULL, &wrapper->keyEncoder) != GHOSTTY_SUCCESS ||
+        ghostty_mouse_encoder_new(NULL, &wrapper->mouseEncoder) != GHOSTTY_SUCCESS) {
         GNVTTerminalDestroy(wrapper);
         return NULL;
     }
 
     wrapper->writeCallback = writeCallback;
     wrapper->userdata = userdata;
+    wrapper->columns = columns;
+    wrapper->rows = rows;
+    wrapper->cellWidth = 8;
+    wrapper->cellHeight = 16;
 
     GhosttyColorRgb foreground = {GNVTDefaultForeground.red, GNVTDefaultForeground.green, GNVTDefaultForeground.blue};
     GhosttyColorRgb background = {GNVTDefaultBackground.red, GNVTDefaultBackground.green, GNVTDefaultBackground.blue};
     GhosttyColorRgb cursor = {GNVTDefaultCursor.red, GNVTDefaultCursor.green, GNVTDefaultCursor.blue};
     GhosttyColorRgb palette[256];
     GNVTBuildColorPalette(palette);
+    // Palette, device attributes, scrollback, and option-as-alt are GhostNotch
+    // policy choices around the vendored libghostty-vt boundary.
     ghostty_terminal_set(wrapper->terminal, GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND, &foreground);
     ghostty_terminal_set(wrapper->terminal, GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND, &background);
     ghostty_terminal_set(wrapper->terminal, GHOSTTY_TERMINAL_OPT_COLOR_CURSOR, &cursor);
@@ -282,6 +294,7 @@ void GNVTTerminalDestroy(GNVTTerminal *terminal) {
         return;
     }
 
+    ghostty_mouse_encoder_free(terminal->mouseEncoder);
     ghostty_key_encoder_free(terminal->keyEncoder);
     ghostty_render_state_row_cells_free(terminal->rowCells);
     ghostty_render_state_row_iterator_free(terminal->rowIterator);
@@ -308,6 +321,10 @@ void GNVTTerminalResize(GNVTTerminal *terminal,
     }
 
     ghostty_terminal_resize(terminal->terminal, columns, rows, cellWidth, cellHeight);
+    terminal->columns = columns;
+    terminal->rows = rows;
+    terminal->cellWidth = cellWidth;
+    terminal->cellHeight = cellHeight;
 }
 
 bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
@@ -315,12 +332,17 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
                           size_t cellCount,
                           uint32_t *graphemes,
                           size_t graphemeCapacity,
+                          bool *dirtyRows,
+                          size_t dirtyRowCount,
                           size_t *requiredGraphemeCount,
                           GNVTSnapshotMeta *meta) {
     if (terminal == NULL || terminal->terminal == NULL || terminal->renderState == NULL || cells == NULL || requiredGraphemeCount == NULL || meta == NULL) {
         return false;
     }
     if (graphemeCapacity > 0 && graphemes == NULL) {
+        return false;
+    }
+    if (dirtyRowCount > 0 && dirtyRows == NULL) {
         return false;
     }
 
@@ -341,10 +363,12 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     size_t totalRows = 0;
     size_t scrollbackRows = 0;
     GhosttyRenderStateCursorVisualStyle cursorStyle = GHOSTTY_RENDER_STATE_CURSOR_VISUAL_STYLE_BAR;
+    GhosttyRenderStateDirty dirtyState = GHOSTTY_RENDER_STATE_DIRTY_FULL;
     GhosttyTerminalScreen activeScreen = GHOSTTY_TERMINAL_SCREEN_PRIMARY;
 
     ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_COLS, &columns);
     ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_ROWS, &rows);
+    ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_DIRTY, &dirtyState);
     ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VISIBLE, &cursorVisible);
     ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_BLINKING, &cursorBlinking);
     ghostty_render_state_get(terminal->renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VISUAL_STYLE, &cursorStyle);
@@ -364,10 +388,16 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     if (cellCount < required) {
         return false;
     }
+    if (dirtyRowCount < rows) {
+        return false;
+    }
 
     bool didOverflowGraphemes = false;
     size_t usedGraphemes = 0;
     *requiredGraphemeCount = 0;
+    for (size_t index = 0; index < dirtyRowCount; index += 1) {
+        dirtyRows[index] = dirtyState == GHOSTTY_RENDER_STATE_DIRTY_FULL;
+    }
 
     for (size_t index = 0; index < required; index += 1) {
         cells[index].graphemeStart = 0;
@@ -396,6 +426,14 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
 
     uint16_t row = 0;
     while (row < rows && ghostty_render_state_row_iterator_next(terminal->rowIterator)) {
+        bool isDirtyRow = dirtyState == GHOSTTY_RENDER_STATE_DIRTY_FULL;
+        if (dirtyState == GHOSTTY_RENDER_STATE_DIRTY_PARTIAL) {
+            ghostty_render_state_row_get(terminal->rowIterator,
+                                         GHOSTTY_RENDER_STATE_ROW_DATA_DIRTY,
+                                         &isDirtyRow);
+        }
+        dirtyRows[row] = isDirtyRow;
+
         if (ghostty_render_state_row_get(terminal->rowIterator,
                                          GHOSTTY_RENDER_STATE_ROW_DATA_CELLS,
                                          &terminal->rowCells) != GHOSTTY_SUCCESS) {
@@ -468,6 +506,10 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
             }
         }
 
+        bool clean = false;
+        ghostty_render_state_row_set(terminal->rowIterator,
+                                     GHOSTTY_RENDER_STATE_ROW_OPTION_DIRTY,
+                                     &clean);
         row += 1;
     }
 
@@ -484,7 +526,17 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     meta->focusEventMode = focusEventMode;
     meta->totalRows = totalRows;
     meta->scrollbackRows = scrollbackRows;
-    return !didOverflowGraphemes;
+    meta->dirtyState = (uint8_t)dirtyState;
+
+    if (didOverflowGraphemes) {
+        return false;
+    }
+
+    GhosttyRenderStateDirty cleanDirtyState = GHOSTTY_RENDER_STATE_DIRTY_FALSE;
+    ghostty_render_state_set(terminal->renderState,
+                             GHOSTTY_RENDER_STATE_OPTION_DIRTY,
+                             &cleanDirtyState);
+    return true;
 }
 
 void GNVTTerminalScrollViewport(GNVTTerminal *terminal, intptr_t deltaRows) {
@@ -495,18 +547,6 @@ void GNVTTerminalScrollViewport(GNVTTerminal *terminal, intptr_t deltaRows) {
     GhosttyTerminalScrollViewport scroll = {
         .tag = GHOSTTY_SCROLL_VIEWPORT_DELTA,
         .value = {.delta = deltaRows},
-    };
-    ghostty_terminal_scroll_viewport(terminal->terminal, scroll);
-}
-
-void GNVTTerminalScrollToBottom(GNVTTerminal *terminal) {
-    if (terminal == NULL || terminal->terminal == NULL) {
-        return;
-    }
-
-    GhosttyTerminalScrollViewport scroll = {
-        .tag = GHOSTTY_SCROLL_VIEWPORT_BOTTOM,
-        .value = {.delta = 0},
     };
     ghostty_terminal_scroll_viewport(terminal->terminal, scroll);
 }
@@ -548,6 +588,57 @@ bool GNVTTerminalEncodeKey(GNVTTerminal *terminal,
                                                       outputLen,
                                                       written);
     ghostty_key_event_free(event);
+    return result == GHOSTTY_SUCCESS;
+}
+
+bool GNVTTerminalEncodeMouseWheel(GNVTTerminal *terminal,
+                                  uint16_t column,
+                                  uint16_t row,
+                                  intptr_t deltaRows,
+                                  char *output,
+                                  size_t outputLen,
+                                  size_t *written) {
+    if (terminal == NULL || terminal->terminal == NULL || terminal->mouseEncoder == NULL || written == NULL || deltaRows == 0) {
+        return false;
+    }
+
+    GhosttyMouseEvent event = NULL;
+    if (ghostty_mouse_event_new(NULL, &event) != GHOSTTY_SUCCESS) {
+        return false;
+    }
+
+    uint32_t cellWidth = terminal->cellWidth == 0 ? 1 : terminal->cellWidth;
+    uint32_t cellHeight = terminal->cellHeight == 0 ? 1 : terminal->cellHeight;
+    GhosttyMouseEncoderSize size = {
+        .size = sizeof(GhosttyMouseEncoderSize),
+        .screen_width = (uint32_t)terminal->columns * cellWidth,
+        .screen_height = (uint32_t)terminal->rows * cellHeight,
+        .cell_width = cellWidth,
+        .cell_height = cellHeight,
+        .padding_top = 0,
+        .padding_bottom = 0,
+        .padding_right = 0,
+        .padding_left = 0,
+    };
+    GhosttyMousePosition position = {
+        .x = ((float)column + 0.5f) * (float)cellWidth,
+        .y = ((float)row + 0.5f) * (float)cellHeight,
+    };
+    GhosttyMouseButton button = deltaRows < 0 ? GHOSTTY_MOUSE_BUTTON_FOUR : GHOSTTY_MOUSE_BUTTON_FIVE;
+
+    ghostty_mouse_encoder_setopt_from_terminal(terminal->mouseEncoder, terminal->terminal);
+    ghostty_mouse_encoder_setopt(terminal->mouseEncoder, GHOSTTY_MOUSE_ENCODER_OPT_SIZE, &size);
+    ghostty_mouse_event_set_action(event, GHOSTTY_MOUSE_ACTION_PRESS);
+    ghostty_mouse_event_set_button(event, button);
+    ghostty_mouse_event_set_mods(event, 0);
+    ghostty_mouse_event_set_position(event, position);
+
+    GhosttyResult result = ghostty_mouse_encoder_encode(terminal->mouseEncoder,
+                                                        event,
+                                                        output,
+                                                        outputLen,
+                                                        written);
+    ghostty_mouse_event_free(event);
     return result == GHOSTTY_SUCCESS;
 }
 

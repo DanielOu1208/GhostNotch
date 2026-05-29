@@ -43,15 +43,20 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
     }
 
     func sendKeyEvent(_ event: TerminalKeyEvent) {
-        guard let input = core.encodeKey(event) else {
+        sendEncodedKeyEvent(event)
+    }
+
+    func handleScrollWheel(_ event: TerminalScrollEvent) {
+        guard event.deltaRows != 0 else {
             return
         }
 
-        writeToSession(input)
-    }
+        if core.snapshot.isAlternateScreen {
+            handleAlternateScreenScrollWheel(event)
+            return
+        }
 
-    func scrollViewport(deltaRows: Int) {
-        core.scrollViewport(deltaRows: deltaRows)
+        core.scrollViewport(deltaRows: event.deltaRows)
         publishSnapshot()
     }
 
@@ -135,7 +140,31 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         }
     }
 
+    private func handleAlternateScreenScrollWheel(_ event: TerminalScrollEvent) {
+        if core.snapshot.hasMouseTracking,
+           let input = core.encodeMouseWheel(column: event.column, row: event.row, deltaRows: event.deltaRows) {
+            writeToSession(input)
+            return
+        }
+
+        let key: TerminalKey = event.deltaRows < 0 ? .arrowUp : .arrowDown
+        let repeats = min(abs(event.deltaRows), 8)
+        for _ in 0..<repeats {
+            sendEncodedKeyEvent(TerminalKeyEvent(key: key, modifiers: [], utf8: nil, isRepeat: false))
+        }
+    }
+
+    private func sendEncodedKeyEvent(_ event: TerminalKeyEvent) {
+        guard let input = core.encodeKey(event) else {
+            return
+        }
+
+        writeToSession(input)
+    }
+
     private func publishSnapshot() {
         onSnapshotChange?(core.snapshot)
     }
 }
+
+typealias GhosttyVTRenderStateEngine = GhosttyTerminalEngine

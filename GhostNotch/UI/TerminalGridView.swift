@@ -4,7 +4,7 @@ final class TerminalGridView: NSView {
     var snapshot = TerminalRenderSnapshot.empty()
     var onInput: ((Data) -> Void)?
     var onKeyEvent: ((TerminalKeyEvent) -> Void)?
-    var onScroll: ((Int) -> Void)?
+    var onScroll: ((TerminalScrollEvent) -> Void)?
     var onResize: ((Int, Int, Int, Int) -> Void)?
     var onMovedToWindow: (() -> Void)?
     var allowsResizeReporting = true
@@ -34,10 +34,11 @@ final class TerminalGridView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         NSColor.clear.setFill()
-        bounds.fill()
+        dirtyRect.fill()
 
         let cellSize = measuredCellSize
-        for row in 0..<snapshot.rows {
+        let rowRange = visibleRowRange(in: dirtyRect, cellSize: cellSize)
+        for row in rowRange {
             for column in 0..<snapshot.columns {
                 drawCell(snapshot.cell(row: row, column: column), row: row, column: column, cellSize: cellSize)
             }
@@ -93,11 +94,6 @@ final class TerminalGridView: NSView {
     }
 
     override func scrollWheel(with event: NSEvent) {
-        guard !snapshot.isAlternateScreen else {
-            super.scrollWheel(with: event)
-            return
-        }
-
         let cellSize = measuredCellSize
         let preciseRows = -event.scrollingDeltaY / max(cellSize.height, 1)
         let rowDelta = Int(preciseRows.rounded())
@@ -105,7 +101,12 @@ final class TerminalGridView: NSView {
             return
         }
 
-        onScroll?(rowDelta)
+        let point = convert(event.locationInWindow, from: nil)
+        let gridPoint = gridPoint(at: point) ?? TerminalGridPoint(
+            row: max(0, min(snapshot.cursorRow, snapshot.rows - 1)),
+            column: max(0, min(snapshot.cursorColumn, snapshot.columns - 1))
+        )
+        onScroll?(TerminalScrollEvent(deltaRows: rowDelta, row: gridPoint.row, column: gridPoint.column))
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -182,6 +183,18 @@ final class TerminalGridView: NSView {
 
         lastReportedResize = resize
         onResize?(resize.columns, resize.rows, resize.cellWidthPixels, resize.cellHeightPixels)
+    }
+
+    func invalidateRowsFromSnapshot() {
+        guard !snapshot.needsFullRedraw else {
+            needsDisplay = true
+            return
+        }
+
+        let cellSize = measuredCellSize
+        for row in snapshot.dirtyRows {
+            setNeedsDisplay(rowRect(row: row, cellSize: cellSize))
+        }
     }
 
     private var measuredCellSize: NSSize {
@@ -297,6 +310,28 @@ final class TerminalGridView: NSView {
         } else {
             rect.fill()
         }
+    }
+
+    private func visibleRowRange(in dirtyRect: NSRect, cellSize: NSSize) -> Range<Int> {
+        let inset = TerminalGridMetrics.contentInset
+        let startRow = max(0, Int(floor((dirtyRect.minY - inset) / max(cellSize.height, 1))))
+        let endRow = min(
+            snapshot.rows,
+            Int(ceil((dirtyRect.maxY - inset) / max(cellSize.height, 1))) + 1
+        )
+        guard startRow < endRow else {
+            return 0..<0
+        }
+        return startRow..<endRow
+    }
+
+    private func rowRect(row: Int, cellSize: NSSize) -> NSRect {
+        NSRect(
+            x: 0,
+            y: CGFloat(row) * cellSize.height + TerminalGridMetrics.contentInset,
+            width: bounds.width,
+            height: cellSize.height
+        )
     }
 
     private func gridPoint(at point: NSPoint) -> TerminalGridPoint? {

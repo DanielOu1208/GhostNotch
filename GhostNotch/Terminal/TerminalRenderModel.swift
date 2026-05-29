@@ -100,6 +100,12 @@ enum TerminalCursorStyle: UInt8, Equatable {
     case hollowBlock = 3
 }
 
+enum TerminalRenderDirtyState: UInt8, Equatable {
+    case clean = 0
+    case partial = 1
+    case full = 2
+}
+
 struct TerminalRenderSnapshot: Equatable {
     let columns: Int
     let rows: Int
@@ -115,6 +121,12 @@ struct TerminalRenderSnapshot: Equatable {
     let isFocusReportingMode: Bool
     let totalRows: Int
     let scrollbackRows: Int
+    let dirtyState: TerminalRenderDirtyState
+    let dirtyRows: Set<Int>
+
+    var needsFullRedraw: Bool {
+        dirtyState == .full
+    }
 
     static func empty(columns: Int = 80, rows: Int = 18) -> TerminalRenderSnapshot {
         TerminalRenderSnapshot(
@@ -131,14 +143,64 @@ struct TerminalRenderSnapshot: Equatable {
             isBracketedPasteMode: false,
             isFocusReportingMode: false,
             totalRows: rows,
-            scrollbackRows: 0
+            scrollbackRows: 0,
+            dirtyState: .full,
+            dirtyRows: Set(0..<max(rows, 1))
         )
     }
 
     static func message(_ text: String, columns: Int = 80, rows: Int = 18) -> TerminalRenderSnapshot {
-        let core = GhosttyTerminalCore(columns: columns, rows: rows)
-        core.processOutput(Data(text.utf8))
-        return core.snapshot
+        let normalizedColumns = max(columns, 2)
+        let normalizedRows = max(rows, 1)
+        var cells = Array(repeating: TerminalCell.blank, count: normalizedColumns * normalizedRows)
+        var row = 0
+        var column = 0
+
+        for character in text {
+            if character == "\n" {
+                row += 1
+                column = 0
+                if row >= normalizedRows {
+                    break
+                }
+                continue
+            }
+
+            guard column < normalizedColumns else {
+                row += 1
+                column = 0
+                if row >= normalizedRows {
+                    break
+                }
+                continue
+            }
+
+            cells[row * normalizedColumns + column] = TerminalCell(
+                character: String(character),
+                style: .default,
+                widthRole: .narrow
+            )
+            column += 1
+        }
+
+        return TerminalRenderSnapshot(
+            columns: normalizedColumns,
+            rows: normalizedRows,
+            cells: cells,
+            cursorColumn: column,
+            cursorRow: row,
+            cursorVisible: false,
+            cursorBlinking: false,
+            cursorStyle: .bar,
+            isAlternateScreen: false,
+            hasMouseTracking: false,
+            isBracketedPasteMode: false,
+            isFocusReportingMode: false,
+            totalRows: normalizedRows,
+            scrollbackRows: 0,
+            dirtyState: .full,
+            dirtyRows: Set(0..<normalizedRows)
+        )
     }
 
     func cell(row: Int, column: Int) -> TerminalCell {
@@ -232,6 +294,12 @@ struct TerminalGridResize: Equatable {
             cellHeightPixels: max(cellHeightPixels, 1)
         )
     }
+}
+
+struct TerminalScrollEvent: Equatable {
+    let deltaRows: Int
+    let row: Int
+    let column: Int
 }
 
 struct TerminalGridPoint: Equatable, Comparable {

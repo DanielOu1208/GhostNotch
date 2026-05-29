@@ -123,6 +123,22 @@ final class TerminalSessionTests: XCTestCase {
 
         XCTAssertEqual(state.phase, .running)
         XCTAssertNil(state.lastError)
+        XCTAssertTrue(state.hasReceivedOutput)
+        XCTAssertTrue(state.outputText.isEmpty)
+    }
+
+    func testSessionStateCapturesOutputOnlyWhenExplicitlyRequested() {
+        let lifecycleOnly = TerminalSessionState()
+        lifecycleOnly.appendOutput(Data("prompt".utf8))
+
+        XCTAssertTrue(lifecycleOnly.hasReceivedOutput)
+        XCTAssertTrue(lifecycleOnly.outputText.isEmpty)
+
+        let captured = TerminalSessionState(outputLimit: 16)
+        captured.appendOutput(Data("prompt".utf8))
+
+        XCTAssertTrue(captured.hasReceivedOutput)
+        XCTAssertEqual(captured.outputText, "prompt")
     }
 
     func testStartupTimeoutRecordsVisibleErrorAndStopsProcess() async throws {
@@ -236,6 +252,46 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(state.phase, .starting)
     }
 
+    func testCoordinatorCoalescesOutputBeforeRendering() throws {
+        let state = TerminalSessionState()
+        let process = FakeTerminalProcess()
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: process
+        )
+        let engine = SpyRenderingEngine()
+        let coordinator = TerminalSurfaceCoordinator(session: session, engine: engine)
+
+        try session.start(cols: 80, rows: 24)
+        process.emitOutput("a")
+        process.emitOutput("b")
+        coordinator.flushPendingOutputForTesting()
+
+        XCTAssertEqual(engine.processedOutput, [Data("ab".utf8)])
+        XCTAssertTrue(state.hasReceivedOutput)
+        XCTAssertTrue(state.outputText.isEmpty)
+    }
+
+    func testCoordinatorRestartPreservesMeasuredGridResize() throws {
+        let state = TerminalSessionState()
+        let process = FakeTerminalProcess()
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: process
+        )
+        let engine = SpyRenderingEngine()
+        let measuredResize = TerminalGridResize(columns: 100, rows: 28, cellWidthPixels: 9, cellHeightPixels: 18)
+        engine.lastAppliedGridResize = measuredResize
+        let coordinator = TerminalSurfaceCoordinator(session: session, engine: engine)
+
+        coordinator.restartPreservingGrid(currentSnapshot: .empty(columns: 40, rows: 10))
+
+        XCTAssertEqual(engine.resetRequests, [TerminalGridSize(columns: 100, rows: 28)])
+        XCTAssertEqual(process.startRequests.last, TerminalGridSize(columns: 100, rows: 28))
+    }
+
     func testStoppingSessionMarksItStopped() throws {
         let state = TerminalSessionState(outputLimit: 16 * 1024)
         let session = TerminalSession(
@@ -253,12 +309,6 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertFalse(session.isRunning)
         XCTAssertFalse(state.isRunning)
         XCTAssertEqual(state.phase, .stopped)
-    }
-
-    func testTerminalInputMappingPreservesTextAndNormalizesNewlines() {
-        XCTAssertEqual(TerminalInputMapping.data(forInsertedText: "pwd"), Data("pwd".utf8))
-        XCTAssertEqual(TerminalInputMapping.data(forInsertedText: "echo hi\n"), Data("echo hi\r".utf8))
-        XCTAssertNil(TerminalInputMapping.data(forInsertedText: ""))
     }
 
     func testTerminalPasteMappingSanitizesUnsafeEscapesWithoutBracketedWrappers() {
@@ -311,10 +361,12 @@ private final class FakeTerminalProcess: @MainActor TerminalProcess {
     private(set) var isRunning = false
     private(set) var startCallCount = 0
     private(set) var stopCallCount = 0
+    private(set) var startRequests: [TerminalGridSize] = []
     var notifyOnStop = false
 
     func start(shell: String, workingDirectory: String, cols: Int, rows: Int) throws {
         startCallCount += 1
+        startRequests.append(TerminalGridSize(columns: cols, rows: rows))
         isRunning = true
     }
 
@@ -344,4 +396,48 @@ private final class FakeTerminalProcess: @MainActor TerminalProcess {
         }
         onTermination?()
     }
+}
+
+private struct TerminalGridSize: Equatable {
+    let columns: Int
+    let rows: Int
+}
+
+@MainActor
+private final class SpyRenderingEngine: TerminalRenderingEngine {
+    var snapshot = TerminalRenderSnapshot.empty()
+    var lastAppliedGridResize: TerminalGridResize?
+    var onSnapshotChange: ((TerminalRenderSnapshot) -> Void)?
+    private(set) var processedOutput: [Data] = []
+    private(set) var resetRequests: [TerminalGridSize] = []
+
+    func start(session: TerminalSession) {}
+
+    func processOutput(_ data: Data) {
+        processedOutput.append(data)
+        onSnapshotChange?(snapshot)
+    }
+
+    func sendInput(_ input: Data) {}
+
+    func sendKeyEvent(_ event: TerminalKeyEvent) {}
+
+    func handleScrollWheel(_ event: TerminalScrollEvent) {}
+
+    func resize(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int) {
+        lastAppliedGridResize = TerminalGridResize(
+            columns: cols,
+            rows: rows,
+            cellWidthPixels: cellWidthPixels,
+            cellHeightPixels: cellHeightPixels
+        )
+    }
+
+    func reset(cols: Int, rows: Int) {
+        resetRequests.append(TerminalGridSize(columns: cols, rows: rows))
+    }
+
+    func focus() {}
+
+    func blur() {}
 }

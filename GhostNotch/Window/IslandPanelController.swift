@@ -14,8 +14,7 @@ final class IslandPanelController: ObservableObject {
     }
 
     private let panel: IslandPanel
-    private let terminalSession: TerminalSession
-    private let terminalEngine: TerminalRenderingEngine
+    private let terminalSurfaceCoordinator: TerminalSurfaceCoordinator
     private var localMouseMonitor: Any?
     private var globalMouseMonitor: Any?
     private lazy var outsideClickMonitor = OutsideClickMonitor(
@@ -25,19 +24,21 @@ final class IslandPanelController: ObservableObject {
     )
 
     var terminalState: TerminalSessionState {
-        terminalSession.state
+        terminalSurfaceCoordinator.state
     }
 
     var lastAppliedGridResize: TerminalGridResize? {
-        terminalEngine.lastAppliedGridResize
+        terminalSurfaceCoordinator.lastAppliedGridResize
     }
 
     init(
         terminalSession: TerminalSession = TerminalSession(),
         terminalEngine: TerminalRenderingEngine = GhosttyTerminalEngine()
     ) {
-        self.terminalSession = terminalSession
-        self.terminalEngine = terminalEngine
+        terminalSurfaceCoordinator = TerminalSurfaceCoordinator(
+            session: terminalSession,
+            engine: terminalEngine
+        )
 
         panel = IslandPanel(
             contentRect: WindowPositioner.frame(for: .collapsed),
@@ -46,12 +47,8 @@ final class IslandPanelController: ObservableObject {
             defer: false
         )
 
-        terminalEngine.start(session: terminalSession)
-        terminalEngine.onSnapshotChange = { [weak self] snapshot in
+        terminalSurfaceCoordinator.onSnapshotChange = { [weak self] snapshot in
             self?.terminalSnapshot = snapshot
-        }
-        terminalSession.addOutputObserver { [weak self] data in
-            self?.terminalEngine.processOutput(data)
         }
 
         configurePanel()
@@ -73,7 +70,7 @@ final class IslandPanelController: ObservableObject {
     func tearDown() {
         outsideClickMonitor.stop()
         stopHoverMonitoring()
-        terminalSession.stop()
+        terminalSurfaceCoordinator.stop()
         panel.close()
     }
 
@@ -102,7 +99,7 @@ final class IslandPanelController: ObservableObject {
         panel.resignKey()
         panel.styleMask.insert(.nonactivatingPanel)
         if shouldSendBlurOnCollapse() {
-            terminalEngine.blur()
+            terminalSurfaceCoordinator.blur()
         }
         transition(to: .collapsed)
     }
@@ -112,15 +109,15 @@ final class IslandPanelController: ObservableObject {
     }
 
     func writeToTerminal(_ data: Data) {
-        terminalEngine.sendInput(data)
+        terminalSurfaceCoordinator.sendInput(data)
     }
 
     func sendTerminalKeyEvent(_ event: TerminalKeyEvent) {
-        terminalEngine.sendKeyEvent(event)
+        terminalSurfaceCoordinator.sendKeyEvent(event)
     }
 
-    func scrollTerminal(deltaRows: Int) {
-        terminalEngine.scrollViewport(deltaRows: deltaRows)
+    func handleTerminalScrollWheel(_ event: TerminalScrollEvent) {
+        terminalSurfaceCoordinator.handleScrollWheel(event)
     }
 
     func resizeTerminal(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int) {
@@ -130,30 +127,11 @@ final class IslandPanelController: ObservableObject {
             cellWidthPixels: cellWidthPixels,
             cellHeightPixels: cellHeightPixels
         )
-        terminalEngine.resize(
-            cols: resize.columns,
-            rows: resize.rows,
-            cellWidthPixels: resize.cellWidthPixels,
-            cellHeightPixels: resize.cellHeightPixels
-        )
+        terminalSurfaceCoordinator.resize(resize)
     }
 
     func restartTerminal() {
-        let resize = TerminalGridResize.normalized(
-            columns: terminalSnapshot.columns,
-            rows: terminalSnapshot.rows,
-            cellWidthPixels: 8,
-            cellHeightPixels: 16
-        )
-
-        terminalEngine.reset(cols: resize.columns, rows: resize.rows)
-
-        do {
-            try terminalSession.restart(cols: resize.columns, rows: resize.rows)
-        } catch {
-            NSLog("GhostNotch failed to restart terminal session: \(error.localizedDescription)")
-        }
-
+        terminalSurfaceCoordinator.restartPreservingGrid(currentSnapshot: terminalSnapshot)
         activateTerminalSurface()
     }
 
@@ -222,21 +200,13 @@ final class IslandPanelController: ObservableObject {
     }
 
     private func startTerminalIfNeeded() {
-        guard !terminalSession.isRunning else {
-            return
-        }
-
-        do {
-            try terminalSession.start(cols: 80, rows: 18)
-        } catch {
-            NSLog("GhostNotch failed to start terminal session: \(error.localizedDescription)")
-        }
+        terminalSurfaceCoordinator.startIfNeeded()
     }
 
     private func activateTerminalSurface() {
         requestTerminalFocus()
-        terminalEngine.focus()
-        terminalSnapshot = terminalEngine.snapshot
+        terminalSurfaceCoordinator.focus()
+        terminalSnapshot = terminalSurfaceCoordinator.refreshSnapshot()
     }
 
     private func requestTerminalFocus() {

@@ -20,7 +20,7 @@ struct IslandRootView: View {
                     focusRequestID: controller.terminalFocusRequestID,
                     onInput: controller.writeToTerminal,
                     onKeyEvent: controller.sendTerminalKeyEvent,
-                    onScroll: controller.scrollTerminal,
+                    onScroll: controller.handleTerminalScrollWheel,
                     onResize: controller.resizeTerminal,
                     onRestart: controller.restartTerminal,
                     onCollapse: controller.collapse

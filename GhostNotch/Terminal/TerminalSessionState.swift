@@ -12,17 +12,18 @@ enum TerminalSessionPhase: Equatable {
 final class TerminalSessionState: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var phase: TerminalSessionPhase = .stopped
-    @Published private(set) var outputData = Data()
+    @Published private(set) var hasReceivedOutput = false
     @Published private(set) var lastError: String?
 
-    private let outputLimit: Int
+    private var capturedOutput = Data()
+    private let outputCaptureLimit: Int?
 
-    init(outputLimit: Int = 128 * 1024) {
-        self.outputLimit = outputLimit
+    init(outputLimit: Int? = nil) {
+        outputCaptureLimit = outputLimit
     }
 
     var outputText: String {
-        String(decoding: outputData, as: UTF8.self)
+        String(decoding: capturedOutput, as: UTF8.self)
     }
 
     func markStarting() {
@@ -53,14 +54,21 @@ final class TerminalSessionState: ObservableObject {
     }
 
     func appendOutput(_ data: Data) {
-        outputData.append(data)
+        hasReceivedOutput = true
 
-        if outputData.count > outputLimit {
-            outputData.removeFirst(outputData.count - outputLimit)
+        guard let outputCaptureLimit else {
+            return
+        }
+
+        capturedOutput.append(data)
+
+        if capturedOutput.count > outputCaptureLimit {
+            capturedOutput.removeFirst(capturedOutput.count - outputCaptureLimit)
         }
     }
 
     func clearOutput() {
-        outputData.removeAll(keepingCapacity: true)
+        hasReceivedOutput = false
+        capturedOutput.removeAll(keepingCapacity: true)
     }
 }

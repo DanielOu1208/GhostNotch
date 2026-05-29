@@ -55,7 +55,14 @@ typedef struct {
     bool focusEventMode;
     size_t totalRows;
     size_t scrollbackRows;
+    uint8_t dirtyState;
 } GNVTSnapshotMeta;
+
+typedef enum {
+    GNVT_RENDER_DIRTY_CLEAN = 0,
+    GNVT_RENDER_DIRTY_PARTIAL = 1,
+    GNVT_RENDER_DIRTY_FULL = 2,
+} GNVTRenderDirtyState;
 
 typedef enum {
     GNVT_KEY_UNIDENTIFIED = 0,
@@ -136,10 +143,11 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
                           size_t cellCount,
                           uint32_t *graphemes,
                           size_t graphemeCapacity,
+                          bool *dirtyRows,
+                          size_t dirtyRowCount,
                           size_t *requiredGraphemeCount,
                           GNVTSnapshotMeta *meta);
 void GNVTTerminalScrollViewport(GNVTTerminal *terminal, intptr_t deltaRows);
-void GNVTTerminalScrollToBottom(GNVTTerminal *terminal);
 bool GNVTTerminalEncodeKey(GNVTTerminal *terminal,
                            GNVTKey key,
                            uint16_t mods,
@@ -149,6 +157,13 @@ bool GNVTTerminalEncodeKey(GNVTTerminal *terminal,
                            char *output,
                            size_t outputLen,
                            size_t *written);
+bool GNVTTerminalEncodeMouseWheel(GNVTTerminal *terminal,
+                                  uint16_t column,
+                                  uint16_t row,
+                                  intptr_t deltaRows,
+                                  char *output,
+                                  size_t outputLen,
+                                  size_t *written);
 bool GNVTPasteEncode(char *data,
                      size_t dataLen,
                      bool bracketed,

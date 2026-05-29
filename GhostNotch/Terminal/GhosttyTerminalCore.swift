@@ -80,11 +80,6 @@ final class GhosttyTerminalCore {
         refreshSnapshot()
     }
 
-    func scrollToBottom() {
-        GNVTTerminalScrollToBottom(terminal)
-        refreshSnapshot()
-    }
-
     func encodeKey(_ event: TerminalKeyEvent) -> Data? {
         guard event.key != .unidentified || event.utf8?.isEmpty == false else {
             return nil
@@ -107,6 +102,36 @@ final class GhosttyTerminalCore {
         )
 
         return encoded
+    }
+
+    func encodeMouseWheel(column: Int, row: Int, deltaRows: Int) -> Data? {
+        guard deltaRows != 0 else {
+            return nil
+        }
+
+        let clampedColumn = UInt16(max(0, min(column, columns - 1)))
+        let clampedRow = UInt16(max(0, min(row, rows - 1)))
+        var output = Array(repeating: CChar(0), count: 64)
+        var written = 0
+        let success = output.withUnsafeMutableBufferPointer { outputBuffer in
+            GNVTTerminalEncodeMouseWheel(
+                terminal,
+                clampedColumn,
+                clampedRow,
+                deltaRows,
+                outputBuffer.baseAddress,
+                outputBuffer.count,
+                &written
+            )
+        }
+
+        guard success, written > 0 else {
+            return nil
+        }
+
+        return output.withUnsafeBufferPointer { buffer in
+            Data(bytes: buffer.baseAddress!, count: written)
+        }
     }
 
     func focusData() -> Data {
@@ -182,6 +207,10 @@ final class GhosttyTerminalCore {
         let meta = loadResult.meta
         columns = Int(meta.columns)
         rows = Int(meta.rows)
+        let dirtyState = TerminalRenderDirtyState(rawValue: meta.dirtyState) ?? .full
+        let dirtyRows = Set(loadResult.dirtyRows.enumerated().compactMap { index, isDirty in
+            isDirty ? index : nil
+        })
         cachedSnapshot = TerminalRenderSnapshot(
             columns: columns,
             rows: rows,
@@ -196,27 +225,34 @@ final class GhosttyTerminalCore {
             isBracketedPasteMode: meta.bracketedPasteMode,
             isFocusReportingMode: meta.focusEventMode,
             totalRows: Int(meta.totalRows),
-            scrollbackRows: Int(meta.scrollbackRows)
+            scrollbackRows: Int(meta.scrollbackRows),
+            dirtyState: dirtyState,
+            dirtyRows: dirtyState == .full ? Set(0..<rows) : dirtyRows
         )
     }
 
     private func loadSnapshot(graphemeCapacity: Int) -> GhosttySnapshotLoadResult {
         var cells = Array(repeating: GNVTCell.blank, count: columns * rows)
         var graphemes = Array(repeating: UInt32(0), count: max(graphemeCapacity, 1))
+        var dirtyRows = Array(repeating: false, count: rows)
         var requiredGraphemeCount = 0
         var meta = GNVTSnapshotMeta()
 
         let success = cells.withUnsafeMutableBufferPointer { cellBuffer in
             graphemes.withUnsafeMutableBufferPointer { graphemeBuffer in
-                GNVTTerminalSnapshot(
-                    terminal,
-                    cellBuffer.baseAddress,
-                    cellBuffer.count,
-                    graphemeBuffer.baseAddress,
-                    graphemeBuffer.count,
-                    &requiredGraphemeCount,
-                    &meta
-                )
+                dirtyRows.withUnsafeMutableBufferPointer { dirtyRowsBuffer in
+                    GNVTTerminalSnapshot(
+                        terminal,
+                        cellBuffer.baseAddress,
+                        cellBuffer.count,
+                        graphemeBuffer.baseAddress,
+                        graphemeBuffer.count,
+                        dirtyRowsBuffer.baseAddress,
+                        dirtyRowsBuffer.count,
+                        &requiredGraphemeCount,
+                        &meta
+                    )
+                }
             }
         }
 
@@ -228,6 +264,7 @@ final class GhosttyTerminalCore {
             success: success,
             cells: cells,
             graphemes: graphemes,
+            dirtyRows: dirtyRows,
             requiredGraphemeCount: requiredGraphemeCount,
             meta: meta
         )
@@ -278,6 +315,7 @@ private struct GhosttySnapshotLoadResult {
     let success: Bool
     let cells: [GNVTCell]
     let graphemes: [UInt32]
+    let dirtyRows: [Bool]
     let requiredGraphemeCount: Int
     let meta: GNVTSnapshotMeta
 }
@@ -467,3 +505,5 @@ private extension TerminalColor {
         self.init(red: ghosttyColor.red, green: ghosttyColor.green, blue: ghosttyColor.blue)
     }
 }
+
+typealias GhosttyVTTerminalCore = GhosttyTerminalCore

@@ -8,7 +8,7 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
     let focusRequestID: Int
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
-    let onScroll: (Int) -> Void
+    let onScroll: (TerminalScrollEvent) -> Void
     let onResize: (Int, Int, Int, Int) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -41,7 +41,7 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
         view.onScroll = onScroll
         view.onResize = onResize
         view.allowsResizeReporting = allowsResizeReporting
-        view.needsDisplay = true
+        view.invalidateRowsFromSnapshot()
         if allowsResizeReporting {
             view.reportSizeIfNeeded()
         }
