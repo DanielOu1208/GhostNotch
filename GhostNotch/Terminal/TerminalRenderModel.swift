@@ -100,10 +100,24 @@ enum TerminalCursorStyle: UInt8, Equatable {
     case hollowBlock = 3
 }
 
+/// Matches `GNVTSnapshotMeta.dirtyState` from GhosttyVTBridge (`uint8_t`).
 enum TerminalRenderDirtyState: UInt8, Equatable {
     case clean = 0
     case partial = 1
     case full = 2
+
+    static func fromBridgeValue(_ value: UInt8) -> TerminalRenderDirtyState {
+        switch value {
+        case Self.clean.rawValue:
+            return .clean
+        case Self.partial.rawValue:
+            return .partial
+        case Self.full.rawValue:
+            return .full
+        default:
+            return .full
+        }
+    }
 }
 
 struct TerminalRenderSnapshot: Equatable {
@@ -126,6 +140,24 @@ struct TerminalRenderSnapshot: Equatable {
 
     var needsFullRedraw: Bool {
         dirtyState == .full
+    }
+
+    /// Rows that must be repainted, including cursor motion when the VT dirty set omits the previous row.
+    func rowsNeedingDisplay(previousCursorRow: Int?) -> Set<Int> {
+        if needsFullRedraw {
+            return Set(0..<rows)
+        }
+
+        var rows = dirtyRows
+        guard cursorVisible else {
+            return rows
+        }
+
+        rows.insert(cursorRow)
+        if let previousCursorRow, previousCursorRow >= 0, previousCursorRow < self.rows {
+            rows.insert(previousCursorRow)
+        }
+        return rows
     }
 
     static func empty(columns: Int = 80, rows: Int = 18) -> TerminalRenderSnapshot {

@@ -1,5 +1,11 @@
 import Foundation
 
+/// Wheel handling on the alternate screen when the app does not use Ghostty mouse reporting.
+enum TerminalAlternateScreenScrollPolicy {
+    /// Maximum synthesized arrow-key events per wheel tick (avoids flooding the PTY).
+    static let maxArrowKeyRepeatsPerWheelTick = 8
+}
+
 @MainActor
 final class GhosttyTerminalEngine: TerminalRenderingEngine {
     var onSnapshotChange: ((TerminalRenderSnapshot) -> Void)?
@@ -148,7 +154,7 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         }
 
         let key: TerminalKey = event.deltaRows < 0 ? .arrowUp : .arrowDown
-        let repeats = min(abs(event.deltaRows), 8)
+        let repeats = min(abs(event.deltaRows), TerminalAlternateScreenScrollPolicy.maxArrowKeyRepeatsPerWheelTick)
         for _ in 0..<repeats {
             sendEncodedKeyEvent(TerminalKeyEvent(key: key, modifiers: [], utf8: nil, isRepeat: false))
         }
@@ -166,5 +172,3 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         onSnapshotChange?(core.snapshot)
     }
 }
-
-typealias GhosttyVTRenderStateEngine = GhosttyTerminalEngine

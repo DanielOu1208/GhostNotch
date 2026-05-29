@@ -207,7 +207,7 @@ final class GhosttyTerminalCore {
         let meta = loadResult.meta
         columns = Int(meta.columns)
         rows = Int(meta.rows)
-        let dirtyState = TerminalRenderDirtyState(rawValue: meta.dirtyState) ?? .full
+        let dirtyState = TerminalRenderDirtyState.fromBridgeValue(meta.dirtyState)
         let dirtyRows = Set(loadResult.dirtyRows.enumerated().compactMap { index, isDirty in
             isDirty ? index : nil
         })
@@ -505,5 +505,3 @@ private extension TerminalColor {
         self.init(red: ghosttyColor.red, green: ghosttyColor.green, blue: ghosttyColor.blue)
     }
 }
-
-typealias GhosttyVTTerminalCore = GhosttyTerminalCore

@@ -226,10 +226,33 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertNotEqual(core.snapshot.dirtyState, .clean)
         XCTAssertFalse(core.snapshot.dirtyRows.isEmpty)
 
-        _ = core.snapshot
-        core.processOutput(Data())
+        core.processOutput(Data("d".utf8))
+        XCTAssertNotEqual(core.snapshot.dirtyState, .clean)
+        XCTAssertTrue(core.snapshot.dirtyRows.contains(0))
+    }
 
-        XCTAssertEqual(core.snapshot.dirtyState, .clean)
+    func testRowsNeedingDisplayUnionsPreviousCursorRow() {
+        let cells = Array(repeating: TerminalCell.blank, count: 50)
+        let snapshot = TerminalRenderSnapshot(
+            columns: 10,
+            rows: 5,
+            cells: cells,
+            cursorColumn: 0,
+            cursorRow: 4,
+            cursorVisible: true,
+            cursorBlinking: false,
+            cursorStyle: .bar,
+            isAlternateScreen: false,
+            hasMouseTracking: false,
+            isBracketedPasteMode: false,
+            isFocusReportingMode: false,
+            totalRows: 5,
+            scrollbackRows: 0,
+            dirtyState: .partial,
+            dirtyRows: [3]
+        )
+
+        XCTAssertEqual(snapshot.rowsNeedingDisplay(previousCursorRow: 2), Set([2, 3, 4]))
     }
 
     func testResetClearsVisibleCellsPreservesDimensionsAndWriteCallback() {

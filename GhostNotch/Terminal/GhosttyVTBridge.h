@@ -55,14 +55,9 @@ typedef struct {
     bool focusEventMode;
     size_t totalRows;
     size_t scrollbackRows;
+    /// Render dirty state: 0 clean, 1 partial, 2 full (see `TerminalRenderDirtyState` in Swift).
     uint8_t dirtyState;
 } GNVTSnapshotMeta;
-
-typedef enum {
-    GNVT_RENDER_DIRTY_CLEAN = 0,
-    GNVT_RENDER_DIRTY_PARTIAL = 1,
-    GNVT_RENDER_DIRTY_FULL = 2,
-} GNVTRenderDirtyState;
 
 typedef enum {
     GNVT_KEY_UNIDENTIFIED = 0,

@@ -206,7 +206,7 @@ final class IslandPanelController: ObservableObject {
     private func activateTerminalSurface() {
         requestTerminalFocus()
         terminalSurfaceCoordinator.focus()
-        terminalSnapshot = terminalSurfaceCoordinator.refreshSnapshot()
+        terminalSnapshot = terminalSurfaceCoordinator.currentSnapshot()
     }
 
     private func requestTerminalFocus() {

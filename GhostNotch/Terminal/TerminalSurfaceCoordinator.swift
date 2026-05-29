@@ -104,7 +104,7 @@ final class TerminalSurfaceCoordinator {
         engine.blur()
     }
 
-    func refreshSnapshot() -> TerminalRenderSnapshot {
+    func currentSnapshot() -> TerminalRenderSnapshot {
         engine.snapshot
     }
 

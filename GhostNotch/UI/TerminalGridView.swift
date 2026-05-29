@@ -12,6 +12,7 @@ final class TerminalGridView: NSView {
     private let typography = TerminalGridTypography(size: TerminalGridMetrics.fontSize)
     var lastReportedResize: TerminalGridResize?
     private var selection: TerminalSelection?
+    private var previousCursorRowForInvalidation: Int?
 
     override var acceptsFirstResponder: Bool {
         true
@@ -44,7 +45,9 @@ final class TerminalGridView: NSView {
             }
         }
 
-        drawCursor(cellSize: cellSize)
+        if snapshot.cursorVisible, rowRange.contains(snapshot.cursorRow) {
+            drawCursor(cellSize: cellSize)
+        }
     }
 
     override func keyDown(with event: NSEvent) {
@@ -187,12 +190,15 @@ final class TerminalGridView: NSView {
 
     func invalidateRowsFromSnapshot() {
         guard !snapshot.needsFullRedraw else {
+            previousCursorRowForInvalidation = snapshot.cursorVisible ? snapshot.cursorRow : nil
             needsDisplay = true
             return
         }
 
         let cellSize = measuredCellSize
-        for row in snapshot.dirtyRows {
+        let rowsToInvalidate = snapshot.rowsNeedingDisplay(previousCursorRow: previousCursorRowForInvalidation)
+        previousCursorRowForInvalidation = snapshot.cursorVisible ? snapshot.cursorRow : nil
+        for row in rowsToInvalidate {
             setNeedsDisplay(rowRect(row: row, cellSize: cellSize))
         }
     }
