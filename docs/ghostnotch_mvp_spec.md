@@ -201,6 +201,10 @@ Current shape behavior:
 - Bottom corners are rounded.
 - Collapsed and hover radius: 14 pt.
 - Expanded radius: 18 pt.
+- Hover and expanded states draw a subtle 2 px white translucent rim.
+- The rim follows only the side and bottom edges; the top edge stays unoutlined so the island remains visually fused with the physical notch.
+- Expanded separation comes from the rim, not a drop shadow, to avoid rectangular backing artifacts around the rounded corners.
+- Foreground content is clipped to the same notch shape so expanded terminal content cannot square off the rounded bottom corners.
 
 `NotchFillMode` currently supports:
 

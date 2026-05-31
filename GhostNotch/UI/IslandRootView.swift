@@ -9,28 +9,40 @@ struct IslandRootView: View {
         ZStack {
             NotchBackground(state: controller.state, fillMode: controller.notchFillMode)
 
-            switch controller.state {
-            case .collapsed, .hover:
-                IslandIndicatorView(isHovering: controller.state == .hover)
-            case .expanded:
-                IslandExpandedView(
-                    sessionState: controller.terminalState,
-                    snapshot: controller.terminalSnapshot,
-                    initialLastReportedResize: controller.lastAppliedGridResize,
-                    focusRequestID: controller.terminalFocusRequestID,
-                    onInput: controller.writeToTerminal,
-                    onKeyEvent: controller.sendTerminalKeyEvent,
-                    onScroll: controller.handleTerminalScrollWheel,
-                    onMouseEvent: controller.handleTerminalMouseEvent,
-                    onResize: controller.resizeTerminal,
-                    onRestart: controller.restartTerminal,
-                    onCollapse: controller.collapse
-                )
-            }
+            islandContent
+                .clipShape(notchShape)
+
+            NotchRimOverlay(state: controller.state)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.all)
         .modifier(CollapsedIslandTapToExpand(onClick: onClick, isEnabled: controller.state != .expanded))
+    }
+
+    private var notchShape: NotchExtensionShape {
+        NotchExtensionShape(cornerRadius: controller.state.notchCornerRadius)
+    }
+
+    @ViewBuilder
+    private var islandContent: some View {
+        switch controller.state {
+        case .collapsed, .hover:
+            IslandIndicatorView(isHovering: controller.state == .hover)
+        case .expanded:
+            IslandExpandedView(
+                sessionState: controller.terminalState,
+                snapshot: controller.terminalSnapshot,
+                initialLastReportedResize: controller.lastAppliedGridResize,
+                focusRequestID: controller.terminalFocusRequestID,
+                onInput: controller.writeToTerminal,
+                onKeyEvent: controller.sendTerminalKeyEvent,
+                onScroll: controller.handleTerminalScrollWheel,
+                onMouseEvent: controller.handleTerminalMouseEvent,
+                onResize: controller.resizeTerminal,
+                onRestart: controller.restartTerminal,
+                onCollapse: controller.collapse
+            )
+        }
     }
 }
 
@@ -56,11 +68,28 @@ private struct NotchBackground: View {
     var body: some View {
         NotchExtensionShape(cornerRadius: cornerRadius)
             .fill(fillMode.color)
-            .shadow(color: .black.opacity(state == .expanded ? 0.32 : 0), radius: state == .expanded ? 22 : 0, y: state == .expanded ? 14 : 0)
     }
 
     private var cornerRadius: CGFloat {
         state.notchCornerRadius
+    }
+}
+
+private struct NotchRimOverlay: View {
+    @Environment(\.displayScale) private var displayScale
+
+    let state: IslandState
+
+    private var rimLineWidth: CGFloat {
+        2 / max(displayScale, 1)
+    }
+
+    var body: some View {
+        if state.showsNotchRim {
+            NotchRimShape(cornerRadius: state.notchCornerRadius, lineWidth: rimLineWidth)
+                .stroke(.white.opacity(state.notchRimOpacity), lineWidth: rimLineWidth)
+                .allowsHitTesting(false)
+        }
     }
 }
 
@@ -93,6 +122,26 @@ private extension IslandState {
             18
         }
     }
+
+    var showsNotchRim: Bool {
+        switch self {
+        case .collapsed:
+            false
+        case .hover, .expanded:
+            true
+        }
+    }
+
+    var notchRimOpacity: Double {
+        switch self {
+        case .collapsed:
+            0
+        case .hover:
+            0.16
+        case .expanded:
+            0.24
+        }
+    }
 }
 
 private struct NotchExtensionShape: Shape {
@@ -119,6 +168,36 @@ private struct NotchExtensionShape: Shape {
             control: CGPoint(x: minX, y: maxY)
         )
         path.closeSubpath()
+
+        return path
+    }
+}
+
+private struct NotchRimShape: Shape {
+    let cornerRadius: CGFloat
+    let lineWidth: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let inset = lineWidth / 2
+        let radius = min(max(cornerRadius - inset, 0), rect.width / 2, rect.height)
+        let minX = rect.minX + inset
+        let maxX = rect.maxX - inset
+        let minY = rect.minY
+        let maxY = rect.maxY - inset
+
+        var path = Path()
+        path.move(to: CGPoint(x: minX, y: minY))
+        path.addLine(to: CGPoint(x: minX, y: maxY - radius))
+        path.addQuadCurve(
+            to: CGPoint(x: minX + radius, y: maxY),
+            control: CGPoint(x: minX, y: maxY)
+        )
+        path.addLine(to: CGPoint(x: maxX - radius, y: maxY))
+        path.addQuadCurve(
+            to: CGPoint(x: maxX, y: maxY - radius),
+            control: CGPoint(x: maxX, y: maxY)
+        )
+        path.addLine(to: CGPoint(x: maxX, y: minY))
 
         return path
     }
