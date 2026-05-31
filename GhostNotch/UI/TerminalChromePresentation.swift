@@ -1,9 +1,5 @@
-import SwiftUI
-
 struct TerminalChromePresentation {
     let gridSnapshot: TerminalRenderSnapshot
-    let statusText: String
-    let statusColor: Color
 
     @MainActor
     static func make(
@@ -12,18 +8,14 @@ struct TerminalChromePresentation {
     ) -> TerminalChromePresentation {
         if let lastError = sessionState.lastError {
             return TerminalChromePresentation(
-                gridSnapshot: .message("GhostNotch terminal error:\n\(lastError)\n"),
-                statusText: "terminal error",
-                statusColor: .orange
+                gridSnapshot: .message("GhostNotch terminal error:\n\(lastError)\n")
             )
         }
 
         switch sessionState.phase {
         case .running:
             return TerminalChromePresentation(
-                gridSnapshot: snapshot,
-                statusText: "default shell",
-                statusColor: .green
+                gridSnapshot: snapshot
             )
         case .starting:
             let gridSnapshot: TerminalRenderSnapshot
@@ -33,21 +25,15 @@ struct TerminalChromePresentation {
                 gridSnapshot = .message("Starting shell...\n")
             }
             return TerminalChromePresentation(
-                gridSnapshot: gridSnapshot,
-                statusText: "starting shell",
-                statusColor: .orange
+                gridSnapshot: gridSnapshot
             )
         case .stopped:
             return TerminalChromePresentation(
-                gridSnapshot: .message("Shell stopped.\n"),
-                statusText: "shell stopped",
-                statusColor: .orange
+                gridSnapshot: .message("Shell stopped.\n")
             )
         case .failed:
             return TerminalChromePresentation(
-                gridSnapshot: .message("Shell stopped.\n"),
-                statusText: "terminal error",
-                statusColor: .orange
+                gridSnapshot: .message("Shell stopped.\n")
             )
         }
     }
