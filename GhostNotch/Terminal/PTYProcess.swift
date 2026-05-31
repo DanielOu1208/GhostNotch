@@ -32,6 +32,10 @@ enum PTYProcessError: Error, LocalizedError, Equatable {
 
 final class PTYProcess: TerminalProcess, @unchecked Sendable {
     static let defaultTerminalType = "xterm-256color"
+    static let termProgram = "GhostNotch"
+    static let termProgramVersion = "dev"
+    static let defaultColorTerminal = "truecolor"
+    static let shellIntegrationResourceSubdirectory = "ShellIntegration"
     static let defaultUTF8Locale = "en_US.UTF-8"
     fileprivate static let defaultExecutableSearchPath = [
         "/opt/homebrew/bin",
@@ -310,9 +314,19 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
     static func terminalEnvironment(from environment: [String: String]) -> [String: String] {
         var terminalEnvironment = environment
         terminalEnvironment["TERM"] = defaultTerminalType
+        terminalEnvironment["TERM_PROGRAM"] = termProgram
+        terminalEnvironment["TERM_PROGRAM_VERSION"] = termProgramVersion
+        terminalEnvironment["GHOSTNOTCH_VERSION"] = termProgramVersion
+        terminalEnvironment["COLORTERM"] = defaultColorTerminal
+        terminalEnvironment["GHOSTNOTCH_RESOURCES_DIR"] = shellIntegrationResourceDirectory()
         terminalEnvironment.applyDefaultUTF8Locale()
         terminalEnvironment.applyDefaultExecutableSearchPath()
         return terminalEnvironment
+    }
+
+    private static func shellIntegrationResourceDirectory() -> String {
+        let resourceURL = Bundle.main.resourceURL ?? Bundle.main.bundleURL
+        return resourceURL.appendingPathComponent(shellIntegrationResourceSubdirectory, isDirectory: true).path
     }
 
     private static func terminate(_ process: Process) {

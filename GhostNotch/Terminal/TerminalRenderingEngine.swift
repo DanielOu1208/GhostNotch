@@ -11,6 +11,7 @@ protocol TerminalRenderingEngine: AnyObject {
     func sendInput(_ input: Data)
     func sendKeyEvent(_ event: TerminalKeyEvent)
     func handleScrollWheel(_ event: TerminalScrollEvent)
+    func handleMouseEvent(_ event: TerminalMouseEvent)
     func resize(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int)
     func reset(cols: Int, rows: Int)
     func focus()

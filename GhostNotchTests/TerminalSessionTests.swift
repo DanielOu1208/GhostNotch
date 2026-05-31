@@ -6,10 +6,20 @@ final class TerminalSessionTests: XCTestCase {
         let environment = PTYProcess.terminalEnvironment(from: [
             "SHELL": "/bin/sh",
             "TERM": "xterm-ghostty",
+            "TERM_PROGRAM": "Ghostty",
+            "TERM_PROGRAM_VERSION": "1.0",
+            "GHOSTNOTCH_VERSION": "stale",
+            "COLORTERM": "falsecolor",
+            "GHOSTNOTCH_RESOURCES_DIR": "/tmp/old",
             "PATH": "/usr/bin:/bin",
         ])
 
         XCTAssertEqual(environment["TERM"], PTYProcess.defaultTerminalType)
+        XCTAssertEqual(environment["TERM_PROGRAM"], PTYProcess.termProgram)
+        XCTAssertEqual(environment["TERM_PROGRAM_VERSION"], PTYProcess.termProgramVersion)
+        XCTAssertEqual(environment["GHOSTNOTCH_VERSION"], PTYProcess.termProgramVersion)
+        XCTAssertEqual(environment["COLORTERM"], PTYProcess.defaultColorTerminal)
+        XCTAssertEqual(environment["GHOSTNOTCH_RESOURCES_DIR"]?.hasSuffix("/ShellIntegration"), true)
         XCTAssertEqual(environment["SHELL"], "/bin/sh")
         XCTAssertEqual(
             environment["PATH"],
@@ -292,6 +302,21 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(process.startRequests.last, TerminalGridSize(columns: 100, rows: 28))
     }
 
+    func testCoordinatorPublishesWorkingDirectoryFromSnapshot() {
+        let state = TerminalSessionState()
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: FakeTerminalProcess()
+        )
+        let engine = SpyRenderingEngine()
+        let coordinator = TerminalSurfaceCoordinator(session: session, engine: engine)
+
+        engine.publish(snapshot: .empty(columns: 80, rows: 24, currentWorkingDirectory: "/tmp/project"))
+
+        XCTAssertEqual(coordinator.state.currentWorkingDirectory, "/tmp/project")
+    }
+
     func testStoppingSessionMarksItStopped() throws {
         let state = TerminalSessionState(outputLimit: 16 * 1024)
         let session = TerminalSession(
@@ -424,6 +449,8 @@ private final class SpyRenderingEngine: TerminalRenderingEngine {
 
     func handleScrollWheel(_ event: TerminalScrollEvent) {}
 
+    func handleMouseEvent(_ event: TerminalMouseEvent) {}
+
     func resize(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int) {
         lastAppliedGridResize = TerminalGridResize(
             columns: cols,
@@ -435,6 +462,11 @@ private final class SpyRenderingEngine: TerminalRenderingEngine {
 
     func reset(cols: Int, rows: Int) {
         resetRequests.append(TerminalGridSize(columns: cols, rows: rows))
+    }
+
+    func publish(snapshot: TerminalRenderSnapshot) {
+        self.snapshot = snapshot
+        onSnapshotChange?(snapshot)
     }
 
     func focus() {}

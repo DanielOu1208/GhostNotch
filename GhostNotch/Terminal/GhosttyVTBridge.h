@@ -55,6 +55,8 @@ typedef struct {
     bool focusEventMode;
     size_t totalRows;
     size_t scrollbackRows;
+    const uint8_t *pwd;
+    size_t pwdLen;
     /// Render dirty state: 0 clean, 1 partial, 2 full (see `TerminalRenderDirtyState` in Swift).
     uint8_t dirtyState;
 } GNVTSnapshotMeta;
@@ -115,6 +117,19 @@ typedef enum {
     GNVT_KEY_F12,
 } GNVTKey;
 
+typedef enum {
+    GNVT_MOUSE_ACTION_PRESS = 0,
+    GNVT_MOUSE_ACTION_RELEASE = 1,
+    GNVT_MOUSE_ACTION_MOTION = 2,
+} GNVTMouseAction;
+
+typedef enum {
+    GNVT_MOUSE_BUTTON_UNKNOWN = 0,
+    GNVT_MOUSE_BUTTON_LEFT = 1,
+    GNVT_MOUSE_BUTTON_RIGHT = 2,
+    GNVT_MOUSE_BUTTON_MIDDLE = 3,
+} GNVTMouseButton;
+
 enum {
     GNVT_MOD_SHIFT = 1 << 0,
     GNVT_MOD_CONTROL = 1 << 1,
@@ -156,6 +171,16 @@ bool GNVTTerminalEncodeMouseWheel(GNVTTerminal *terminal,
                                   uint16_t column,
                                   uint16_t row,
                                   intptr_t deltaRows,
+                                  char *output,
+                                  size_t outputLen,
+                                  size_t *written);
+bool GNVTTerminalEncodeMouseEvent(GNVTTerminal *terminal,
+                                  GNVTMouseAction action,
+                                  GNVTMouseButton button,
+                                  uint16_t column,
+                                  uint16_t row,
+                                  uint16_t mods,
+                                  bool anyButtonPressed,
                                   char *output,
                                   size_t outputLen,
                                   size_t *written);

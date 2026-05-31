@@ -9,6 +9,7 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
     let onScroll: (TerminalScrollEvent) -> Void
+    let onMouseEvent: (TerminalMouseEvent) -> Void
     let onResize: (Int, Int, Int, Int) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -22,6 +23,7 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
         view.onInput = onInput
         view.onKeyEvent = onKeyEvent
         view.onScroll = onScroll
+        view.onMouseEvent = onMouseEvent
         view.onResize = onResize
         view.allowsResizeReporting = allowsResizeReporting
         view.onMovedToWindow = { [weak view, weak coordinator = context.coordinator] in
@@ -35,10 +37,11 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
     }
 
     func updateNSView(_ view: TerminalGridView, context: Context) {
-        view.snapshot = snapshot
+        view.updateSnapshot(snapshot)
         view.onInput = onInput
         view.onKeyEvent = onKeyEvent
         view.onScroll = onScroll
+        view.onMouseEvent = onMouseEvent
         view.onResize = onResize
         view.allowsResizeReporting = allowsResizeReporting
         view.invalidateRowsFromSnapshot()

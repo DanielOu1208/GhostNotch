@@ -120,6 +120,10 @@ final class IslandPanelController: ObservableObject {
         terminalSurfaceCoordinator.handleScrollWheel(event)
     }
 
+    func handleTerminalMouseEvent(_ event: TerminalMouseEvent) {
+        terminalSurfaceCoordinator.handleMouseEvent(event)
+    }
+
     func resizeTerminal(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int) {
         let resize = TerminalGridResize.normalized(
             columns: cols,

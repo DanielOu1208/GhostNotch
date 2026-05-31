@@ -17,6 +17,7 @@ struct TerminalGridTypography {
         let leading = ceil(CTFontGetLeading(regularCTFont))
         cellSize = NSSize(width: max(width, 7), height: max(ascent + descent + leading + 1, 14))
         baselineOffset = max(1, floor((cellSize.height - ascent - descent) / 2)) + ascent
+        Self.logFontDiagnostics(font: regularFont)
     }
 
     func draw(_ text: String, style: TerminalCellStyle, foreground: NSColor, in rect: NSRect, viewHeight: CGFloat) {
@@ -60,7 +61,7 @@ struct TerminalGridTypography {
             return weightedFont
         }
 
-        for name in preferredInstalledFontNames {
+        for name in preferredInstalledFontNames() {
             if let font = NSFont(name: name, size: size) {
                 return font
             }
@@ -79,7 +80,7 @@ struct TerminalGridTypography {
             return baseCTFont
         }
 
-        for name in preferredInstalledFontNames {
+        for name in preferredInstalledFontNames() {
             guard let fallbackFont = NSFont(name: name, size: baseFont.pointSize) else {
                 continue
             }
@@ -99,11 +100,12 @@ struct TerminalGridTypography {
 
         let codeUnits = Array(text.utf16).map { UniChar($0) }
         var glyphs = Array(repeating: CGGlyph(), count: codeUnits.count)
-        return codeUnits.withUnsafeBufferPointer { codeUnitBuffer in
+        let mapped = codeUnits.withUnsafeBufferPointer { codeUnitBuffer in
             glyphs.withUnsafeMutableBufferPointer { glyphBuffer in
                 CTFontGetGlyphsForCharacters(font, codeUnitBuffer.baseAddress!, glyphBuffer.baseAddress!, codeUnitBuffer.count)
             }
         }
+        return mapped && glyphs.allSatisfy { $0 != 0 }
     }
 
     private static func measurementGlyph(for font: CTFont) -> CGGlyph {
@@ -113,13 +115,45 @@ struct TerminalGridTypography {
         return glyph
     }
 
-    private static let preferredInstalledFontNames = [
-        "MesloLGS NF",
-        "MesloLGS NF Regular",
-        "JetBrainsMono Nerd Font",
-        "JetBrains Mono NL",
-        "Hack Nerd Font",
-        "FiraCode Nerd Font",
-        "Menlo",
-    ]
+    private static func preferredInstalledFontNames() -> [String] {
+        let explicitNames = [
+            "MesloLGS NF",
+            "MesloLGS NF Regular",
+            "JetBrainsMono Nerd Font",
+            "JetBrains Mono Nerd Font",
+            "JetBrains Mono NL",
+            "Hack Nerd Font",
+            "FiraCode Nerd Font",
+            "Fira Code Nerd Font",
+            "CaskaydiaCove Nerd Font",
+            "SauceCodePro Nerd Font",
+            "Monaspace Neon",
+            "Menlo",
+        ]
+        let discoveredNames = NSFontManager.shared.availableFontFamilies.filter { name in
+            let normalized = name.lowercased()
+            return normalized.contains("nerd font") ||
+                normalized.contains("meslo") ||
+                normalized.contains("jetbrains mono") ||
+                normalized.contains("fira code") ||
+                normalized.contains("hack")
+        }
+
+        return (explicitNames + discoveredNames).uniqued()
+    }
+
+    private static func logFontDiagnostics(font: NSFont) {
+        let powerline = "\u{E0B0}"
+        let supportsPowerline = supports(powerline, font: font as CTFont)
+        NSLog(
+            "GhostNotch terminal font: \(font.fontName) family=\(font.familyName ?? "unknown") supportsPowerline=\(supportsPowerline)"
+        )
+    }
+}
+
+private extension Array where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
+    }
 }

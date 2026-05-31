@@ -66,7 +66,7 @@ struct IslandIndicatorView: View {
     }
 
     private var collapsedCenterGapWidth: CGFloat {
-        min(IslandMetrics.physicalNotchReferenceWidth, IslandMetrics.collapsedSize.width)
+        min(IslandMetrics.currentNotchReferenceWidth, IslandMetrics.collapsedSize.width)
     }
 
     private var hoverIndicator: some View {

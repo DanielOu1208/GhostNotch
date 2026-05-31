@@ -8,6 +8,7 @@ final class GhosttyTerminalCore {
 
     private var terminal: OpaquePointer?
     private var cachedSnapshot: TerminalRenderSnapshot
+    private var currentWorkingDirectory: String?
 
     init(columns: Int = 80, rows: Int = 18) {
         self.columns = max(columns, 2)
@@ -32,6 +33,15 @@ final class GhosttyTerminalCore {
     }
 
     func processOutput(_ data: Data) {
+        if let report = Self.workingDirectoryReport(in: data) {
+            switch report {
+            case .clear:
+                currentWorkingDirectory = nil
+            case .path(let path):
+                currentWorkingDirectory = path
+            }
+        }
+
         data.withUnsafeBytes { rawBuffer in
             guard let baseAddress = rawBuffer.bindMemory(to: UInt8.self).baseAddress else {
                 return
@@ -64,6 +74,7 @@ final class GhosttyTerminalCore {
         GNVTTerminalDestroy(terminal)
         columns = max(newColumns, 2)
         rows = max(newRows, 1)
+        currentWorkingDirectory = nil
         cachedSnapshot = .empty(columns: columns, rows: rows)
 
         terminal = GNVTTerminalCreate(
@@ -119,6 +130,35 @@ final class GhosttyTerminalCore {
                 clampedColumn,
                 clampedRow,
                 deltaRows,
+                outputBuffer.baseAddress,
+                outputBuffer.count,
+                &written
+            )
+        }
+
+        guard success, written > 0 else {
+            return nil
+        }
+
+        return output.withUnsafeBufferPointer { buffer in
+            Data(bytes: buffer.baseAddress!, count: written)
+        }
+    }
+
+    func encodeMouseEvent(_ event: TerminalMouseEvent) -> Data? {
+        let clampedColumn = UInt16(max(0, min(event.column, columns - 1)))
+        let clampedRow = UInt16(max(0, min(event.row, rows - 1)))
+        var output = Array(repeating: CChar(0), count: 64)
+        var written = 0
+        let success = output.withUnsafeMutableBufferPointer { outputBuffer in
+            GNVTTerminalEncodeMouseEvent(
+                terminal,
+                event.action.bridgeValue,
+                event.button.bridgeValue,
+                clampedColumn,
+                clampedRow,
+                event.modifiers.bridgeValue,
+                event.anyButtonPressed,
                 outputBuffer.baseAddress,
                 outputBuffer.count,
                 &written
@@ -224,11 +264,82 @@ final class GhosttyTerminalCore {
             hasMouseTracking: meta.hasMouseTracking,
             isBracketedPasteMode: meta.bracketedPasteMode,
             isFocusReportingMode: meta.focusEventMode,
+            currentWorkingDirectory: Self.currentWorkingDirectory(from: meta) ?? currentWorkingDirectory,
             totalRows: Int(meta.totalRows),
             scrollbackRows: Int(meta.scrollbackRows),
             dirtyState: dirtyState,
             dirtyRows: dirtyState == .full ? Set(0..<rows) : dirtyRows
         )
+    }
+
+    private static func currentWorkingDirectory(from meta: GNVTSnapshotMeta) -> String? {
+        guard let pwd = meta.pwd, meta.pwdLen > 0 else {
+            return nil
+        }
+
+        return String(data: Data(bytes: pwd, count: meta.pwdLen), encoding: .utf8)
+    }
+
+    private enum WorkingDirectoryReport {
+        case clear
+        case path(String)
+    }
+
+    private static func workingDirectoryReport(in data: Data) -> WorkingDirectoryReport? {
+        let bytes = Array(data)
+        var index = 0
+        var report: WorkingDirectoryReport?
+
+        while index + 3 < bytes.count {
+            guard bytes[index] == 0x1B, bytes[index + 1] == 0x5D, bytes[index + 2] == 0x37, bytes[index + 3] == 0x3B else {
+                index += 1
+                continue
+            }
+
+            let payloadStart = index + 4
+            var cursor = payloadStart
+            while cursor < bytes.count {
+                if bytes[cursor] == 0x07 {
+                    report = workingDirectoryReport(payloadBytes: bytes[payloadStart..<cursor])
+                    index = cursor + 1
+                    break
+                }
+
+                if cursor + 1 < bytes.count, bytes[cursor] == 0x1B, bytes[cursor + 1] == 0x5C {
+                    report = workingDirectoryReport(payloadBytes: bytes[payloadStart..<cursor])
+                    index = cursor + 2
+                    break
+                }
+
+                cursor += 1
+            }
+
+            if cursor >= bytes.count {
+                break
+            }
+        }
+
+        return report
+    }
+
+    private static func workingDirectoryReport(payloadBytes: ArraySlice<UInt8>) -> WorkingDirectoryReport? {
+        guard !payloadBytes.isEmpty else {
+            return .clear
+        }
+
+        guard let payload = String(data: Data(payloadBytes), encoding: .utf8),
+              let components = URLComponents(string: payload),
+              components.scheme == "file" || components.scheme == "kitty-shell-cwd"
+        else {
+            return nil
+        }
+
+        let path = components.percentEncodedPath.removingPercentEncoding ?? components.path
+        guard !path.isEmpty else {
+            return .clear
+        }
+
+        return .path(path)
     }
 
     private func loadSnapshot(graphemeCapacity: Int) -> GhosttySnapshotLoadResult {
@@ -308,6 +419,27 @@ final class GhosttyTerminalCore {
         }
 
         onWriteToPTY?(Data(bytes: bytes, count: count))
+    }
+}
+
+private extension TerminalMouseEventAction {
+    var bridgeValue: GNVTMouseAction {
+        switch self {
+        case .press: return GNVT_MOUSE_ACTION_PRESS
+        case .release: return GNVT_MOUSE_ACTION_RELEASE
+        case .motion: return GNVT_MOUSE_ACTION_MOTION
+        }
+    }
+}
+
+private extension TerminalMouseButton {
+    var bridgeValue: GNVTMouseButton {
+        switch self {
+        case .unknown: return GNVT_MOUSE_BUTTON_UNKNOWN
+        case .left: return GNVT_MOUSE_BUTTON_LEFT
+        case .right: return GNVT_MOUSE_BUTTON_RIGHT
+        case .middle: return GNVT_MOUSE_BUTTON_MIDDLE
+        }
     }
 }
 

@@ -140,9 +140,9 @@ Recommended next action:
 
 ## Prioritized Fix Order
 
-1. R8 collapse/reopen viewport stability.
-2. R8 alternate-screen wheel behavior for `less` and `vim`.
-3. R6 private-use glyph/font selection, only after confirming a compatible Nerd Font is installed.
+1. Manual rerun of R8 collapse/reopen viewport stability after duplicate-resize and selection-clearing hardening.
+2. Manual rerun of R8 alternate-screen wheel and mouse behavior for `less`, `vim`/`nano`, and `top`.
+3. Manual R6/R7 prompt, glyph, font fallback, color, and style pass after the font-discovery and diagnostics baseline.
 
 This order keeps the next work focused on behavioral correctness before visual polish, matching the current MVP implementation order.
 
@@ -152,8 +152,8 @@ This order keeps the next work focused on behavioral correctness before visual p
 - `less` stays on the same visible lines after collapse/reopen when cols/rows do not change.
 - `vim` or `nano` does not jump unexpectedly after collapse/reopen when cols/rows do not change.
 - Trackpad/wheel scroll works in `less`.
-- Trackpad/wheel behavior in `vim` or `nano` is usable and does not inject visible garbage.
-- Powerline glyph behavior is classified as either missing-font setup or renderer font-selection bug.
+- Mouse-enabled TUI press/release/drag behavior does not inject visible garbage.
+- Powerline glyph behavior is classified as either missing-font setup or renderer font-selection bug, using the terminal font diagnostic log.
 
 ## Rendering Fidelity Fixture Commands
 

@@ -45,6 +45,7 @@
 		1A00013A0000000000000001 /* TerminalSurfaceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000290000000000000001 /* TerminalSurfaceCoordinator.swift */; };
 		1A00011E0000000000000001 /* GhosttyVTBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000190000000000000001 /* GhosttyVTBridge.c */; };
 		1A00011F0000000000000001 /* GhosttyVT.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00001B0000000000000001 /* GhosttyVT.xcframework */; };
+		1A00013B0000000000000001 /* ShellIntegration in Resources */ = {isa = PBXBuildFile; fileRef = 1A00013C0000000000000001 /* ShellIntegration */; };
 		1A00010F0000000000000001 /* ShellResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000B0000000000000001 /* ShellResolver.swift */; };
 		1A0001100000000000000001 /* PTYProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000C0000000000000001 /* PTYProcess.swift */; };
 		1A0001110000000000000001 /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000D0000000000000001 /* TerminalSession.swift */; };
@@ -95,6 +96,7 @@
 		1A0000190000000000000001 /* GhosttyVTBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = GhosttyVTBridge.c; sourceTree = "<group>"; };
 		1A00001A0000000000000001 /* GhosttyVTBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GhosttyVTBridge.h; sourceTree = "<group>"; };
 		1A00001B0000000000000001 /* GhosttyVT.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = "vendor/ghostty-vt/GhosttyVT.xcframework"; sourceTree = SOURCE_ROOT; };
+		1A00013C0000000000000001 /* ShellIntegration */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources/ShellIntegration; sourceTree = "<group>"; };
 		1A0000100000000000000001 /* GhostNotchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GhostNotchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A0000110000000000000001 /* ShellResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellResolverTests.swift; sourceTree = "<group>"; };
 		1A0000120000000000000001 /* TerminalSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionTests.swift; sourceTree = "<group>"; };
@@ -137,6 +139,7 @@
 				1A0000010000000000000001 /* GhostNotchApp.swift */,
 				1A0000020000000000000001 /* AppDelegate.swift */,
 				1A0000180000000000000001 /* GhostNotch-Bridging-Header.h */,
+				1A00013C0000000000000001 /* ShellIntegration */,
 				1A0003060000000000000001 /* Terminal */,
 				1A0003040000000000000001 /* Window */,
 				1A0003050000000000000001 /* UI */,
@@ -300,6 +303,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A00013B0000000000000001 /* ShellIntegration in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

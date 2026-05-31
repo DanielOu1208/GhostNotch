@@ -66,6 +66,15 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         publishSnapshot()
     }
 
+    func handleMouseEvent(_ event: TerminalMouseEvent) {
+        guard core.snapshot.hasMouseTracking,
+              let input = core.encodeMouseEvent(event) else {
+            return
+        }
+
+        writeToSession(input)
+    }
+
     func resize(cols: Int, rows: Int, cellWidthPixels: Int, cellHeightPixels: Int) {
         let requested = TerminalGridResize.normalized(
             columns: cols,

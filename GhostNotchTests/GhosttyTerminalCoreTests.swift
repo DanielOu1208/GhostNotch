@@ -246,6 +246,7 @@ final class GhosttyTerminalCoreTests: XCTestCase {
             hasMouseTracking: false,
             isBracketedPasteMode: false,
             isFocusReportingMode: false,
+            currentWorkingDirectory: nil,
             totalRows: 5,
             scrollbackRows: 0,
             dirtyState: .partial,
@@ -385,6 +386,72 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertNotEqual(writes[0], Data("\u{1B}[A".utf8))
     }
 
+    func testMouseTrackingPressDragReleaseUsesGhosttyMouseEncoder() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+        var writes: [Data] = []
+        let engine = GhosttyTerminalEngine(core: core) { _, data in
+            writes.append(data)
+        }
+
+        engine.processOutput(Data("\u{1B}[?1049h\u{1B}[?1000h\u{1B}[?1002h\u{1B}[?1006h".utf8))
+        XCTAssertTrue(core.snapshot.hasMouseTracking)
+
+        engine.handleMouseEvent(TerminalMouseEvent(
+            action: .press,
+            button: .left,
+            row: 0,
+            column: 0,
+            modifiers: [],
+            anyButtonPressed: true
+        ))
+        engine.handleMouseEvent(TerminalMouseEvent(
+            action: .motion,
+            button: .left,
+            row: 0,
+            column: 1,
+            modifiers: [],
+            anyButtonPressed: true
+        ))
+        engine.handleMouseEvent(TerminalMouseEvent(
+            action: .release,
+            button: .left,
+            row: 0,
+            column: 1,
+            modifiers: [],
+            anyButtonPressed: false
+        ))
+
+        XCTAssertEqual(writes.count, 3)
+        XCTAssertTrue(writes.allSatisfy { !$0.isEmpty })
+    }
+
+    func testMouseEventsAreIgnoredWhenMouseTrackingIsOff() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+        var writes: [Data] = []
+        let engine = GhosttyTerminalEngine(core: core) { _, data in
+            writes.append(data)
+        }
+
+        engine.handleMouseEvent(TerminalMouseEvent(
+            action: .press,
+            button: .left,
+            row: 0,
+            column: 0,
+            modifiers: [],
+            anyButtonPressed: true
+        ))
+
+        XCTAssertTrue(writes.isEmpty)
+    }
+
+    func testOsc7WorkingDirectoryIsExposedInSnapshot() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+
+        core.processOutput(Data("\u{1B}]7;file://localhost/Users/danielou/project\u{07}".utf8))
+
+        XCTAssertEqual(core.snapshot.currentWorkingDirectory, "/Users/danielou/project")
+    }
+
     func testGhosttyKeyEncodingHandlesEscapeAndArrows() {
         let core = GhosttyTerminalCore()
 
@@ -465,6 +532,18 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         scrollback.scrollViewport(deltaRows: -2)
         XCTAssertGreaterThan(scrollback.snapshot.scrollbackRows, 0)
         XCTAssertNotEqual(scrollback.snapshot.plainText, bottomText)
+    }
+
+    func testGhosttyComparisonFixtureStreamsDoNotRegressCoreModel() {
+        let prompt = renderFixture("\u{1B}[32m➜\u{1B}[0m  project git:(main) \u{E0B0} echo ok", columns: 48, rows: 2)
+        XCTAssertTrue(prompt.plainText.contains("project git:(main)"))
+        XCTAssertTrue(prompt.plainText.contains("\u{E0B0}"))
+
+        let hyperlinkNegotiation = renderFixture("\u{1B}]8;;https://ghostty.org\u{07}Ghostty\u{1B}]8;;\u{07}", columns: 24, rows: 2)
+        XCTAssertTrue(hyperlinkNegotiation.plainText.contains("Ghostty"))
+
+        let graphicsNegotiation = renderFixture("\u{1B}_Ga=q,i=1;AAAA\u{1B}\\after", columns: 24, rows: 2)
+        XCTAssertTrue(graphicsNegotiation.plainText.contains("after"))
     }
 
     func testBlockElementFillRectsUseExpectedFractions() {
@@ -555,6 +634,7 @@ final class GhosttyTerminalCoreTests: XCTestCase {
             hasMouseTracking: false,
             isBracketedPasteMode: false,
             isFocusReportingMode: false,
+            currentWorkingDirectory: nil,
             totalRows: 1,
             scrollbackRows: 0,
             dirtyState: .full,

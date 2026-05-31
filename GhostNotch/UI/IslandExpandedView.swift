@@ -11,6 +11,7 @@ struct IslandExpandedView: View {
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
     let onScroll: (TerminalScrollEvent) -> Void
+    let onMouseEvent: (TerminalMouseEvent) -> Void
     let onResize: (Int, Int, Int, Int) -> Void
     let onRestart: () -> Void
     let onCollapse: () -> Void
@@ -36,6 +37,7 @@ struct IslandExpandedView: View {
                 onInput: onInput,
                 onKeyEvent: onKeyEvent,
                 onScroll: onScroll,
+                onMouseEvent: onMouseEvent,
                 onResize: onResize
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)

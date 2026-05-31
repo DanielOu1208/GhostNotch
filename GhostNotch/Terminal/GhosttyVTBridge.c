@@ -202,6 +202,50 @@ static GhosttyMods GNVTGhosttyModsFromMods(uint16_t mods) {
     return result;
 }
 
+static GhosttyMouseAction GNVTGhosttyMouseActionFromAction(GNVTMouseAction action) {
+    switch (action) {
+        case GNVT_MOUSE_ACTION_PRESS: return GHOSTTY_MOUSE_ACTION_PRESS;
+        case GNVT_MOUSE_ACTION_RELEASE: return GHOSTTY_MOUSE_ACTION_RELEASE;
+        case GNVT_MOUSE_ACTION_MOTION: return GHOSTTY_MOUSE_ACTION_MOTION;
+        default: return GHOSTTY_MOUSE_ACTION_MOTION;
+    }
+}
+
+static GhosttyMouseButton GNVTGhosttyMouseButtonFromButton(GNVTMouseButton button) {
+    switch (button) {
+        case GNVT_MOUSE_BUTTON_LEFT: return GHOSTTY_MOUSE_BUTTON_LEFT;
+        case GNVT_MOUSE_BUTTON_RIGHT: return GHOSTTY_MOUSE_BUTTON_RIGHT;
+        case GNVT_MOUSE_BUTTON_MIDDLE: return GHOSTTY_MOUSE_BUTTON_MIDDLE;
+        case GNVT_MOUSE_BUTTON_UNKNOWN:
+        default: return GHOSTTY_MOUSE_BUTTON_UNKNOWN;
+    }
+}
+
+static GhosttyMouseEncoderSize GNVTMouseEncoderSize(GNVTTerminal *terminal) {
+    uint32_t cellWidth = terminal->cellWidth == 0 ? 1 : terminal->cellWidth;
+    uint32_t cellHeight = terminal->cellHeight == 0 ? 1 : terminal->cellHeight;
+    return (GhosttyMouseEncoderSize){
+        .size = sizeof(GhosttyMouseEncoderSize),
+        .screen_width = (uint32_t)terminal->columns * cellWidth,
+        .screen_height = (uint32_t)terminal->rows * cellHeight,
+        .cell_width = cellWidth,
+        .cell_height = cellHeight,
+        .padding_top = 0,
+        .padding_bottom = 0,
+        .padding_right = 0,
+        .padding_left = 0,
+    };
+}
+
+static GhosttyMousePosition GNVTMousePosition(GNVTTerminal *terminal, uint16_t column, uint16_t row) {
+    uint32_t cellWidth = terminal->cellWidth == 0 ? 1 : terminal->cellWidth;
+    uint32_t cellHeight = terminal->cellHeight == 0 ? 1 : terminal->cellHeight;
+    return (GhosttyMousePosition){
+        .x = ((float)column + 0.5f) * (float)cellWidth,
+        .y = ((float)row + 0.5f) * (float)cellHeight,
+    };
+}
+
 static void GNVTWritePty(GhosttyTerminal terminal,
                          void *userdata,
                          const uint8_t *data,
@@ -362,6 +406,7 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     bool focusEventMode = false;
     size_t totalRows = 0;
     size_t scrollbackRows = 0;
+    GhosttyString pwd = {0};
     GhosttyRenderStateCursorVisualStyle cursorStyle = GHOSTTY_RENDER_STATE_CURSOR_VISUAL_STYLE_BAR;
     GhosttyRenderStateDirty dirtyState = GHOSTTY_RENDER_STATE_DIRTY_FULL;
     GhosttyTerminalScreen activeScreen = GHOSTTY_TERMINAL_SCREEN_PRIMARY;
@@ -381,6 +426,7 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_MOUSE_TRACKING, &hasMouseTracking);
     ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_TOTAL_ROWS, &totalRows);
     ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_SCROLLBACK_ROWS, &scrollbackRows);
+    ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_PWD, &pwd);
     ghostty_terminal_mode_get(terminal->terminal, GHOSTTY_MODE_BRACKETED_PASTE, &bracketedPasteMode);
     ghostty_terminal_mode_get(terminal->terminal, GHOSTTY_MODE_FOCUS_EVENT, &focusEventMode);
 
@@ -526,6 +572,8 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     meta->focusEventMode = focusEventMode;
     meta->totalRows = totalRows;
     meta->scrollbackRows = scrollbackRows;
+    meta->pwd = pwd.ptr;
+    meta->pwdLen = pwd.len;
     meta->dirtyState = (uint8_t)dirtyState;
 
     if (didOverflowGraphemes) {
@@ -607,23 +655,8 @@ bool GNVTTerminalEncodeMouseWheel(GNVTTerminal *terminal,
         return false;
     }
 
-    uint32_t cellWidth = terminal->cellWidth == 0 ? 1 : terminal->cellWidth;
-    uint32_t cellHeight = terminal->cellHeight == 0 ? 1 : terminal->cellHeight;
-    GhosttyMouseEncoderSize size = {
-        .size = sizeof(GhosttyMouseEncoderSize),
-        .screen_width = (uint32_t)terminal->columns * cellWidth,
-        .screen_height = (uint32_t)terminal->rows * cellHeight,
-        .cell_width = cellWidth,
-        .cell_height = cellHeight,
-        .padding_top = 0,
-        .padding_bottom = 0,
-        .padding_right = 0,
-        .padding_left = 0,
-    };
-    GhosttyMousePosition position = {
-        .x = ((float)column + 0.5f) * (float)cellWidth,
-        .y = ((float)row + 0.5f) * (float)cellHeight,
-    };
+    GhosttyMouseEncoderSize size = GNVTMouseEncoderSize(terminal);
+    GhosttyMousePosition position = GNVTMousePosition(terminal, column, row);
     GhosttyMouseButton button = deltaRows < 0 ? GHOSTTY_MOUSE_BUTTON_FOUR : GHOSTTY_MOUSE_BUTTON_FIVE;
 
     ghostty_mouse_encoder_setopt_from_terminal(terminal->mouseEncoder, terminal->terminal);
@@ -631,6 +664,50 @@ bool GNVTTerminalEncodeMouseWheel(GNVTTerminal *terminal,
     ghostty_mouse_event_set_action(event, GHOSTTY_MOUSE_ACTION_PRESS);
     ghostty_mouse_event_set_button(event, button);
     ghostty_mouse_event_set_mods(event, 0);
+    ghostty_mouse_event_set_position(event, position);
+
+    GhosttyResult result = ghostty_mouse_encoder_encode(terminal->mouseEncoder,
+                                                        event,
+                                                        output,
+                                                        outputLen,
+                                                        written);
+    ghostty_mouse_event_free(event);
+    return result == GHOSTTY_SUCCESS;
+}
+
+bool GNVTTerminalEncodeMouseEvent(GNVTTerminal *terminal,
+                                  GNVTMouseAction action,
+                                  GNVTMouseButton button,
+                                  uint16_t column,
+                                  uint16_t row,
+                                  uint16_t mods,
+                                  bool anyButtonPressed,
+                                  char *output,
+                                  size_t outputLen,
+                                  size_t *written) {
+    if (terminal == NULL || terminal->terminal == NULL || terminal->mouseEncoder == NULL || written == NULL) {
+        return false;
+    }
+
+    GhosttyMouseEvent event = NULL;
+    if (ghostty_mouse_event_new(NULL, &event) != GHOSTTY_SUCCESS) {
+        return false;
+    }
+
+    GhosttyMouseEncoderSize size = GNVTMouseEncoderSize(terminal);
+    GhosttyMousePosition position = GNVTMousePosition(terminal, column, row);
+    bool anyPressed = anyButtonPressed;
+
+    ghostty_mouse_encoder_setopt_from_terminal(terminal->mouseEncoder, terminal->terminal);
+    ghostty_mouse_encoder_setopt(terminal->mouseEncoder, GHOSTTY_MOUSE_ENCODER_OPT_SIZE, &size);
+    ghostty_mouse_encoder_setopt(terminal->mouseEncoder, GHOSTTY_MOUSE_ENCODER_OPT_ANY_BUTTON_PRESSED, &anyPressed);
+    ghostty_mouse_event_set_action(event, GNVTGhosttyMouseActionFromAction(action));
+    if (button == GNVT_MOUSE_BUTTON_UNKNOWN) {
+        ghostty_mouse_event_clear_button(event);
+    } else {
+        ghostty_mouse_event_set_button(event, GNVTGhosttyMouseButtonFromButton(button));
+    }
+    ghostty_mouse_event_set_mods(event, GNVTGhosttyModsFromMods(mods));
     ghostty_mouse_event_set_position(event, position);
 
     GhosttyResult result = ghostty_mouse_encoder_encode(terminal->mouseEncoder,

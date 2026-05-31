@@ -21,6 +21,7 @@ struct IslandRootView: View {
                     onInput: controller.writeToTerminal,
                     onKeyEvent: controller.sendTerminalKeyEvent,
                     onScroll: controller.handleTerminalScrollWheel,
+                    onMouseEvent: controller.handleTerminalMouseEvent,
                     onResize: controller.resizeTerminal,
                     onRestart: controller.restartTerminal,
                     onCollapse: controller.collapse

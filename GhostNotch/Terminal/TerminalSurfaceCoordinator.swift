@@ -19,6 +19,7 @@ final class TerminalSurfaceCoordinator {
 
         engine.start(session: session)
         engine.onSnapshotChange = { [weak self] snapshot in
+            self?.session.state.updateWorkingDirectory(snapshot.currentWorkingDirectory)
             self?.onSnapshotChange?(snapshot)
         }
         session.addOutputObserver { [weak self] data in
@@ -68,6 +69,10 @@ final class TerminalSurfaceCoordinator {
 
     func handleScrollWheel(_ event: TerminalScrollEvent) {
         engine.handleScrollWheel(event)
+    }
+
+    func handleMouseEvent(_ event: TerminalMouseEvent) {
+        engine.handleMouseEvent(event)
     }
 
     func resize(_ resize: TerminalGridResize) {

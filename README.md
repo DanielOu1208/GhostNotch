@@ -100,18 +100,16 @@ The current implementation includes:
 - Grid-based terminal rendering through a vendored Ghostty VT boundary and modular AppKit/CoreText drawing path.
 - ANSI style handling, cursor movement, alternate-screen support, primary-screen scrollback viewport control, grapheme-aware snapshots, wide-cell metadata, and app-level terminal text selection/copy.
 - Product toggle hotkey with `Option+Space`.
-- Debug notch-fill toggle for visual testing.
 
 ## Current Limitations
 
 GhostNotch is still early. The important known gaps are:
 
 - No packaged release or public install flow yet.
-- Runtime/manual renderer acceptance has identified follow-up work around alternate-screen scrolling, collapse/reopen viewport stability, and private-use glyph/font selection.
-- Font feature, ligature, fallback-font, color/style, mouse, selection, and alternate-screen behavior still need polish.
-- Shell integration is conservative: the app currently avoids advertising a Ghostty-style terminal identity until terminfo and shell-resource behavior are deliberately implemented.
-- Runtime notch measurement and non-notch display fallback behavior still need more work.
-- The debug notch color control should be removed or hidden before a public MVP build.
+- Runtime/manual renderer acceptance still needs a fresh expanded-app pass after the latest R6-R8 hardening.
+- Font feature, ligature, fallback-font, color/style, selection, and alternate-screen behavior still need continued real-program polish.
+- Shell integration is conservative: the app now advertises GhostNotch terminal metadata and truecolor, but keeps `TERM=xterm-256color` until a bundled/copied terminfo strategy exists.
+- Runtime notch measurement now uses the built-in display safe-area/auxiliary-top geometry when available, with a stable synthetic fallback on non-notch displays.
 
 See the MVP spec for the detailed work packages.
 

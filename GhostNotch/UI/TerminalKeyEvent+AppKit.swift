@@ -33,6 +33,10 @@ extension TerminalKeyEvent {
 
 extension TerminalKeyModifiers {
     init(_ flags: NSEvent.ModifierFlags) {
+        self.init(eventModifierFlags: flags)
+    }
+
+    init(eventModifierFlags flags: NSEvent.ModifierFlags) {
         var modifiers: TerminalKeyModifiers = []
         let filtered = flags.intersection(.deviceIndependentFlagsMask)
         if filtered.contains(.shift) {

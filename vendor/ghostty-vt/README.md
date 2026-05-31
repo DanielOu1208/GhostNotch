@@ -35,6 +35,21 @@ Pinned upstream API reference:
 - Header boundary: `include/ghostty/vt.h`
 - API status: work in progress and not stable.
 
+Current exposed capabilities used by GhostNotch:
+
+- Terminal VT parser/state and render-state snapshots.
+- Dirty state and dirty rows for targeted AppKit invalidation.
+- Key, paste, focus, and mouse encoding helpers.
+- Mode state for alternate screen, bracketed paste, focus reporting, and mouse tracking.
+- OSC 7 working-directory state is still captured by GhostNotch at the VT boundary because this `libghostty-vt` stream path parses but ignores report-pwd effects; `GHOSTTY_TERMINAL_DATA_PWD` remains exposed through the bridge for future artifact updates.
+- Formatter and hyperlink-related headers are present, but GhostNotch does not yet expose hyperlink interaction.
+- Kitty graphics headers are present, but GhostNotch does not yet render image placements.
+
+Current non-capabilities for GhostNotch:
+
+- No full `include/ghostty.h` app/config/surface embedding boundary is vendored.
+- No Ghostty renderer, font shaping, glyph atlas, Metal draw commands, config loader, terminfo assets, or shell integration resources are exposed by this artifact.
+
 Artifact layout:
 
 ```text

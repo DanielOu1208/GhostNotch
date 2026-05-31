@@ -5,6 +5,7 @@ final class TerminalGridView: NSView {
     var onInput: ((Data) -> Void)?
     var onKeyEvent: ((TerminalKeyEvent) -> Void)?
     var onScroll: ((TerminalScrollEvent) -> Void)?
+    var onMouseEvent: ((TerminalMouseEvent) -> Void)?
     var onResize: ((Int, Int, Int, Int) -> Void)?
     var onMovedToWindow: (() -> Void)?
     var allowsResizeReporting = true
@@ -116,7 +117,8 @@ final class TerminalGridView: NSView {
         window?.makeFirstResponder(self)
 
         guard !snapshot.hasMouseTracking else {
-            super.mouseDown(with: event)
+            selection = nil
+            sendMouseEvent(.press, button: .left, from: event, anyButtonPressed: true)
             return
         }
 
@@ -133,7 +135,8 @@ final class TerminalGridView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         guard !snapshot.hasMouseTracking else {
-            super.mouseDragged(with: event)
+            selection = nil
+            sendMouseEvent(.motion, button: .left, from: event, anyButtonPressed: true)
             return
         }
 
@@ -145,6 +148,15 @@ final class TerminalGridView: NSView {
 
         selection = TerminalSelection(start: currentSelection.start, end: gridPoint)
         needsDisplay = true
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard snapshot.hasMouseTracking else {
+            super.mouseUp(with: event)
+            return
+        }
+
+        sendMouseEvent(.release, button: .left, from: event, anyButtonPressed: false)
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -184,8 +196,14 @@ final class TerminalGridView: NSView {
             return
         }
 
+        selection = nil
         lastReportedResize = resize
         onResize?(resize.columns, resize.rows, resize.cellWidthPixels, resize.cellHeightPixels)
+    }
+
+    func updateSnapshot(_ newSnapshot: TerminalRenderSnapshot) {
+        clearSelectionIfNeeded(for: newSnapshot)
+        snapshot = newSnapshot
     }
 
     func invalidateRowsFromSnapshot() {
@@ -338,6 +356,41 @@ final class TerminalGridView: NSView {
             width: bounds.width,
             height: cellSize.height
         )
+    }
+
+    private func sendMouseEvent(
+        _ action: TerminalMouseEventAction,
+        button: TerminalMouseButton,
+        from event: NSEvent,
+        anyButtonPressed: Bool
+    ) {
+        let point = convert(event.locationInWindow, from: nil)
+        let gridPoint = gridPoint(at: point) ?? TerminalGridPoint(
+            row: max(0, min(snapshot.cursorRow, snapshot.rows - 1)),
+            column: max(0, min(snapshot.cursorColumn, snapshot.columns - 1))
+        )
+        onMouseEvent?(TerminalMouseEvent(
+            action: action,
+            button: button,
+            row: gridPoint.row,
+            column: gridPoint.column,
+            modifiers: TerminalKeyModifiers(eventModifierFlags: event.modifierFlags),
+            anyButtonPressed: anyButtonPressed
+        ))
+    }
+
+    private func clearSelectionIfNeeded(for newSnapshot: TerminalRenderSnapshot) {
+        guard let selection else {
+            return
+        }
+
+        if newSnapshot.hasMouseTracking ||
+            newSnapshot.columns != snapshot.columns ||
+            newSnapshot.rows != snapshot.rows ||
+            !selection.isValid(in: newSnapshot) ||
+            selection.intersects(rows: newSnapshot.dirtyRows) {
+            self.selection = nil
+        }
     }
 
     private func gridPoint(at point: NSPoint) -> TerminalGridPoint? {

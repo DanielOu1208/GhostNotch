@@ -14,6 +14,7 @@ final class TerminalSessionState: ObservableObject {
     @Published private(set) var phase: TerminalSessionPhase = .stopped
     @Published private(set) var hasReceivedOutput = false
     @Published private(set) var lastError: String?
+    @Published private(set) var currentWorkingDirectory: String?
 
     private var capturedOutput = Data()
     private let outputCaptureLimit: Int?
@@ -70,5 +71,13 @@ final class TerminalSessionState: ObservableObject {
     func clearOutput() {
         hasReceivedOutput = false
         capturedOutput.removeAll(keepingCapacity: true)
+    }
+
+    func updateWorkingDirectory(_ path: String?) {
+        guard currentWorkingDirectory != path else {
+            return
+        }
+
+        currentWorkingDirectory = path
     }
 }

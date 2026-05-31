@@ -133,6 +133,7 @@ struct TerminalRenderSnapshot: Equatable {
     let hasMouseTracking: Bool
     let isBracketedPasteMode: Bool
     let isFocusReportingMode: Bool
+    let currentWorkingDirectory: String?
     let totalRows: Int
     let scrollbackRows: Int
     let dirtyState: TerminalRenderDirtyState
@@ -160,7 +161,11 @@ struct TerminalRenderSnapshot: Equatable {
         return rows
     }
 
-    static func empty(columns: Int = 80, rows: Int = 18) -> TerminalRenderSnapshot {
+    static func empty(
+        columns: Int = 80,
+        rows: Int = 18,
+        currentWorkingDirectory: String? = nil
+    ) -> TerminalRenderSnapshot {
         TerminalRenderSnapshot(
             columns: columns,
             rows: rows,
@@ -174,6 +179,7 @@ struct TerminalRenderSnapshot: Equatable {
             hasMouseTracking: false,
             isBracketedPasteMode: false,
             isFocusReportingMode: false,
+            currentWorkingDirectory: currentWorkingDirectory,
             totalRows: rows,
             scrollbackRows: 0,
             dirtyState: .full,
@@ -228,6 +234,7 @@ struct TerminalRenderSnapshot: Equatable {
             hasMouseTracking: false,
             isBracketedPasteMode: false,
             isFocusReportingMode: false,
+            currentWorkingDirectory: nil,
             totalRows: normalizedRows,
             scrollbackRows: 0,
             dirtyState: .full,
@@ -334,6 +341,28 @@ struct TerminalScrollEvent: Equatable {
     let column: Int
 }
 
+enum TerminalMouseEventAction: UInt8, Equatable {
+    case press = 0
+    case release = 1
+    case motion = 2
+}
+
+enum TerminalMouseButton: UInt8, Equatable {
+    case unknown = 0
+    case left = 1
+    case right = 2
+    case middle = 3
+}
+
+struct TerminalMouseEvent: Equatable {
+    let action: TerminalMouseEventAction
+    let button: TerminalMouseButton
+    let row: Int
+    let column: Int
+    let modifiers: TerminalKeyModifiers
+    let anyButtonPressed: Bool
+}
+
 struct TerminalGridPoint: Equatable, Comparable {
     let row: Int
     let column: Int
@@ -355,5 +384,20 @@ struct TerminalSelection: Equatable {
         let normalized = normalized
         let point = TerminalGridPoint(row: row, column: column)
         return point >= normalized.start && point <= normalized.end
+    }
+
+    func intersects(rows dirtyRows: Set<Int>) -> Bool {
+        let normalized = normalized
+        return dirtyRows.contains { row in
+            row >= normalized.start.row && row <= normalized.end.row
+        }
+    }
+
+    func isValid(in snapshot: TerminalRenderSnapshot) -> Bool {
+        let normalized = normalized
+        return normalized.start.row >= 0 &&
+            normalized.end.row < snapshot.rows &&
+            normalized.start.column >= 0 &&
+            normalized.end.column < snapshot.columns
     }
 }
