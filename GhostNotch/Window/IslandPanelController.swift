@@ -17,6 +17,8 @@ final class IslandPanelController: ObservableObject {
     private let terminalSurfaceCoordinator: TerminalSurfaceCoordinator
     private var localMouseMonitor: Any?
     private var globalMouseMonitor: Any?
+    private var lastHoverContainment: Bool?
+    private var latestTerminalSnapshot = TerminalRenderSnapshot.empty()
     private lazy var outsideClickMonitor = OutsideClickMonitor(
         shouldCollapse: { [weak self] in self?.state == .expanded },
         isPointInsidePanel: { [weak self] point in self?.panel.frame.contains(point) ?? false },
@@ -48,7 +50,17 @@ final class IslandPanelController: ObservableObject {
         )
 
         terminalSurfaceCoordinator.onSnapshotChange = { [weak self] snapshot in
-            self?.terminalSnapshot = snapshot
+            guard let self else {
+                return
+            }
+
+            self.latestTerminalSnapshot = snapshot
+            guard self.state == .expanded || self.terminalSurfacePhase != .idle else {
+                GhostNotchRuntimeMetrics.recordSkippedCollapsedSnapshot()
+                return
+            }
+
+            self.terminalSnapshot = snapshot
         }
 
         configurePanel()
@@ -135,7 +147,7 @@ final class IslandPanelController: ObservableObject {
     }
 
     func restartTerminal() {
-        terminalSurfaceCoordinator.restartPreservingGrid(currentSnapshot: terminalSnapshot)
+        terminalSurfaceCoordinator.restartPreservingGrid(currentSnapshot: latestTerminalSnapshot)
         activateTerminalSurface()
     }
 
@@ -145,16 +157,18 @@ final class IslandPanelController: ObservableObject {
         }
 
         localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
-            Task { @MainActor in
-                self?.refreshHoverState()
-            }
+            self?.refreshHoverState()
             return event
         }
 
         globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
-            Task { @MainActor in
-                self?.refreshHoverState()
+            guard Thread.isMainThread else {
+                DispatchQueue.main.async {
+                    self?.refreshHoverState()
+                }
+                return
             }
+            self?.refreshHoverState()
         }
     }
 
@@ -175,7 +189,15 @@ final class IslandPanelController: ObservableObject {
             return
         }
 
-        setHovering(panel.frame.contains(NSEvent.mouseLocation))
+        let isHovering = panel.frame.contains(NSEvent.mouseLocation)
+        guard lastHoverContainment != isHovering else {
+            GhostNotchRuntimeMetrics.recordHoverEvent(stateChanged: false)
+            return
+        }
+
+        lastHoverContainment = isHovering
+        GhostNotchRuntimeMetrics.recordHoverEvent(stateChanged: true)
+        setHovering(isHovering)
     }
 
     private func setHovering(_ isHovering: Bool) {
@@ -210,7 +232,8 @@ final class IslandPanelController: ObservableObject {
     private func activateTerminalSurface() {
         requestTerminalFocus()
         terminalSurfaceCoordinator.focus()
-        terminalSnapshot = terminalSurfaceCoordinator.currentSnapshot()
+        latestTerminalSnapshot = terminalSurfaceCoordinator.currentSnapshot()
+        terminalSnapshot = latestTerminalSnapshot
     }
 
     private func requestTerminalFocus() {
@@ -219,6 +242,9 @@ final class IslandPanelController: ObservableObject {
 
     private func transition(to newState: IslandState) {
         state = newState
+        if newState == .expanded {
+            lastHoverContainment = nil
+        }
         animatePanel(to: newState)
     }
 
@@ -250,6 +276,6 @@ final class IslandPanelController: ObservableObject {
     }
 
     private func shouldSendBlurOnCollapse() -> Bool {
-        !terminalSnapshot.isAlternateScreen
+        !latestTerminalSnapshot.isAlternateScreen
     }
 }

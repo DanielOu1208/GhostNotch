@@ -218,6 +218,19 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertEqual(core.snapshot.plainText, scrolledText)
     }
 
+    func testEngineSkipsEmptyOutputSnapshotPublish() {
+        let engine = GhosttyTerminalEngine(core: GhosttyTerminalCore(columns: 8, rows: 2))
+        var publishedSnapshots: [TerminalRenderSnapshot] = []
+        engine.onSnapshotChange = { snapshot in
+            publishedSnapshots.append(snapshot)
+        }
+
+        engine.start(session: TerminalSession())
+        engine.processOutput(Data())
+
+        XCTAssertEqual(publishedSnapshots.count, 1)
+    }
+
     func testDirtyRowsAreSurfacedFromRenderState() {
         let core = GhosttyTerminalCore(columns: 8, rows: 2)
 

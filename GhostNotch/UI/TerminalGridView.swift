@@ -14,6 +14,7 @@ final class TerminalGridView: NSView {
     var lastReportedResize: TerminalGridResize?
     private var selection: TerminalSelection?
     private var previousCursorRowForInvalidation: Int?
+    private var colorCache: [TerminalColor: NSColor] = [:]
 
     override var acceptsFirstResponder: Bool {
         true
@@ -209,6 +210,7 @@ final class TerminalGridView: NSView {
     func invalidateRowsFromSnapshot() {
         guard !snapshot.needsFullRedraw else {
             previousCursorRowForInvalidation = snapshot.cursorVisible ? snapshot.cursorRow : nil
+            GhostNotchRuntimeMetrics.recordGridInvalidation(fullRedraw: true, rowCount: snapshot.rows)
             needsDisplay = true
             return
         }
@@ -216,6 +218,7 @@ final class TerminalGridView: NSView {
         let cellSize = measuredCellSize
         let rowsToInvalidate = snapshot.rowsNeedingDisplay(previousCursorRow: previousCursorRowForInvalidation)
         previousCursorRowForInvalidation = snapshot.cursorVisible ? snapshot.cursorRow : nil
+        GhostNotchRuntimeMetrics.recordGridInvalidation(fullRedraw: false, rowCount: rowsToInvalidate.count)
         for row in rowsToInvalidate {
             setNeedsDisplay(rowRect(row: row, cellSize: cellSize))
         }
@@ -255,12 +258,22 @@ final class TerminalGridView: NSView {
         let style = cell.style
         let foreground = style.isInverse ? style.background : style.foreground
         let background = style.isInverse ? style.foreground : style.background
+        let hasSelection = selection?.contains(row: row, column: column) == true
+        let hasVisibleGlyph = cell.hasVisibleGlyph
+        let hasDecoration = style.hasTextDecoration
 
-        if selection?.contains(row: row, column: column) == true {
+        if !hasSelection,
+           background == .background,
+           (!hasVisibleGlyph || cell.widthRole.isSpacer || style.isInvisible),
+           !hasDecoration {
+            return
+        }
+
+        if hasSelection {
             NSColor.selectedTextBackgroundColor.withAlphaComponent(0.55).setFill()
             rect.fill()
         } else if background != .background {
-            background.nsColor.setFill()
+            cachedColor(for: background).setFill()
             rect.fill()
         }
 
@@ -268,8 +281,7 @@ final class TerminalGridView: NSView {
             return
         }
 
-        let resolvedForeground = foreground.nsColor.withAlphaComponent(style.isFaint ? 0.5 : 0.92)
-        let hasVisibleGlyph = !cell.character.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let resolvedForeground = cachedColor(for: foreground).withAlphaComponent(style.isFaint ? 0.5 : 0.92)
         if hasVisibleGlyph {
             let didDrawTerminalGlyph = TerminalCellGlyphRenderer.draw(
                 cell.character,
@@ -290,12 +302,14 @@ final class TerminalGridView: NSView {
             }
         }
 
-        TerminalTextDecorationRenderer.draw(
-            style: style,
-            foreground: resolvedForeground,
-            in: textRect,
-            scale: backingScale
-        )
+        if hasDecoration {
+            TerminalTextDecorationRenderer.draw(
+                style: style,
+                foreground: resolvedForeground,
+                in: textRect,
+                scale: backingScale
+            )
+        }
     }
 
     private func drawCursor(cellSize: NSSize) {
@@ -328,7 +342,7 @@ final class TerminalGridView: NSView {
             )
         }
 
-        TerminalColor.cursor.nsColor.withAlphaComponent(0.9).setFill()
+        cachedColor(for: .cursor).withAlphaComponent(0.9).setFill()
         if snapshot.cursorStyle == .hollowBlock {
             rect.frame(withWidth: 1.2)
         } else {
@@ -404,8 +418,30 @@ final class TerminalGridView: NSView {
 
         return TerminalGridPoint(row: row, column: column)
     }
+
+    private func cachedColor(for color: TerminalColor) -> NSColor {
+        if let cachedColor = colorCache[color] {
+            return cachedColor
+        }
+
+        let resolvedColor = color.nsColor
+        colorCache[color] = resolvedColor
+        return resolvedColor
+    }
 }
 enum TerminalGridMetrics {
     static let fontSize: CGFloat = 10.5
     static let contentInset: CGFloat = 3
+}
+
+private extension TerminalCell {
+    var hasVisibleGlyph: Bool {
+        !character.isEmpty && character != " " && character != "\t"
+    }
+}
+
+private extension TerminalCellStyle {
+    var hasTextDecoration: Bool {
+        underlineStyle != .none || isStrikethrough || isOverline
+    }
 }

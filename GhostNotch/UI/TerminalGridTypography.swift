@@ -1,14 +1,20 @@
 import AppKit
 import CoreText
-struct TerminalGridTypography {
+final class TerminalGridTypography {
+    private static let maximumCacheEntries = 512
+
     let regularFont: NSFont
     let boldFont: NSFont
     let cellSize: NSSize
     let baselineOffset: CGFloat
+    private let fallbackFonts: [NSFont]
+    private var supportCache: [String: Bool] = [:]
+    private var fontCache: [String: CTFont] = [:]
 
     init(size: CGFloat) {
         regularFont = Self.makeFont(size: size, weight: .regular)
         boldFont = Self.makeFont(size: size, weight: .semibold, matching: regularFont)
+        fallbackFonts = Self.makeFallbackFonts(size: size)
         let regularCTFont = regularFont as CTFont
         let advance = CTFontGetAdvancesForGlyphs(regularCTFont, .horizontal, [Self.measurementGlyph(for: regularCTFont)], nil, 1)
         let width = ceil(advance)
@@ -26,7 +32,7 @@ struct TerminalGridTypography {
         }
 
         let baseFont = style.isBold ? boldFont : regularFont
-        let drawFont = Self.font(for: text, baseFont: baseFont)
+        let drawFont = font(for: text, baseFont: baseFont)
         var attributes: [NSAttributedString.Key: Any] = [
             NSAttributedString.Key(kCTFontAttributeName as String): drawFont,
             NSAttributedString.Key(kCTForegroundColorAttributeName as String): foreground.cgColor,
@@ -47,7 +53,7 @@ struct TerminalGridTypography {
     }
 
     func supports(_ text: String) -> Bool {
-        Self.supports(text, font: regularFont as CTFont)
+        supports(text, font: regularFont as CTFont)
     }
 
     private static func makeFont(size: CGFloat, weight: NSFont.Weight, matching baseFont: NSFont? = nil) -> NSFont {
@@ -70,32 +76,43 @@ struct TerminalGridTypography {
         return .monospacedSystemFont(ofSize: size, weight: weight)
     }
 
-    private static func font(for text: String, baseFont: NSFont) -> CTFont {
+    private func font(for text: String, baseFont: NSFont) -> CTFont {
         let baseCTFont = baseFont as CTFont
         guard !text.isEmpty else {
             return baseCTFont
         }
 
+        let cacheKey = "\(baseFont.fontName)|\(text)"
+        if let cachedFont = fontCache[cacheKey] {
+            return cachedFont
+        }
+
         guard !supports(text, font: baseCTFont) else {
+            cacheFont(baseCTFont, for: cacheKey)
             return baseCTFont
         }
 
-        for name in preferredInstalledFontNames() {
-            guard let fallbackFont = NSFont(name: name, size: baseFont.pointSize) else {
-                continue
-            }
+        for fallbackFont in fallbackFonts where fallbackFont.pointSize == baseFont.pointSize {
             let fallbackCTFont = fallbackFont as CTFont
             if supports(text, font: fallbackCTFont) {
+                cacheFont(fallbackCTFont, for: cacheKey)
                 return fallbackCTFont
             }
         }
 
-        return CTFontCreateForString(baseCTFont, text as CFString, CFRange(location: 0, length: text.utf16.count))
+        let fallbackFont = CTFontCreateForString(baseCTFont, text as CFString, CFRange(location: 0, length: text.utf16.count))
+        cacheFont(fallbackFont, for: cacheKey)
+        return fallbackFont
     }
 
-    private static func supports(_ text: String, font: CTFont) -> Bool {
+    private func supports(_ text: String, font: CTFont) -> Bool {
         guard !text.isEmpty else {
             return true
+        }
+
+        let cacheKey = "\(CTFontCopyPostScriptName(font))|\(text)"
+        if let cachedSupport = supportCache[cacheKey] {
+            return cachedSupport
         }
 
         let codeUnits = Array(text.utf16).map { UniChar($0) }
@@ -105,7 +122,23 @@ struct TerminalGridTypography {
                 CTFontGetGlyphsForCharacters(font, codeUnitBuffer.baseAddress!, glyphBuffer.baseAddress!, codeUnitBuffer.count)
             }
         }
-        return mapped && glyphs.allSatisfy { $0 != 0 }
+        let isSupported = mapped && glyphs.allSatisfy { $0 != 0 }
+        cacheSupport(isSupported, for: cacheKey)
+        return isSupported
+    }
+
+    private func cacheFont(_ font: CTFont, for key: String) {
+        if fontCache.count >= Self.maximumCacheEntries {
+            fontCache.removeAll(keepingCapacity: true)
+        }
+        fontCache[key] = font
+    }
+
+    private func cacheSupport(_ isSupported: Bool, for key: String) {
+        if supportCache.count >= Self.maximumCacheEntries {
+            supportCache.removeAll(keepingCapacity: true)
+        }
+        supportCache[key] = isSupported
     }
 
     private static func measurementGlyph(for font: CTFont) -> CGGlyph {
@@ -142,12 +175,31 @@ struct TerminalGridTypography {
         return (explicitNames + discoveredNames).uniqued()
     }
 
+    private static func makeFallbackFonts(size: CGFloat) -> [NSFont] {
+        preferredInstalledFontNames().compactMap { NSFont(name: $0, size: size) }
+    }
+
     private static func logFontDiagnostics(font: NSFont) {
         let powerline = "\u{E0B0}"
-        let supportsPowerline = supports(powerline, font: font as CTFont)
+        let supportsPowerline = Self.staticSupports(powerline, font: font as CTFont)
         NSLog(
             "GhostNotch terminal font: \(font.fontName) family=\(font.familyName ?? "unknown") supportsPowerline=\(supportsPowerline)"
         )
+    }
+
+    private static func staticSupports(_ text: String, font: CTFont) -> Bool {
+        guard !text.isEmpty else {
+            return true
+        }
+
+        let codeUnits = Array(text.utf16).map { UniChar($0) }
+        var glyphs = Array(repeating: CGGlyph(), count: codeUnits.count)
+        let mapped = codeUnits.withUnsafeBufferPointer { codeUnitBuffer in
+            glyphs.withUnsafeMutableBufferPointer { glyphBuffer in
+                CTFontGetGlyphsForCharacters(font, codeUnitBuffer.baseAddress!, glyphBuffer.baseAddress!, codeUnitBuffer.count)
+            }
+        }
+        return mapped && glyphs.allSatisfy { $0 != 0 }
     }
 }
 

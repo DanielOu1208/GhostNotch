@@ -1,6 +1,6 @@
 import Foundation
 
-struct TerminalColor: Equatable {
+struct TerminalColor: Equatable, Hashable {
     let red: UInt8
     let green: UInt8
     let blue: UInt8

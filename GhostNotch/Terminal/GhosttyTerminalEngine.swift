@@ -16,6 +16,7 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
     private var cellWidthPixels = 8
     private var cellHeightPixels = 16
     private(set) var lastAppliedGridResize: TerminalGridResize?
+    private var lastPublishedSnapshotSignature: TerminalRenderSnapshotSignature?
 
     init(
         core: GhosttyTerminalCore = GhosttyTerminalCore(),
@@ -36,10 +37,14 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         core.onWriteToPTY = { [weak self] data in
             self?.writeToSession(data)
         }
-        publishSnapshot()
+        publishSnapshot(force: true)
     }
 
     func processOutput(_ data: Data) {
+        guard !data.isEmpty else {
+            return
+        }
+
         core.processOutput(data)
         publishSnapshot()
     }
@@ -95,7 +100,7 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
             cellWidthPixels: requested.cellWidthPixels,
             cellHeightPixels: requested.cellHeightPixels
         )
-        publishSnapshot()
+        publishSnapshot(force: true)
 
         guard session?.isRunning == true else {
             return
@@ -124,7 +129,7 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
             cellHeightPixels: requested.cellHeightPixels
         )
         lastAppliedGridResize = requested
-        publishSnapshot()
+        publishSnapshot(force: true)
     }
 
     func focus() {
@@ -177,7 +182,54 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
         writeToSession(input)
     }
 
-    private func publishSnapshot() {
-        onSnapshotChange?(core.snapshot)
+    private func publishSnapshot(force: Bool = false) {
+        let snapshot = core.snapshot
+        let signature = TerminalRenderSnapshotSignature(snapshot)
+        guard force || signature != lastPublishedSnapshotSignature else {
+            GhostNotchRuntimeMetrics.recordSnapshotPublish(snapshot, skipped: true)
+            return
+        }
+
+        lastPublishedSnapshotSignature = signature
+        GhostNotchRuntimeMetrics.recordSnapshotPublish(snapshot, skipped: false)
+        onSnapshotChange?(snapshot)
+    }
+}
+
+private struct TerminalRenderSnapshotSignature: Equatable {
+    let columns: Int
+    let rows: Int
+    let cursorColumn: Int
+    let cursorRow: Int
+    let cursorVisible: Bool
+    let cursorBlinking: Bool
+    let cursorStyle: TerminalCursorStyle
+    let isAlternateScreen: Bool
+    let hasMouseTracking: Bool
+    let isBracketedPasteMode: Bool
+    let isFocusReportingMode: Bool
+    let currentWorkingDirectory: String?
+    let totalRows: Int
+    let scrollbackRows: Int
+    let dirtyState: TerminalRenderDirtyState
+    let dirtyRows: Set<Int>
+
+    init(_ snapshot: TerminalRenderSnapshot) {
+        columns = snapshot.columns
+        rows = snapshot.rows
+        cursorColumn = snapshot.cursorColumn
+        cursorRow = snapshot.cursorRow
+        cursorVisible = snapshot.cursorVisible
+        cursorBlinking = snapshot.cursorBlinking
+        cursorStyle = snapshot.cursorStyle
+        isAlternateScreen = snapshot.isAlternateScreen
+        hasMouseTracking = snapshot.hasMouseTracking
+        isBracketedPasteMode = snapshot.isBracketedPasteMode
+        isFocusReportingMode = snapshot.isFocusReportingMode
+        currentWorkingDirectory = snapshot.currentWorkingDirectory
+        totalRows = snapshot.totalRows
+        scrollbackRows = snapshot.scrollbackRows
+        dirtyState = snapshot.dirtyState
+        dirtyRows = snapshot.dirtyRows
     }
 }
