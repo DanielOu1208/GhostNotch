@@ -8,7 +8,13 @@ protocol TerminalProcess: AnyObject {
     var onTermination: TerminalTerminationHandler? { get set }
     var isRunning: Bool { get }
 
-    func start(shell: String, workingDirectory: String, cols: Int, rows: Int) throws
+    func start(
+        shell: String,
+        workingDirectory: String,
+        cols: Int,
+        rows: Int,
+        environmentOverrides: [String: String]
+    ) throws
     func stop() -> Bool
     func write(_ data: Data) throws
     func resize(cols: Int, rows: Int) throws
@@ -36,9 +42,11 @@ final class TerminalSession {
     private let workingDirectory: String
     private let startupTimeout: TimeInterval
     private let process: any TerminalProcess
+    private let agentStateFileURL: URL
     private var outputObservers: [@MainActor (Data) -> Void] = []
     private var lifecycleGeneration = 0
     private var startupWatchdogTask: Task<Void, Never>?
+    private var agentStateMonitorTask: Task<Void, Never>?
 
     init(
         shellResolver: ShellResolver = ShellResolver(),
@@ -52,6 +60,8 @@ final class TerminalSession {
         self.state = state ?? TerminalSessionState()
         self.process = process
         self.startupTimeout = startupTimeout
+        agentStateFileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ghostnotch-agent-state-\(UUID().uuidString)", isDirectory: false)
 
         process.onOutput = { [weak self] data in
             self?.state.appendOutput(data)
@@ -78,16 +88,20 @@ final class TerminalSession {
 
     func stop() {
         cancelStartupWatchdog()
+        stopAgentStateMonitoring()
         lifecycleGeneration += 1
         _ = process.stop()
+        resetAgentActivityState()
         state.markStopped()
     }
 
     func restart(cols: Int = 80, rows: Int = 24) throws {
         cancelStartupWatchdog()
+        stopAgentStateMonitoring()
         lifecycleGeneration += 1
         let generation = lifecycleGeneration
         state.clearOutput()
+        resetAgentActivityState()
         _ = process.stop()
 
         try launch(cols: cols, rows: rows, generation: generation)
@@ -136,22 +150,30 @@ final class TerminalSession {
 
         cancelStartupWatchdog()
         state.markStopped()
+        stopAgentStateMonitoring()
+        resetAgentActivityState()
     }
 
     private func launch(cols: Int, rows: Int, generation: Int) throws {
         let shell = shellResolver.resolve()
+        resetAgentActivityState()
 
         do {
             try process.start(
                 shell: shell,
                 workingDirectory: workingDirectory,
                 cols: cols,
-                rows: rows
+                rows: rows,
+                environmentOverrides: [
+                    "GHOSTNOTCH_AGENT_STATE_FILE": agentStateFileURL.path,
+                ]
             )
             state.markStarting()
+            startAgentStateMonitoring()
             scheduleStartupWatchdog(shell: shell, generation: generation)
         } catch {
             cancelStartupWatchdog()
+            stopAgentStateMonitoring()
             state.recordError(error)
             throw error
         }
@@ -190,5 +212,51 @@ final class TerminalSession {
         startupWatchdogTask?.cancel()
         startupWatchdogTask = nil
     }
-}
 
+    private func startAgentStateMonitoring() {
+        stopAgentStateMonitoring()
+
+        agentStateMonitorTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await MainActor.run {
+                    self?.refreshAgentActivityState()
+                }
+
+                do {
+                    try await Task.sleep(nanoseconds: 200_000_000)
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func stopAgentStateMonitoring() {
+        agentStateMonitorTask?.cancel()
+        agentStateMonitorTask = nil
+    }
+
+    private func resetAgentActivityState() {
+        state.updateAgentActivityState(.idle)
+
+        do {
+            try "idle\n".write(to: agentStateFileURL, atomically: true, encoding: .utf8)
+        } catch {
+            NSLog("GhostNotch failed to reset agent state file: \(error.localizedDescription)")
+        }
+    }
+
+    private func refreshAgentActivityState() {
+        guard process.isRunning else {
+            state.updateAgentActivityState(.idle)
+            return
+        }
+
+        guard let stateText = try? String(contentsOf: agentStateFileURL, encoding: .utf8) else {
+            state.updateAgentActivityState(.idle)
+            return
+        }
+
+        state.updateAgentActivityState(TerminalAgentActivityState(rawFileValue: stateText))
+    }
+}

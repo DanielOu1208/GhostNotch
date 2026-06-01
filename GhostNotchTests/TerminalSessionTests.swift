@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 
 @MainActor
@@ -91,6 +92,15 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(environment["LANG"], "fr_CA.UTF-8")
         XCTAssertEqual(environment["LC_CTYPE"], "en_US.UTF-8")
         XCTAssertEqual(environment["LC_ALL"], "en_GB.UTF-8")
+    }
+
+    func testPTYEnvironmentAppliesTerminalStateOverrides() {
+        let environment = PTYProcess.terminalEnvironment(
+            from: ["PATH": "/usr/bin:/bin"],
+            overrides: ["GHOSTNOTCH_AGENT_STATE_FILE": "/tmp/ghostnotch-agent-state"]
+        )
+
+        XCTAssertEqual(environment["GHOSTNOTCH_AGENT_STATE_FILE"], "/tmp/ghostnotch-agent-state")
     }
 
     func testSessionRunsCommandAndCapturesOutput() async throws {
@@ -189,6 +199,93 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(state.phase, .running)
         XCTAssertNil(state.lastError)
         XCTAssertEqual(process.stopCallCount, 0)
+    }
+
+    func testAgentActivityStateParsesRawFileValues() {
+        XCTAssertEqual(TerminalAgentActivityState(rawFileValue: "idle\n"), .idle)
+        XCTAssertEqual(TerminalAgentActivityState(rawFileValue: " working "), .working)
+        XCTAssertEqual(TerminalAgentActivityState(rawFileValue: "ATTENTION"), .attention)
+        XCTAssertEqual(TerminalAgentActivityState(rawFileValue: "busy"), .idle)
+        XCTAssertEqual(TerminalAgentActivityState(rawFileValue: ""), .idle)
+    }
+
+    func testAgentActivityStatePublishesWorkingToIdleTransition() {
+        let state = TerminalSessionState()
+        var publishedStates: [TerminalAgentActivityState] = []
+
+        let cancellable = state.$agentActivityState
+            .dropFirst()
+            .sink { publishedStates.append($0) }
+
+        state.updateAgentActivityState(.working)
+        state.updateAgentActivityState(.idle)
+
+        XCTAssertEqual(publishedStates, [.working, .idle])
+        withExtendedLifetime(cancellable) {}
+    }
+
+    func testPTYOutputDoesNotMarkAgentAsWorking() throws {
+        let state = TerminalSessionState()
+        let process = FakeTerminalProcess()
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: process
+        )
+
+        try session.start(cols: 80, rows: 24)
+        process.emitOutput("$ ")
+
+        XCTAssertEqual(state.phase, .running)
+        XCTAssertEqual(state.agentActivityState, .idle)
+    }
+
+    func testAgentStateFileDrivesWorkingAndAttentionStates() async throws {
+        let state = TerminalSessionState()
+        let process = FakeTerminalProcess()
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: process
+        )
+
+        try session.start(cols: 80, rows: 24)
+        guard let stateFilePath = process.startEnvironmentOverrides.last?["GHOSTNOTCH_AGENT_STATE_FILE"] else {
+            return XCTFail("Expected GhostNotch agent state file override")
+        }
+
+        try "working\n".write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.working, in: state)
+
+        try "idle\n".write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.idle, in: state)
+
+        try "working\n".write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.working, in: state)
+
+        try "attention\n".write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.attention, in: state)
+
+        try "invalid\n".write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.idle, in: state)
+    }
+
+    func testAgentActivityClearsWhenSessionStopsOrFails() {
+        let state = TerminalSessionState()
+
+        state.markRunning()
+        state.updateAgentActivityState(.working)
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        state.markStopped()
+        XCTAssertEqual(state.agentActivityState, .idle)
+
+        state.markRunning()
+        state.updateAgentActivityState(.attention)
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.recordError("boom")
+        XCTAssertEqual(state.agentActivityState, .idle)
     }
 
     func testRestartClearsOutputAndStartsFreshShell() async throws {
@@ -377,6 +474,22 @@ final class TerminalSessionTests: XCTestCase {
 
         XCTFail("Terminal session did not reach phase \(phase). Current phase: \(state.phase)")
     }
+
+    private func waitForAgentActivityState(
+        _ expectedValue: TerminalAgentActivityState,
+        in state: TerminalSessionState
+    ) async throws {
+        let deadline = Date().addingTimeInterval(1)
+        while Date() < deadline {
+            if state.agentActivityState == expectedValue {
+                return
+            }
+
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        XCTFail("Agent activity state did not become \(expectedValue). Current value: \(state.agentActivityState)")
+    }
 }
 
 @MainActor
@@ -387,11 +500,19 @@ private final class FakeTerminalProcess: @MainActor TerminalProcess {
     private(set) var startCallCount = 0
     private(set) var stopCallCount = 0
     private(set) var startRequests: [TerminalGridSize] = []
+    private(set) var startEnvironmentOverrides: [[String: String]] = []
     var notifyOnStop = false
 
-    func start(shell: String, workingDirectory: String, cols: Int, rows: Int) throws {
+    func start(
+        shell: String,
+        workingDirectory: String,
+        cols: Int,
+        rows: Int,
+        environmentOverrides: [String: String]
+    ) throws {
         startCallCount += 1
         startRequests.append(TerminalGridSize(columns: cols, rows: rows))
+        startEnvironmentOverrides.append(environmentOverrides)
         isRunning = true
     }
 

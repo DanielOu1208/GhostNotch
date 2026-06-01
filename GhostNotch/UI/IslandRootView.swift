@@ -27,7 +27,10 @@ struct IslandRootView: View {
     private var islandContent: some View {
         switch controller.state {
         case .collapsed, .hover:
-            IslandIndicatorView(isHovering: controller.state == .hover)
+            IslandIndicatorView(
+                sessionState: controller.terminalState,
+                isHovering: controller.state == .hover
+            )
         case .expanded:
             IslandExpandedView(
                 sessionState: controller.terminalState,

@@ -8,11 +8,23 @@ enum TerminalSessionPhase: Equatable {
     case failed
 }
 
+enum TerminalAgentActivityState: String, Equatable {
+    case idle
+    case working
+    case attention
+
+    init(rawFileValue: String) {
+        let normalizedValue = rawFileValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        self = TerminalAgentActivityState(rawValue: normalizedValue) ?? .idle
+    }
+}
+
 @MainActor
 final class TerminalSessionState: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var phase: TerminalSessionPhase = .stopped
     @Published private(set) var hasReceivedOutput = false
+    @Published private(set) var agentActivityState: TerminalAgentActivityState = .idle
     @Published private(set) var lastError: String?
     @Published private(set) var currentWorkingDirectory: String?
 
@@ -42,6 +54,7 @@ final class TerminalSessionState: ObservableObject {
     func markStopped() {
         isRunning = false
         phase = .stopped
+        updateAgentActivityState(.idle)
     }
 
     func recordError(_ error: Error) {
@@ -52,6 +65,7 @@ final class TerminalSessionState: ObservableObject {
         lastError = message
         isRunning = false
         phase = .failed
+        updateAgentActivityState(.idle)
     }
 
     func appendOutput(_ data: Data) {
@@ -71,6 +85,7 @@ final class TerminalSessionState: ObservableObject {
     func clearOutput() {
         hasReceivedOutput = false
         capturedOutput.removeAll(keepingCapacity: true)
+        updateAgentActivityState(.idle)
     }
 
     func updateWorkingDirectory(_ path: String?) {
@@ -79,5 +94,13 @@ final class TerminalSessionState: ObservableObject {
         }
 
         currentWorkingDirectory = path
+    }
+
+    func updateAgentActivityState(_ newState: TerminalAgentActivityState) {
+        guard agentActivityState != newState else {
+            return
+        }
+
+        agentActivityState = newState
     }
 }

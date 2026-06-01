@@ -63,7 +63,13 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         }
     }
 
-    func start(shell: String, workingDirectory: String, cols: Int = 80, rows: Int = 24) throws {
+    func start(
+        shell: String,
+        workingDirectory: String,
+        cols: Int = 80,
+        rows: Int = 24,
+        environmentOverrides: [String: String] = [:]
+    ) throws {
         lock.lock()
         defer { lock.unlock() }
 
@@ -86,7 +92,12 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
 
         let shellProcess: Process
         do {
-            shellProcess = try makeProcess(shell: shell, workingDirectory: workingDirectory, slave: slave)
+            shellProcess = try makeProcess(
+                shell: shell,
+                workingDirectory: workingDirectory,
+                slave: slave,
+                environmentOverrides: environmentOverrides
+            )
             generation += 1
             let processGeneration = generation
             shellProcess.terminationHandler = { [weak self] _ in
@@ -279,7 +290,12 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         notifyTermination()
     }
 
-    private func makeProcess(shell: String, workingDirectory: String, slave: Int32) throws -> Process {
+    private func makeProcess(
+        shell: String,
+        workingDirectory: String,
+        slave: Int32,
+        environmentOverrides: [String: String]
+    ) throws -> Process {
         let standardInputDescriptor = dup(slave)
         let standardOutputDescriptor = dup(slave)
         let standardErrorDescriptor = dup(slave)
@@ -297,7 +313,10 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
         process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory)
-        process.environment = Self.terminalEnvironment(from: ProcessInfo.processInfo.environment)
+        process.environment = Self.terminalEnvironment(
+            from: ProcessInfo.processInfo.environment,
+            overrides: environmentOverrides
+        )
         process.standardInput = FileHandle(fileDescriptor: standardInputDescriptor, closeOnDealloc: true)
         process.standardOutput = FileHandle(fileDescriptor: standardOutputDescriptor, closeOnDealloc: true)
         process.standardError = FileHandle(fileDescriptor: standardErrorDescriptor, closeOnDealloc: true)
@@ -311,7 +330,10 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         return process
     }
 
-    static func terminalEnvironment(from environment: [String: String]) -> [String: String] {
+    static func terminalEnvironment(
+        from environment: [String: String],
+        overrides: [String: String] = [:]
+    ) -> [String: String] {
         var terminalEnvironment = environment
         terminalEnvironment["TERM"] = defaultTerminalType
         terminalEnvironment["TERM_PROGRAM"] = termProgram
@@ -319,6 +341,9 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         terminalEnvironment["GHOSTNOTCH_VERSION"] = termProgramVersion
         terminalEnvironment["COLORTERM"] = defaultColorTerminal
         terminalEnvironment["GHOSTNOTCH_RESOURCES_DIR"] = shellIntegrationResourceDirectory()
+        for (key, value) in overrides {
+            terminalEnvironment[key] = value
+        }
         terminalEnvironment.applyDefaultUTF8Locale()
         terminalEnvironment.applyDefaultExecutableSearchPath()
         return terminalEnvironment

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct IslandIndicatorView: View {
+    @ObservedObject var sessionState: TerminalSessionState
+
     let isHovering: Bool
 
     var body: some View {
@@ -26,11 +28,31 @@ struct IslandIndicatorView: View {
         .animation(.easeInOut(duration: 0.2), value: isHovering)
     }
 
+    @ViewBuilder
     private var collapsedStatusDot: some View {
-        Circle()
-            .fill(Color.white)
-            .frame(width: 6, height: 6)
-            .shadow(color: .white.opacity(0.62), radius: 5)
+        switch renderedAgentActivityState {
+        case .idle:
+            StaticAgentStatusDot(
+                color: AgentStatusDotStyle.idleGreen,
+                opacity: 1,
+                shadowColor: AgentStatusDotStyle.idleGreen.opacity(0.84),
+                shadowRadius: 6
+            )
+        case .working:
+            BreathingAgentStatusDot(
+                color: .white,
+                brightShadowRadius: 10
+            )
+        case .attention:
+            BreathingAgentStatusDot(
+                color: AgentStatusDotStyle.attentionBlue,
+                brightShadowRadius: 11
+            )
+        }
+    }
+
+    private var renderedAgentActivityState: TerminalAgentActivityState {
+        sessionState.isRunning ? sessionState.agentActivityState : .idle
     }
 
     private var collapsedGhosttyLogo: some View {
@@ -96,6 +118,47 @@ struct IslandIndicatorView: View {
         .padding(.bottom, 15)
         .animation(.easeInOut(duration: 0.2), value: isHovering)
     }
+}
+
+private struct StaticAgentStatusDot: View {
+    let color: Color
+    let opacity: Double
+    let shadowColor: Color
+    let shadowRadius: CGFloat
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 6, height: 6)
+            .opacity(opacity)
+            .shadow(color: shadowColor, radius: shadowRadius)
+    }
+}
+
+private struct BreathingAgentStatusDot: View {
+    let color: Color
+    let brightShadowRadius: CGFloat
+
+    @State private var isBright = false
+
+    var body: some View {
+        Circle()
+            .fill(isBright ? color : .black)
+            .frame(width: 6, height: 6)
+            .shadow(
+                color: color.opacity(isBright ? 0.92 : 0),
+                radius: isBright ? brightShadowRadius : 0
+            )
+            .animation(.easeInOut(duration: 1.28).repeatForever(autoreverses: true), value: isBright)
+            .onAppear {
+                isBright = true
+            }
+    }
+}
+
+private enum AgentStatusDotStyle {
+    static let idleGreen = Color(red: 0.12, green: 1, blue: 0.34)
+    static let attentionBlue = Color(red: 0.18, green: 0.58, blue: 1)
 }
 
 private struct GhosttyMarkShape: Shape {
