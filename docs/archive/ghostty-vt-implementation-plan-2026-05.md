@@ -1,8 +1,10 @@
-# Ghosttylib Review Implementation Plan
+# Ghostty VT Review Implementation Plan
+
+> Historical implementation checklist. Current architecture guidance lives in [`../architecture.md`](../architecture.md).
 
 Date: 2026-05-24
 
-This checklist tracks implementation work from `docs/ghosttylib_deep_code_review.md`.
+This checklist tracks implementation work from `docs/archive/ghostty-vt-architecture-review-2026-05.md`.
 The production path remains the vendored `libghostty-vt` boundary plus the
 GhostNotch AppKit renderer while a separate full Ghostty surface spike evaluates
 whether a later migration is worth doing.

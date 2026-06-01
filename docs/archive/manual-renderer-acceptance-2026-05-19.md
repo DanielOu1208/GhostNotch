@@ -1,5 +1,7 @@
 # Manual Renderer Acceptance Findings - 2026-05-19
 
+> Historical manual acceptance note. Current build and acceptance guidance lives in [`../testing.md`](../testing.md).
+
 ## Context
 
 Manual acceptance was run against the current GhostNotch terminal renderer after the automated renderer/session baseline passed.
@@ -71,8 +73,8 @@ Recommended next action:
 Manual programs:
 
 ```sh
-less docs/ghostnotch_mvp_spec.md
-vim docs/ghostnotch_mvp_spec.md
+less docs/archive/mvp-spec-2026-05.md
+vim docs/archive/mvp-spec-2026-05.md
 ```
 
 Observed:

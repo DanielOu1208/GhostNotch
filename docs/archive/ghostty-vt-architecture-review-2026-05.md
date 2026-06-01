@@ -1,4 +1,6 @@
-# Ghosttylib Deep Code Review
+# Ghostty VT Deep Code Review
+
+> Historical architecture review. Current architecture guidance lives in [`../architecture.md`](../architecture.md).
 
 Date: 2026-05-23
 

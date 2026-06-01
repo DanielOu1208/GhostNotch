@@ -1,5 +1,7 @@
 # Manual Renderer Acceptance Notes - 2026-05-30
 
+> Historical manual acceptance note. Current build and acceptance guidance lives in [`../testing.md`](../testing.md).
+
 ## Context
 
 This note records the post-hardening acceptance status after the R6, R7, and R8 code baselines were implemented.

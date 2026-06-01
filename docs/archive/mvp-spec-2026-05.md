@@ -1,5 +1,7 @@
 # GhostNotch MVP Specification
 
+> Historical MVP implementation plan. The baseline described here is now implemented; current public docs live in [`../README.md`](../README.md).
+
 ## Current Implementation Baseline
 
 GhostNotch is a native macOS Dynamic-Island-style terminal utility. The current codebase has completed the Stage 1 floating island shell, notch geometry work, a native PTY-backed terminal session module, and Ghostty-backed grid terminal rendering. The expanded island now starts a real default-shell session on first open, renders PTY output through a vendored `libghostty-vt` artifact, accepts keyboard input and paste, resizes the PTY from the terminal surface, and preserves the session while collapsed. It should be treated as a Ghostty-backed notch terminal surface, not a full Ghostty-equivalent renderer or shell environment yet.
@@ -26,7 +28,8 @@ The duplicate project/source copy has been removed. Future implementation work s
 ## Product Goal
 
 Build a tiny floating terminal island for macOS that:
-![alt text](image.png)
+![GhostNotch expanded terminal island](../image2.webp)
+
 - Sits visually at the MacBook notch.
 - Extends subtly beyond the physical notch so users can tell the app is active.
 - Expands on hover for a preview state.
@@ -188,7 +191,7 @@ hoverSize: 420 x 72 pt
 expandedSize: 680 x 320 pt
 ```
 
-The 220 pt reference comes from local notch research in `docs/notch_geometry_research.md`.
+The 220 pt reference comes from local notch research in `docs/notch-geometry.md`.
 
 ### UI System
 
@@ -600,8 +603,8 @@ except Exception:
 PY
 command -v gum >/dev/null && gum style --border rounded --padding '0 1' 'gum border sample' || true
 top
-less docs/ghostnotch_mvp_spec.md
-vim docs/ghostnotch_mvp_spec.md # or nano if vim is unavailable
+less docs/archive/mvp-spec-2026-05.md
+vim docs/archive/mvp-spec-2026-05.md # or nano if vim is unavailable
 ```
 
 Acceptance notes:
@@ -618,5 +621,5 @@ Acceptance notes:
 ## Documentation References
 
 - `README.md`: top-level project entry point.
-- `docs/notch_geometry_research.md`: measured notch geometry and AppKit runtime detection notes.
-- `docs/ghostnotch_mvp_spec.md`: this MVP implementation reference.
+- `docs/notch-geometry.md`: measured notch geometry and AppKit runtime detection notes.
+- `docs/archive/mvp-spec-2026-05.md`: this historical MVP implementation reference.
