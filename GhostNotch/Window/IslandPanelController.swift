@@ -18,7 +18,6 @@ final class IslandPanelController: ObservableObject {
     private var localMouseMonitor: Any?
     private var globalMouseMonitor: Any?
     private var lastHoverContainment: Bool?
-    private var latestTerminalSnapshot = TerminalRenderSnapshot.empty()
     private lazy var outsideClickMonitor = OutsideClickMonitor(
         shouldCollapse: { [weak self] in self?.state == .expanded },
         isPointInsidePanel: { [weak self] point in self?.panel.frame.contains(point) ?? false },
@@ -54,7 +53,6 @@ final class IslandPanelController: ObservableObject {
                 return
             }
 
-            self.latestTerminalSnapshot = snapshot
             guard self.state == .expanded || self.terminalSurfacePhase != .idle else {
                 GhostNotchRuntimeMetrics.recordSkippedCollapsedSnapshot()
                 return
@@ -147,7 +145,7 @@ final class IslandPanelController: ObservableObject {
     }
 
     func restartTerminal() {
-        terminalSurfaceCoordinator.restartPreservingGrid(currentSnapshot: latestTerminalSnapshot)
+        terminalSurfaceCoordinator.restartPreservingGrid(currentSnapshot: terminalSurfaceCoordinator.currentSnapshot())
         activateTerminalSurface()
     }
 
@@ -232,8 +230,7 @@ final class IslandPanelController: ObservableObject {
     private func activateTerminalSurface() {
         requestTerminalFocus()
         terminalSurfaceCoordinator.focus()
-        latestTerminalSnapshot = terminalSurfaceCoordinator.currentSnapshot()
-        terminalSnapshot = latestTerminalSnapshot
+        terminalSnapshot = terminalSurfaceCoordinator.currentSnapshot()
     }
 
     private func requestTerminalFocus() {
@@ -276,6 +273,6 @@ final class IslandPanelController: ObservableObject {
     }
 
     private func shouldSendBlurOnCollapse() -> Bool {
-        !latestTerminalSnapshot.isAlternateScreen
+        !terminalSurfaceCoordinator.currentSnapshot().isAlternateScreen
     }
 }

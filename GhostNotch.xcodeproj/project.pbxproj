@@ -35,6 +35,7 @@
 		1A0001300000000000000001 /* IslandTerminalSurfacePhase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000270000000000000001 /* IslandTerminalSurfacePhase.swift */; };
 		1A0001310000000000000001 /* TerminalInputMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000280000000000000001 /* TerminalInputMapping.swift */; };
 		1A0001390000000000000001 /* TerminalSurfaceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000290000000000000001 /* TerminalSurfaceCoordinator.swift */; };
+		1A00013E0000000000000001 /* GhostNotchRuntimeMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00013D0000000000000001 /* GhostNotchRuntimeMetrics.swift */; };
 		1A0001320000000000000001 /* TerminalGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000200000000000000001 /* TerminalGridView.swift */; };
 		1A0001330000000000000001 /* TerminalCellGlyphRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000210000000000000001 /* TerminalCellGlyphRenderer.swift */; };
 		1A0001340000000000000001 /* TerminalTextDecorationRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000220000000000000001 /* TerminalTextDecorationRenderer.swift */; };
@@ -43,6 +44,7 @@
 		1A0001370000000000000001 /* TerminalKeyEvent+AppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000250000000000000001 /* TerminalKeyEvent+AppKit.swift */; };
 		1A0001380000000000000001 /* TerminalInputMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000280000000000000001 /* TerminalInputMapping.swift */; };
 		1A00013A0000000000000001 /* TerminalSurfaceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000290000000000000001 /* TerminalSurfaceCoordinator.swift */; };
+		1A00013F0000000000000001 /* GhostNotchRuntimeMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00013D0000000000000001 /* GhostNotchRuntimeMetrics.swift */; };
 		1A00011E0000000000000001 /* GhosttyVTBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000190000000000000001 /* GhosttyVTBridge.c */; };
 		1A00011F0000000000000001 /* GhosttyVT.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00001B0000000000000001 /* GhosttyVT.xcframework */; };
 		1A00013B0000000000000001 /* ShellIntegration in Resources */ = {isa = PBXBuildFile; fileRef = 1A00013C0000000000000001 /* ShellIntegration */; };
@@ -92,6 +94,7 @@
 		1A0000270000000000000001 /* IslandTerminalSurfacePhase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandTerminalSurfacePhase.swift; sourceTree = "<group>"; };
 		1A0000280000000000000001 /* TerminalInputMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalInputMapping.swift; sourceTree = "<group>"; };
 		1A0000290000000000000001 /* TerminalSurfaceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSurfaceCoordinator.swift; sourceTree = "<group>"; };
+		1A00013D0000000000000001 /* GhostNotchRuntimeMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostNotchRuntimeMetrics.swift; sourceTree = "<group>"; };
 		1A0000180000000000000001 /* GhostNotch-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "GhostNotch-Bridging-Header.h"; sourceTree = "<group>"; };
 		1A0000190000000000000001 /* GhosttyVTBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = GhosttyVTBridge.c; sourceTree = "<group>"; };
 		1A00001A0000000000000001 /* GhosttyVTBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GhosttyVTBridge.h; sourceTree = "<group>"; };
@@ -140,6 +143,7 @@
 				1A0000020000000000000001 /* AppDelegate.swift */,
 				1A0000180000000000000001 /* GhostNotch-Bridging-Header.h */,
 				1A00013C0000000000000001 /* ShellIntegration */,
+				1A0001400000000000000001 /* Diagnostics */,
 				1A0003060000000000000001 /* Terminal */,
 				1A0003040000000000000001 /* Window */,
 				1A0003050000000000000001 /* UI */,
@@ -203,6 +207,14 @@
 				1A00001A0000000000000001 /* GhosttyVTBridge.h */,
 			);
 			path = Terminal;
+			sourceTree = "<group>";
+		};
+		1A0001400000000000000001 /* Diagnostics */ = {
+			isa = PBXGroup;
+			children = (
+				1A00013D0000000000000001 /* GhostNotchRuntimeMetrics.swift */,
+			);
+			path = Diagnostics;
 			sourceTree = "<group>";
 		};
 		1A0003080000000000000001 /* Vendor */ = {
@@ -349,6 +361,7 @@
 				1A0001300000000000000001 /* IslandTerminalSurfacePhase.swift in Sources */,
 				1A0001310000000000000001 /* TerminalInputMapping.swift in Sources */,
 				1A0001390000000000000001 /* TerminalSurfaceCoordinator.swift in Sources */,
+				1A00013E0000000000000001 /* GhostNotchRuntimeMetrics.swift in Sources */,
 				1A00011E0000000000000001 /* GhosttyVTBridge.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -374,6 +387,7 @@
 				1A0001370000000000000001 /* TerminalKeyEvent+AppKit.swift in Sources */,
 				1A0001380000000000000001 /* TerminalInputMapping.swift in Sources */,
 				1A00013A0000000000000001 /* TerminalSurfaceCoordinator.swift in Sources */,
+				1A00013F0000000000000001 /* GhostNotchRuntimeMetrics.swift in Sources */,
 				1A0001200000000000000001 /* GhosttyVTBridge.c in Sources */,
 				1A0001140000000000000001 /* ShellResolverTests.swift in Sources */,
 				1A0001150000000000000001 /* TerminalSessionTests.swift in Sources */,
