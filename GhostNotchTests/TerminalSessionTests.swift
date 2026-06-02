@@ -378,14 +378,13 @@ final class TerminalSessionTests: XCTestCase {
         try await waitForAgentActivityState(.idle, in: state)
     }
 
-    func testCodexWorkingStateExpiresToIdleWithoutRewritingStateFile() async throws {
+    func testCodexWorkingStateDoesNotExpireDuringLongHookGap() async throws {
         let state = TerminalSessionState()
         let process = FakeTerminalProcess()
         let session = TerminalSession(
             shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
             state: state,
-            process: process,
-            codexWorkingFreshnessTimeout: 0.2
+            process: process
         )
 
         try session.start(cols: 80, rows: 24)
@@ -401,25 +400,25 @@ final class TerminalSessionTests: XCTestCase {
         ).write(toFile: stateFilePath, atomically: true, encoding: .utf8)
         try await waitForAgentActivityState(.working, in: state)
 
-        let expiredEnvelope = agentActivityEnvelope(
+        let oldEnvelope = agentActivityEnvelope(
             agent: "codex",
             state: "working",
             event: "PreToolUse",
             timestamp: Date().addingTimeInterval(-5)
         )
-        try expiredEnvelope.write(toFile: stateFilePath, atomically: true, encoding: .utf8)
-        try await waitForAgentActivityState(.idle, in: state)
-        XCTAssertEqual(try String(contentsOfFile: stateFilePath, encoding: .utf8), expiredEnvelope)
+        try oldEnvelope.write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.working, in: state)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(state.agentActivityState, .working)
     }
 
-    func testCodexAttentionClaudeWorkingAndLegacyWorkingDoNotExpire() async throws {
+    func testCodexAttentionClaudeWorkingAndLegacyWorkingRemainStable() async throws {
         let state = TerminalSessionState()
         let process = FakeTerminalProcess()
         let session = TerminalSession(
             shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
             state: state,
-            process: process,
-            codexWorkingFreshnessTimeout: 0.1
+            process: process
         )
 
         try session.start(cols: 80, rows: 24)
@@ -449,6 +448,153 @@ final class TerminalSessionTests: XCTestCase {
         try await waitForAgentActivityState(.working, in: state)
         try await Task.sleep(nanoseconds: 250_000_000)
         XCTAssertEqual(state.agentActivityState, .working)
+    }
+
+    func testCodexPickerDetectorRequiresStrictOptionSelectorMarkers() {
+        let pickerText = """
+        Question 1/1 (1 unanswered)
+        Which hover animation direction should the plan use?
+
+          1. Terminal cursor
+        > 2. Status breath
+          3. Subtle entrance
+
+        tab to add notes | enter to submit answer | esc to interrupt
+        """
+
+        XCTAssertTrue(CodexTerminalAttentionDetector.isOptionSelectorVisible(in: pickerText))
+        XCTAssertFalse(CodexTerminalAttentionDetector.isOptionSelectorVisible(in: "Question 1/1\n1. Not enough\n2. Markers"))
+        XCTAssertFalse(CodexTerminalAttentionDetector.isOptionSelectorVisible(in: "enter to submit answer\nesc to interrupt\nno question marker"))
+    }
+
+    func testCodexVisiblePickerOverridesWorkingStateToAttention() {
+        let state = TerminalSessionState()
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .codex,
+                state: .working,
+                event: "PreToolUse",
+                timestamp: Date(),
+                isLegacy: false
+            )
+        )
+
+        state.updateVisibleTerminalSnapshot(codexPickerSnapshot())
+
+        XCTAssertEqual(state.agentActivityState, .attention)
+    }
+
+    func testNonCodexAndNonPickerSnapshotsDoNotTriggerAttention() {
+        let state = TerminalSessionState()
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .claude,
+                state: .working,
+                event: "ElicitationResult",
+                timestamp: Date(),
+                isLegacy: false
+            )
+        )
+
+        state.updateVisibleTerminalSnapshot(codexPickerSnapshot())
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .codex,
+                state: .working,
+                event: "PreToolUse",
+                timestamp: Date(),
+                isLegacy: false
+            )
+        )
+        state.updateVisibleTerminalSnapshot(.message("Question 1/1\nworking output", columns: 120, rows: 8))
+
+        XCTAssertEqual(state.agentActivityState, .working)
+    }
+
+    func testFreshCodexHookClearsVisiblePickerAttentionBackToWorking() {
+        let state = TerminalSessionState()
+        let firstRecord = TerminalAgentActivityRecord(
+            agent: .codex,
+            state: .working,
+            event: "PreToolUse",
+            timestamp: Date(),
+            isLegacy: false
+        )
+        state.updateAgentActivityRecord(firstRecord)
+        state.updateVisibleTerminalSnapshot(codexPickerSnapshot())
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .codex,
+                state: .working,
+                event: "UserPromptSubmit",
+                timestamp: Date().addingTimeInterval(1),
+                isLegacy: false
+            )
+        )
+
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        state.updateVisibleTerminalSnapshot(codexPickerSnapshot())
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        state.updateVisibleTerminalSnapshot(.message("Codex is working", columns: 120, rows: 12))
+        state.updateVisibleTerminalSnapshot(codexPickerSnapshot(question: "Which later choice should Codex use?"))
+        XCTAssertEqual(state.agentActivityState, .attention)
+    }
+
+    func testStopFailureAndClearOutputClearCodexPickerOverride() {
+        let state = TerminalSessionState()
+        state.markRunning()
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .codex,
+                state: .working,
+                event: "PreToolUse",
+                timestamp: Date(),
+                isLegacy: false
+            )
+        )
+        state.updateVisibleTerminalSnapshot(codexPickerSnapshot())
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.markStopped()
+        XCTAssertEqual(state.agentActivityState, .idle)
+
+        state.markRunning()
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .codex,
+                state: .working,
+                event: "PreToolUse",
+                timestamp: Date().addingTimeInterval(1),
+                isLegacy: false
+            )
+        )
+        state.updateVisibleTerminalSnapshot(codexPickerSnapshot())
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.recordError("boom")
+        XCTAssertEqual(state.agentActivityState, .idle)
+
+        state.markRunning()
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .codex,
+                state: .working,
+                event: "PreToolUse",
+                timestamp: Date().addingTimeInterval(2),
+                isLegacy: false
+            )
+        )
+        state.updateVisibleTerminalSnapshot(codexPickerSnapshot())
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.clearOutput()
+        XCTAssertEqual(state.agentActivityState, .idle)
     }
 
     func testAgentActivityClearsWhenSessionStopsOrFails() {
@@ -670,6 +816,23 @@ final class TerminalSessionTests: XCTestCase {
         }
 
         XCTFail("Agent activity state did not become \(expectedValue). Current value: \(state.agentActivityState)")
+    }
+
+    private func codexPickerSnapshot(question: String = "Which hover animation direction should the plan use?") -> TerminalRenderSnapshot {
+        TerminalRenderSnapshot.message(
+            """
+            Question 1/1 (1 unanswered)
+            \(question)
+
+              1. Terminal cursor
+            > 2. Status breath
+              3. Subtle entrance
+
+            tab to add notes | enter to submit answer | esc to interrupt
+            """,
+            columns: 120,
+            rows: 12
+        )
     }
 
     private func agentActivityEnvelope(

@@ -48,9 +48,9 @@ Current Codex mapping:
 - `PermissionRequest`: `attention`
 - `Stop`: `idle`
 
-Normal Codex replies and option pickers that ask a question are not treated as `attention` unless Codex exposes a reliable hook signal for that case.
+Normal Codex replies are not treated as `attention` unless Codex exposes a reliable hook signal for that case.
 
-Codex `working` states expire back to rendered `idle` after a short freshness timeout when no newer hook arrives. This prevents the collapsed indicator from pulsing forever while Codex is blocked on an option picker that does not emit a hook. The state file is not rewritten during this timeout; only the rendered app state changes.
+Codex option pickers do not currently expose a documented hook signal. While the latest structured Codex hook state is `working`, GhostNotch also checks the rendered terminal snapshot for strict Codex picker markers such as `Question N/N`, `unanswered`, numbered choices, `enter to submit answer`, and `esc to interrupt`. When those markers are visible, the rendered indicator becomes `attention`. A newer Codex hook clears that visible-picker override.
 
 ## Claude Hooks
 
@@ -101,4 +101,4 @@ When GhostNotch starts the terminal session, it exposes two per-session paths to
 - `GHOSTNOTCH_AGENT_STATE_FILE`: the state file GhostNotch polls for indicator updates.
 - `GHOSTNOTCH_AGENT_EVENT_LOG`: optional JSONL diagnostics written by `ghostnotch-agent-hook`.
 
-The event log is intentionally metadata-only. Entries may include agent name, event name, timestamp, payload keys, and payload value types. They must not include raw prompts, commands, assistant text, terminal output, nested secret values, or other payload contents.
+The event log is intentionally metadata-only. Entries may include agent name, event name, timestamp, payload keys, payload value types, and allowlisted scalar payload values such as `hook_event_name`, `notification_type`, and `tool_name`. They must not include raw prompts, commands, assistant text, terminal output, nested secret values, or other payload contents.

@@ -114,6 +114,37 @@ private struct AgentActivityEnvelope: Decodable {
     let timestamp: String?
 }
 
+enum CodexTerminalAttentionDetector {
+    static func isOptionSelectorVisible(in snapshot: TerminalRenderSnapshot) -> Bool {
+        isOptionSelectorVisible(in: snapshot.plainText)
+    }
+
+    static func isOptionSelectorVisible(in text: String) -> Bool {
+        let normalizedText = text.lowercased()
+        guard normalizedText.contains("unanswered"),
+              normalizedText.contains("enter to submit answer"),
+              normalizedText.contains("esc to interrupt"),
+              hasQuestionMarker(in: text)
+        else {
+            return false
+        }
+
+        return hasNumberedChoices(in: text)
+    }
+
+    private static func hasQuestionMarker(in text: String) -> Bool {
+        text.range(
+            of: #"Question\s+\d+\s*/\s*\d+"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
+    }
+
+    private static func hasNumberedChoices(in text: String) -> Bool {
+        let matches = text.matches(of: #"(?m)^\s*(?:>\s*)?\d+\.\s+\S"#)
+        return matches.count >= 2
+    }
+}
+
 @MainActor
 final class TerminalSessionState: ObservableObject {
     @Published private(set) var isRunning = false
@@ -125,6 +156,10 @@ final class TerminalSessionState: ObservableObject {
 
     private var capturedOutput = Data()
     private let outputCaptureLimit: Int?
+    private var hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: .idle, isLegacy: true)
+    private var hasCodexVisiblePicker = false
+    private var codexVisiblePickerText: String?
+    private var suppressedCodexPickerText: String?
 
     init(outputLimit: Int? = nil) {
         outputCaptureLimit = outputLimit
@@ -149,7 +184,7 @@ final class TerminalSessionState: ObservableObject {
     func markStopped() {
         isRunning = false
         phase = .stopped
-        updateAgentActivityState(.idle)
+        resetAgentActivityState()
     }
 
     func recordError(_ error: Error) {
@@ -160,7 +195,7 @@ final class TerminalSessionState: ObservableObject {
         lastError = message
         isRunning = false
         phase = .failed
-        updateAgentActivityState(.idle)
+        resetAgentActivityState()
     }
 
     func appendOutput(_ data: Data) {
@@ -180,7 +215,7 @@ final class TerminalSessionState: ObservableObject {
     func clearOutput() {
         hasReceivedOutput = false
         capturedOutput.removeAll(keepingCapacity: true)
-        updateAgentActivityState(.idle)
+        resetAgentActivityState()
     }
 
     func updateWorkingDirectory(_ path: String?) {
@@ -192,10 +227,110 @@ final class TerminalSessionState: ObservableObject {
     }
 
     func updateAgentActivityState(_ newState: TerminalAgentActivityState) {
-        guard agentActivityState != newState else {
+        hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: newState, isLegacy: true)
+        clearCodexPickerOverride()
+        resolveAgentActivityState()
+    }
+
+    func updateAgentActivityRecord(_ record: TerminalAgentActivityRecord) {
+        let isNewRecord = record != hookActivityRecord
+        hookActivityRecord = record
+
+        if isNewRecord {
+            if hasCodexVisiblePicker {
+                suppressedCodexPickerText = codexVisiblePickerText
+            }
+            hasCodexVisiblePicker = false
+            codexVisiblePickerText = nil
+
+            if record.agent != .codex || record.state != .working || record.isLegacy {
+                suppressedCodexPickerText = nil
+            }
+        }
+
+        resolveAgentActivityState()
+    }
+
+    func updateVisibleTerminalSnapshot(_ snapshot: TerminalRenderSnapshot) {
+        let visibleText = snapshot.plainText
+        guard hookActivityRecord.agent == .codex,
+              hookActivityRecord.state == .working,
+              hookActivityRecord.isLegacy == false
+        else {
+            setCodexVisiblePicker(false)
             return
         }
 
-        agentActivityState = newState
+        if visibleText == suppressedCodexPickerText {
+            setCodexVisiblePicker(false)
+            return
+        }
+
+        let isVisiblePicker = CodexTerminalAttentionDetector.isOptionSelectorVisible(in: visibleText)
+        if !isVisiblePicker {
+            suppressedCodexPickerText = nil
+        }
+
+        setCodexVisiblePicker(isVisiblePicker, text: isVisiblePicker ? visibleText : nil)
+    }
+
+    private func resetAgentActivityState() {
+        hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: .idle, isLegacy: true)
+        clearCodexPickerOverride()
+        resolveAgentActivityState()
+    }
+
+    private func setCodexVisiblePicker(_ isVisible: Bool, text: String? = nil) {
+        guard hasCodexVisiblePicker != isVisible else {
+            if isVisible {
+                codexVisiblePickerText = text
+            }
+            return
+        }
+
+        hasCodexVisiblePicker = isVisible
+        codexVisiblePickerText = text
+        resolveAgentActivityState()
+    }
+
+    private func clearCodexPickerOverride() {
+        hasCodexVisiblePicker = false
+        codexVisiblePickerText = nil
+        suppressedCodexPickerText = nil
+    }
+
+    private func resolveAgentActivityState() {
+        let resolvedState: TerminalAgentActivityState
+        if hookActivityRecord.agent == .codex,
+           hookActivityRecord.state == .working,
+           hookActivityRecord.isLegacy == false,
+           hasCodexVisiblePicker {
+            resolvedState = .attention
+        } else {
+            resolvedState = hookActivityRecord.state
+        }
+
+        guard agentActivityState != resolvedState else {
+            return
+        }
+
+        agentActivityState = resolvedState
+    }
+}
+
+private extension String {
+    func matches(of pattern: String) -> [String] {
+        guard let regularExpression = try? NSRegularExpression(pattern: pattern) else {
+            return []
+        }
+
+        let range = NSRange(startIndex..<endIndex, in: self)
+        return regularExpression.matches(in: self, range: range).compactMap { match in
+            guard let matchRange = Range(match.range, in: self) else {
+                return nil
+            }
+
+            return String(self[matchRange])
+        }
     }
 }

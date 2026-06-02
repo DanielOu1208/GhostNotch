@@ -11,6 +11,7 @@ import tempfile
 
 VALID_AGENTS = {"codex", "claude"}
 VALID_STATES = {"idle", "working", "attention"}
+SAFE_PAYLOAD_VALUE_FIELDS = {"hook_event_name", "notification_type", "tool_name"}
 
 
 def utc_timestamp() -> str:
@@ -71,10 +72,16 @@ def safe_payload_metadata(payload: dict) -> dict:
         str(key): type(value).__name__
         for key, value in payload.items()
     }
+    payload_values = {
+        str(key): value
+        for key, value in payload.items()
+        if str(key) in SAFE_PAYLOAD_VALUE_FIELDS and isinstance(value, (str, int, float, bool))
+    }
 
     return {
         "payloadKeys": payload_keys,
         "payloadTypes": payload_types,
+        "payloadValues": payload_values,
     }
 
 
@@ -131,6 +138,10 @@ def run_self_test() -> None:
     assert claude_envelope["state"] == "attention"
     assert codex_envelope["payloadKeys"] == ["command", "hook_event_name", "nested", "notification_type", "prompt"]
     assert codex_envelope["payloadTypes"]["nested"] == "dict"
+    assert codex_envelope["payloadValues"] == {
+        "hook_event_name": "UserPromptSubmit",
+        "notification_type": "permission_prompt",
+    }
     assert should_write_state(payload, ["notification_type=permission_prompt,idle_prompt"])
     assert not should_write_state(payload, ["notification_type=other"])
     assert not should_write_state(payload, ["malformed-filter"])
