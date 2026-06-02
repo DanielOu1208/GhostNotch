@@ -96,24 +96,37 @@ struct IslandIndicatorView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
 
             HStack(alignment: .center, spacing: 9) {
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 7, height: 7)
-                    .shadow(color: .white.opacity(0.58), radius: 5)
+                hoverStatusDot
 
-                Text(">_")
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.92))
-
-                Text("ready")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.68))
+                HoverStatusText(state: renderedAgentActivityState)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .padding(.bottom, 15)
         .animation(.easeInOut(duration: 0.2), value: isHovering)
+    }
+
+    @ViewBuilder
+    private var hoverStatusDot: some View {
+        let style = AgentStatusDotStyle.style(for: renderedAgentActivityState)
+
+        switch style.animation {
+        case .static:
+            StaticAgentStatusDot(
+                color: style.color,
+                opacity: style.opacity,
+                shadowColor: style.shadowColor,
+                shadowRadius: style.shadowRadius,
+                diameter: 7
+            )
+        case .breathing:
+            BreathingAgentStatusDot(
+                color: style.color,
+                brightShadowRadius: style.shadowRadius,
+                diameter: 7
+            )
+        }
     }
 }
 
@@ -122,11 +135,26 @@ private struct StaticAgentStatusDot: View {
     let opacity: Double
     let shadowColor: Color
     let shadowRadius: CGFloat
+    let diameter: CGFloat
+
+    init(
+        color: Color,
+        opacity: Double,
+        shadowColor: Color,
+        shadowRadius: CGFloat,
+        diameter: CGFloat = 6
+    ) {
+        self.color = color
+        self.opacity = opacity
+        self.shadowColor = shadowColor
+        self.shadowRadius = shadowRadius
+        self.diameter = diameter
+    }
 
     var body: some View {
         Circle()
             .fill(color)
-            .frame(width: 6, height: 6)
+            .frame(width: diameter, height: diameter)
             .opacity(opacity)
             .shadow(color: shadowColor, radius: shadowRadius)
     }
@@ -135,6 +163,13 @@ private struct StaticAgentStatusDot: View {
 private struct BreathingAgentStatusDot: View {
     let color: Color
     let brightShadowRadius: CGFloat
+    let diameter: CGFloat
+
+    init(color: Color, brightShadowRadius: CGFloat, diameter: CGFloat = 6) {
+        self.color = color
+        self.brightShadowRadius = brightShadowRadius
+        self.diameter = diameter
+    }
 
     var body: some View {
         TimelineView(.animation) { timeline in
@@ -146,7 +181,7 @@ private struct BreathingAgentStatusDot: View {
                     Circle()
                         .fill(color.opacity(intensity))
                 }
-                .frame(width: 6, height: 6)
+                .frame(width: diameter, height: diameter)
                 .shadow(
                     color: color.opacity(0.92 * intensity),
                     radius: brightShadowRadius * intensity
@@ -165,6 +200,50 @@ private struct BreathingAgentStatusDot: View {
     private static let halfCycleDuration: TimeInterval = 1.024
     private static let fullCycleDuration = halfCycleDuration * 2
     private static let blackEndpointCompression = 0.7
+}
+
+private struct HoverStatusText: View {
+    let state: TerminalAgentActivityState
+
+    var body: some View {
+        switch state {
+        case .idle:
+            statusText("Ready")
+        case .working:
+            animatedStatusText("Working")
+        case .attention:
+            animatedStatusText("Waiting")
+        }
+    }
+
+    private func statusText(_ text: String) -> some View {
+        Text(text)
+            .font(Self.font)
+            .foregroundStyle(.white.opacity(0.68))
+    }
+
+    private func animatedStatusText(_ text: String) -> some View {
+        TimelineView(.animation) { timeline in
+            let dots = String(repeating: ".", count: dotCount(at: timeline.date))
+
+            HStack(spacing: 0) {
+                Text(text)
+
+                Text(dots)
+                    .frame(width: 18, alignment: .leading)
+            }
+            .font(Self.font)
+            .foregroundStyle(.white.opacity(0.68))
+        }
+    }
+
+    private func dotCount(at date: Date) -> Int {
+        let elapsed = date.timeIntervalSinceReferenceDate
+        return Int(elapsed / Self.dotStepDuration) % 4
+    }
+
+    private static let font = Font.system(size: 12, weight: .semibold, design: .rounded)
+    private static let dotStepDuration: TimeInterval = 0.42
 }
 
 private struct AgentStatusDotStyle {
