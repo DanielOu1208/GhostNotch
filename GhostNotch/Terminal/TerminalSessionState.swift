@@ -14,9 +14,104 @@ enum TerminalAgentActivityState: String, Equatable {
     case attention
 
     init(rawFileValue: String) {
-        let normalizedValue = rawFileValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        self = TerminalAgentActivityState(rawValue: normalizedValue) ?? .idle
+        self = TerminalAgentActivityRecord(rawFileValue: rawFileValue).state
     }
+}
+
+enum TerminalAgentActivityAgent: String, Equatable {
+    case codex
+    case claude
+    case unknown
+}
+
+struct TerminalAgentActivityRecord: Equatable {
+    private static let supportedAgents = Set(["codex", "claude"])
+
+    let agent: TerminalAgentActivityAgent
+    let state: TerminalAgentActivityState
+    let event: String?
+    let timestamp: Date?
+    let isLegacy: Bool
+
+    init(
+        agent: TerminalAgentActivityAgent,
+        state: TerminalAgentActivityState,
+        event: String? = nil,
+        timestamp: Date? = nil,
+        isLegacy: Bool
+    ) {
+        self.agent = agent
+        self.state = state
+        self.event = event
+        self.timestamp = timestamp
+        self.isLegacy = isLegacy
+    }
+
+    init(rawFileValue: String) {
+        let trimmedValue = rawFileValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let structuredRecord = Self.structuredRecord(from: trimmedValue) {
+            self = structuredRecord
+            return
+        }
+
+        self = TerminalAgentActivityRecord(
+            agent: .unknown,
+            state: TerminalAgentActivityState(rawValue: trimmedValue.lowercased()) ?? .idle,
+            isLegacy: true
+        )
+    }
+
+    private static func structuredRecord(from rawValue: String) -> TerminalAgentActivityRecord? {
+        guard rawValue.first == "{",
+              let data = rawValue.data(using: .utf8),
+              let envelope = try? JSONDecoder().decode(AgentActivityEnvelope.self, from: data)
+        else {
+            return rawValue.first == "{" ? malformedStructuredRecord : nil
+        }
+
+        let normalizedAgent = envelope.agent.lowercased()
+        guard supportedAgents.contains(normalizedAgent),
+              let agent = TerminalAgentActivityAgent(rawValue: normalizedAgent),
+              let state = TerminalAgentActivityState(rawValue: envelope.state.lowercased())
+        else {
+            return malformedStructuredRecord
+        }
+
+        return TerminalAgentActivityRecord(
+            agent: agent,
+            state: state,
+            event: envelope.event,
+            timestamp: parseTimestamp(envelope.timestamp),
+            isLegacy: false
+        )
+    }
+
+    private static var malformedStructuredRecord: TerminalAgentActivityRecord {
+        TerminalAgentActivityRecord(agent: .unknown, state: .idle, isLegacy: false)
+    }
+
+    private static func parseTimestamp(_ value: String?) -> Date? {
+        guard let value else {
+            return nil
+        }
+
+        let formatterWithFractionalSeconds = ISO8601DateFormatter()
+        formatterWithFractionalSeconds.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatterWithFractionalSeconds.date(from: value) {
+            return date
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
+    }
+}
+
+private struct AgentActivityEnvelope: Decodable {
+    let agent: String
+    let state: String
+    let event: String?
+    let timestamp: String?
 }
 
 @MainActor

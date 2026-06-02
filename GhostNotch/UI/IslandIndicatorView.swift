@@ -30,23 +30,20 @@ struct IslandIndicatorView: View {
 
     @ViewBuilder
     private var collapsedStatusDot: some View {
-        switch renderedAgentActivityState {
-        case .idle:
+        let style = AgentStatusDotStyle.style(for: renderedAgentActivityState)
+
+        switch style.animation {
+        case .static:
             StaticAgentStatusDot(
-                color: AgentStatusDotStyle.idleGreen,
-                opacity: 1,
-                shadowColor: AgentStatusDotStyle.idleGreen.opacity(0.84),
-                shadowRadius: 6
+                color: style.color,
+                opacity: style.opacity,
+                shadowColor: style.shadowColor,
+                shadowRadius: style.shadowRadius
             )
-        case .working:
+        case .breathing:
             BreathingAgentStatusDot(
-                color: .white,
-                brightShadowRadius: 10
-            )
-        case .attention:
-            BreathingAgentStatusDot(
-                color: AgentStatusDotStyle.attentionBlue,
-                brightShadowRadius: 11
+                color: style.color,
+                brightShadowRadius: style.shadowRadius
             )
         }
     }
@@ -139,26 +136,80 @@ private struct BreathingAgentStatusDot: View {
     let color: Color
     let brightShadowRadius: CGFloat
 
-    @State private var isBright = false
-
     var body: some View {
-        Circle()
-            .fill(isBright ? color : .black)
-            .frame(width: 6, height: 6)
-            .shadow(
-                color: color.opacity(isBright ? 0.92 : 0),
-                radius: isBright ? brightShadowRadius : 0
-            )
-            .animation(.easeInOut(duration: 1.28).repeatForever(autoreverses: true), value: isBright)
-            .onAppear {
-                isBright = true
-            }
+        TimelineView(.animation) { timeline in
+            let intensity = breathingIntensity(at: timeline.date)
+
+            Circle()
+                .fill(.black)
+                .overlay {
+                    Circle()
+                        .fill(color.opacity(intensity))
+                }
+                .frame(width: 6, height: 6)
+                .shadow(
+                    color: color.opacity(0.92 * intensity),
+                    radius: brightShadowRadius * intensity
+                )
+        }
     }
+
+    private func breathingIntensity(at date: Date) -> Double {
+        let elapsed = date.timeIntervalSinceReferenceDate
+        let cycleProgress = elapsed.truncatingRemainder(dividingBy: Self.fullCycleDuration) / Self.fullCycleDuration
+        let triangularProgress = cycleProgress < 0.5 ? cycleProgress * 2 : (1 - cycleProgress) * 2
+
+        return pow(triangularProgress, Self.blackEndpointCompression)
+    }
+
+    private static let halfCycleDuration: TimeInterval = 1.024
+    private static let fullCycleDuration = halfCycleDuration * 2
+    private static let blackEndpointCompression = 0.7
 }
 
-private enum AgentStatusDotStyle {
-    static let idleGreen = Color(red: 0.12, green: 1, blue: 0.34)
-    static let attentionBlue = Color(red: 0.18, green: 0.58, blue: 1)
+private struct AgentStatusDotStyle {
+    enum Animation {
+        case `static`
+        case breathing
+    }
+
+    let animation: Animation
+    let color: Color
+    let opacity: Double
+    let shadowColor: Color
+    let shadowRadius: CGFloat
+
+    static func style(for state: TerminalAgentActivityState) -> AgentStatusDotStyle {
+        switch state {
+        case .idle:
+            return AgentStatusDotStyle(
+                animation: .static,
+                color: idleGreen,
+                opacity: 1,
+                shadowColor: idleGreen.opacity(0.84),
+                shadowRadius: 6
+            )
+        case .working:
+            return AgentStatusDotStyle(
+                animation: .breathing,
+                color: .white,
+                opacity: 1,
+                shadowColor: .white,
+                shadowRadius: 10
+            )
+        case .attention:
+            return AgentStatusDotStyle(
+                animation: .breathing,
+                color: attentionBlue,
+                opacity: 1,
+                shadowColor: attentionBlue,
+                shadowRadius: 10
+            )
+        }
+    }
+
+    private static let idleGreen = Color(red: 0.12, green: 1, blue: 0.34)
+    private static let attentionBlue = Color(red: 0.18, green: 0.58, blue: 1)
 }
 
 private struct GhosttyMarkShape: Shape {

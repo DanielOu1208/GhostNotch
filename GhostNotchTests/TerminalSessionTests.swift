@@ -97,10 +97,14 @@ final class TerminalSessionTests: XCTestCase {
     func testPTYEnvironmentAppliesTerminalStateOverrides() {
         let environment = PTYProcess.terminalEnvironment(
             from: ["PATH": "/usr/bin:/bin"],
-            overrides: ["GHOSTNOTCH_AGENT_STATE_FILE": "/tmp/ghostnotch-agent-state"]
+            overrides: [
+                "GHOSTNOTCH_AGENT_STATE_FILE": "/tmp/ghostnotch-agent-state",
+                "GHOSTNOTCH_AGENT_EVENT_LOG": "/tmp/ghostnotch-agent-events.jsonl",
+            ]
         )
 
         XCTAssertEqual(environment["GHOSTNOTCH_AGENT_STATE_FILE"], "/tmp/ghostnotch-agent-state")
+        XCTAssertEqual(environment["GHOSTNOTCH_AGENT_EVENT_LOG"], "/tmp/ghostnotch-agent-events.jsonl")
     }
 
     func testSessionRunsCommandAndCapturesOutput() async throws {
@@ -209,6 +213,82 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(TerminalAgentActivityState(rawFileValue: ""), .idle)
     }
 
+    func testAgentActivityStateParsesStructuredJSONEnvelopeValues() {
+        XCTAssertEqual(
+            TerminalAgentActivityState(
+                rawFileValue: #"{"version":1,"agent":"codex","state":"idle","event":"SessionStart"}"#
+            ),
+            .idle
+        )
+        XCTAssertEqual(
+            TerminalAgentActivityState(
+                rawFileValue: #"{"version":1,"agent":"codex","state":"working","event":"UserPromptSubmit"}"#
+            ),
+            .working
+        )
+        XCTAssertEqual(
+            TerminalAgentActivityState(
+                rawFileValue: #"{"version":1,"agent":"codex","state":"attention","event":"PermissionRequest"}"#
+            ),
+            .attention
+        )
+        XCTAssertEqual(
+            TerminalAgentActivityState(
+                rawFileValue: #"{"version":1,"agent":"claude","state":"working","event":"UserPromptSubmit"}"#
+            ),
+            .working
+        )
+        XCTAssertEqual(
+            TerminalAgentActivityState(
+                rawFileValue: #"{"version":1,"agent":"Claude","state":"ATTENTION","event":"Elicitation"}"#
+            ),
+            .attention
+        )
+        XCTAssertEqual(
+            TerminalAgentActivityState(
+                rawFileValue: #"{"version":1,"agent":"pi","state":"working","event":"UserPromptSubmit"}"#
+            ),
+            .idle
+        )
+        XCTAssertEqual(
+            TerminalAgentActivityState(
+                rawFileValue: #"{"version":1,"agent":"codex","state":"busy","event":"UserPromptSubmit"}"#
+            ),
+            .idle
+        )
+        XCTAssertEqual(TerminalAgentActivityState(rawFileValue: #"{"agent":"codex","state":"working""#), .idle)
+    }
+
+    func testAgentActivityRecordParsesStructuredMetadataAndLegacyValues() {
+        let timestamp = Date(timeIntervalSince1970: 1_780_000_000)
+        let codexRecord = TerminalAgentActivityRecord(
+            rawFileValue: agentActivityEnvelope(
+                agent: "codex",
+                state: "working",
+                event: "PreToolUse",
+                timestamp: timestamp
+            )
+        )
+
+        XCTAssertEqual(codexRecord.agent, .codex)
+        XCTAssertEqual(codexRecord.state, .working)
+        XCTAssertEqual(codexRecord.event, "PreToolUse")
+        XCTAssertEqual(codexRecord.timestamp?.timeIntervalSince1970 ?? 0, timestamp.timeIntervalSince1970, accuracy: 0.001)
+        XCTAssertFalse(codexRecord.isLegacy)
+
+        let legacyRecord = TerminalAgentActivityRecord(rawFileValue: "working\n")
+        XCTAssertEqual(legacyRecord.agent, .unknown)
+        XCTAssertEqual(legacyRecord.state, .working)
+        XCTAssertNil(legacyRecord.event)
+        XCTAssertNil(legacyRecord.timestamp)
+        XCTAssertTrue(legacyRecord.isLegacy)
+
+        let malformedRecord = TerminalAgentActivityRecord(rawFileValue: #"{"agent":"codex","state":"working""#)
+        XCTAssertEqual(malformedRecord.agent, .unknown)
+        XCTAssertEqual(malformedRecord.state, .idle)
+        XCTAssertFalse(malformedRecord.isLegacy)
+    }
+
     func testAgentActivityStatePublishesWorkingToIdleTransition() {
         let state = TerminalSessionState()
         var publishedStates: [TerminalAgentActivityState] = []
@@ -253,6 +333,7 @@ final class TerminalSessionTests: XCTestCase {
         guard let stateFilePath = process.startEnvironmentOverrides.last?["GHOSTNOTCH_AGENT_STATE_FILE"] else {
             return XCTFail("Expected GhostNotch agent state file override")
         }
+        XCTAssertNotNil(process.startEnvironmentOverrides.last?["GHOSTNOTCH_AGENT_EVENT_LOG"])
 
         try "working\n".write(toFile: stateFilePath, atomically: true, encoding: .utf8)
         try await waitForAgentActivityState(.working, in: state)
@@ -268,6 +349,106 @@ final class TerminalSessionTests: XCTestCase {
 
         try "invalid\n".write(toFile: stateFilePath, atomically: true, encoding: .utf8)
         try await waitForAgentActivityState(.idle, in: state)
+    }
+
+    func testAgentStateFileDrivesStructuredJSONAttentionWorkingIdleTransitions() async throws {
+        let state = TerminalSessionState()
+        let process = FakeTerminalProcess()
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: process
+        )
+
+        try session.start(cols: 80, rows: 24)
+        guard let stateFilePath = process.startEnvironmentOverrides.last?["GHOSTNOTCH_AGENT_STATE_FILE"] else {
+            return XCTFail("Expected GhostNotch agent state file override")
+        }
+
+        try #"{"version":1,"agent":"codex","state":"attention","event":"PermissionRequest"}"#
+            .write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.attention, in: state)
+
+        try #"{"version":1,"agent":"claude","state":"working","event":"ElicitationResult"}"#
+            .write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.working, in: state)
+
+        try #"{"version":1,"agent":"claude","state":"idle","event":"Stop"}"#
+            .write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.idle, in: state)
+    }
+
+    func testCodexWorkingStateExpiresToIdleWithoutRewritingStateFile() async throws {
+        let state = TerminalSessionState()
+        let process = FakeTerminalProcess()
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: process,
+            codexWorkingFreshnessTimeout: 0.2
+        )
+
+        try session.start(cols: 80, rows: 24)
+        guard let stateFilePath = process.startEnvironmentOverrides.last?["GHOSTNOTCH_AGENT_STATE_FILE"] else {
+            return XCTFail("Expected GhostNotch agent state file override")
+        }
+
+        try agentActivityEnvelope(
+            agent: "codex",
+            state: "working",
+            event: "PreToolUse",
+            timestamp: Date()
+        ).write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.working, in: state)
+
+        let expiredEnvelope = agentActivityEnvelope(
+            agent: "codex",
+            state: "working",
+            event: "PreToolUse",
+            timestamp: Date().addingTimeInterval(-5)
+        )
+        try expiredEnvelope.write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.idle, in: state)
+        XCTAssertEqual(try String(contentsOfFile: stateFilePath, encoding: .utf8), expiredEnvelope)
+    }
+
+    func testCodexAttentionClaudeWorkingAndLegacyWorkingDoNotExpire() async throws {
+        let state = TerminalSessionState()
+        let process = FakeTerminalProcess()
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: process,
+            codexWorkingFreshnessTimeout: 0.1
+        )
+
+        try session.start(cols: 80, rows: 24)
+        guard let stateFilePath = process.startEnvironmentOverrides.last?["GHOSTNOTCH_AGENT_STATE_FILE"] else {
+            return XCTFail("Expected GhostNotch agent state file override")
+        }
+
+        try agentActivityEnvelope(
+            agent: "codex",
+            state: "attention",
+            event: "PermissionRequest",
+            timestamp: Date().addingTimeInterval(-5)
+        ).write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.attention, in: state)
+
+        try agentActivityEnvelope(
+            agent: "claude",
+            state: "working",
+            event: "ElicitationResult",
+            timestamp: Date().addingTimeInterval(-5)
+        ).write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.working, in: state)
+        try await Task.sleep(nanoseconds: 250_000_000)
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        try "working\n".write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.working, in: state)
+        try await Task.sleep(nanoseconds: 250_000_000)
+        XCTAssertEqual(state.agentActivityState, .working)
     }
 
     func testAgentActivityClearsWhenSessionStopsOrFails() {
@@ -489,6 +670,23 @@ final class TerminalSessionTests: XCTestCase {
         }
 
         XCTFail("Agent activity state did not become \(expectedValue). Current value: \(state.agentActivityState)")
+    }
+
+    private func agentActivityEnvelope(
+        agent: String,
+        state: String,
+        event: String,
+        timestamp: Date
+    ) -> String {
+        """
+        {"agent":"\(agent)","event":"\(event)","state":"\(state)","timestamp":"\(isoTimestamp(timestamp))","version":1}
+        """
+    }
+
+    private func isoTimestamp(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
     }
 }
 

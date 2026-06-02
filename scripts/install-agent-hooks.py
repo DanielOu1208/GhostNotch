@@ -6,61 +6,129 @@ import copy
 import datetime as dt
 import json
 import pathlib
+import shlex
 import shutil
 import tempfile
+from dataclasses import dataclass
 
 
 MANAGED_MARKER = "GHOSTNOTCH_MANAGED_HOOK=1"
+PACKAGE_MARKER_NAME = "GHOSTNOTCH_HOOK_PACKAGE"
+PACKAGE_DIRECTORY = pathlib.Path(__file__).with_name("agent-hook-packages")
 
 
-CODEX_HOOKS = {
-    "SessionStart": [("idle", None)],
-    "UserPromptSubmit": [("working", None)],
-    "Stop": [("idle", None)],
-    "PermissionRequest": [("attention", "*")],
-}
-
-CLAUDE_HOOKS = {
-    "SessionStart": [("idle", None)],
-    "UserPromptSubmit": [("working", None)],
-    "Stop": [("idle", None)],
-    "StopFailure": [("idle", None)],
-    "SessionEnd": [("idle", None)],
-    "PermissionRequest": [("attention", "*")],
-    "Notification": [("attention --when-field notification_type=permission_prompt,idle_prompt,elicitation_dialog", None)],
-    "Elicitation": [("attention", "*")],
-    "ElicitationResult": [("working", "*")],
-}
+@dataclass(frozen=True)
+class HookSpec:
+    event: str
+    state: str
+    matcher: str | None = None
+    when_field: str | None = None
 
 
-def hook_command(state_args: str) -> str:
-    helper = '"$GHOSTNOTCH_RESOURCES_DIR/ghostnotch-agent-state"'
-    return (
-        f'[ -n "$GHOSTNOTCH_RESOURCES_DIR" ] && '
-        f'[ -x {helper} ] && '
-        f'{MANAGED_MARKER} {helper} {state_args} || true'
+@dataclass(frozen=True)
+class AgentHookPackage:
+    package_id: str
+    package_version: int
+    display_name: str
+    binary_name: str
+    default_config_path: pathlib.Path
+    helper_name: str
+    legacy_helper_names: tuple[str, ...]
+    hooks: tuple[HookSpec, ...]
+
+    @property
+    def marker(self) -> str:
+        return f"{self.package_id}-v{self.package_version}"
+
+
+def load_package(path: pathlib.Path) -> AgentHookPackage:
+    with path.open("r", encoding="utf-8") as file:
+        data = json.load(file)
+
+    hooks = tuple(
+        HookSpec(
+            event=hook["event"],
+            state=hook["state"],
+            matcher=hook.get("matcher"),
+            when_field=hook.get("whenField"),
+        )
+        for hook in data["hooks"]
+    )
+
+    return AgentHookPackage(
+        package_id=data["id"],
+        package_version=int(data["packageVersion"]),
+        display_name=data["displayName"],
+        binary_name=data["binaryName"],
+        default_config_path=pathlib.Path(data["defaultConfigPath"]).expanduser(),
+        helper_name=data["helperName"],
+        legacy_helper_names=tuple(data.get("legacyHelperNames", [])),
+        hooks=hooks,
     )
 
 
-def managed_hook(state_args: str) -> dict:
+def load_packages(package_directory: pathlib.Path = PACKAGE_DIRECTORY) -> tuple[AgentHookPackage, ...]:
+    return tuple(load_package(path) for path in sorted(package_directory.glob("*.json")))
+
+
+def hook_command(package: AgentHookPackage, hook: HookSpec) -> str:
+    helper = f'"$GHOSTNOTCH_RESOURCES_DIR/{package.helper_name}"'
+    helper_args = [
+        "--agent",
+        package.package_id,
+        "--event",
+        hook.event,
+        "--state",
+        hook.state,
+    ]
+    if hook.when_field:
+        helper_args.extend(["--when-field", hook.when_field])
+
+    quoted_args = " ".join(shlex.quote(arg) for arg in helper_args)
+    package_marker = f"{PACKAGE_MARKER_NAME}={shlex.quote(package.marker)}"
+
+    return (
+        f'[ -n "$GHOSTNOTCH_RESOURCES_DIR" ] && '
+        f'[ -x {helper} ] && '
+        f'{MANAGED_MARKER} {package_marker} {helper} {quoted_args} || true'
+    )
+
+
+def managed_hook(package: AgentHookPackage, hook: HookSpec) -> dict:
     return {
         "type": "command",
-        "command": hook_command(state_args),
+        "command": hook_command(package, hook),
     }
 
 
-def managed_block(state_args: str, matcher: str | None) -> dict:
-    block = {"hooks": [managed_hook(state_args)]}
-    if matcher is not None:
-        block["matcher"] = matcher
+def managed_block(package: AgentHookPackage, hook: HookSpec) -> dict:
+    block = {"hooks": [managed_hook(package, hook)]}
+    if hook.matcher is not None:
+        block["matcher"] = hook.matcher
     return block
 
 
-def is_managed_hook(hook: object) -> bool:
-    return isinstance(hook, dict) and MANAGED_MARKER in str(hook.get("command", ""))
+def hook_command_text(hook: object) -> str:
+    if not isinstance(hook, dict):
+        return ""
+    command = hook.get("command", "")
+    return command if isinstance(command, str) else ""
 
 
-def remove_managed_hooks(config: dict) -> dict:
+def is_package_hook(hook: object, package: AgentHookPackage) -> bool:
+    return f"{PACKAGE_MARKER_NAME}={package.marker}" in hook_command_text(hook)
+
+
+def is_legacy_package_hook(hook: object, package: AgentHookPackage) -> bool:
+    command = hook_command_text(hook)
+    return MANAGED_MARKER in command and any(helper_name in command for helper_name in package.legacy_helper_names)
+
+
+def should_remove_hook(hook: object, package: AgentHookPackage, include_legacy: bool) -> bool:
+    return is_package_hook(hook, package) or (include_legacy and is_legacy_package_hook(hook, package))
+
+
+def remove_package_hooks(config: dict, package: AgentHookPackage, include_legacy: bool) -> dict:
     result = copy.deepcopy(config)
     hooks_by_event = result.get("hooks")
     if not isinstance(hooks_by_event, dict):
@@ -82,7 +150,11 @@ def remove_managed_hooks(config: dict) -> dict:
                 kept_blocks.append(block)
                 continue
 
-            kept_hooks = [hook for hook in hook_list if not is_managed_hook(hook)]
+            kept_hooks = [
+                hook
+                for hook in hook_list
+                if not should_remove_hook(hook, package, include_legacy)
+            ]
             if kept_hooks:
                 next_block = copy.deepcopy(block)
                 next_block["hooks"] = kept_hooks
@@ -96,21 +168,20 @@ def remove_managed_hooks(config: dict) -> dict:
     return result
 
 
-def install_hooks(config: dict, hook_map: dict[str, list[tuple[str, str | None]]]) -> dict:
-    result = remove_managed_hooks(config)
+def install_package_hooks(config: dict, package: AgentHookPackage) -> dict:
+    result = remove_package_hooks(config, package, include_legacy=True)
     hooks_by_event = result.setdefault("hooks", {})
     if not isinstance(hooks_by_event, dict):
         result["hooks"] = {}
         hooks_by_event = result["hooks"]
 
-    for event_name, hooks in hook_map.items():
-        blocks = hooks_by_event.setdefault(event_name, [])
+    for hook in package.hooks:
+        blocks = hooks_by_event.setdefault(hook.event, [])
         if not isinstance(blocks, list):
-            hooks_by_event[event_name] = []
-            blocks = hooks_by_event[event_name]
+            hooks_by_event[hook.event] = []
+            blocks = hooks_by_event[hook.event]
 
-        for state_args, matcher in hooks:
-            blocks.append(managed_block(state_args, matcher))
+        blocks.append(managed_block(package, hook))
 
     return result
 
@@ -139,13 +210,32 @@ def write_json(path: pathlib.Path, data: dict, backup: bool) -> None:
         file.write("\n")
 
 
-def apply_config(path: pathlib.Path, hook_map: dict[str, list[tuple[str, str | None]]], action: str, backup: bool) -> None:
+def apply_config(path: pathlib.Path, package: AgentHookPackage, action: str, backup: bool) -> None:
     current = load_json(path)
-    updated = install_hooks(current, hook_map) if action == "install" else remove_managed_hooks(current)
+    if action == "install":
+        updated = install_package_hooks(current, package)
+    else:
+        updated = remove_package_hooks(current, package, include_legacy=True)
     write_json(path, updated, backup=backup)
 
 
+def package_config_path(package: AgentHookPackage, args: argparse.Namespace) -> pathlib.Path:
+    override = getattr(args, f"{package.package_id}_path", None)
+    return override or package.default_config_path
+
+
+def legacy_hook_command(helper_name: str, helper_args: str) -> str:
+    helper = f'"$GHOSTNOTCH_RESOURCES_DIR/{helper_name}"'
+    return (
+        f'[ -n "$GHOSTNOTCH_RESOURCES_DIR" ] && '
+        f'{MANAGED_MARKER} {helper} {helper_args} || true'
+    )
+
+
 def run_self_test() -> None:
+    packages = {package.package_id: package for package in load_packages()}
+    assert set(packages) == {"claude", "codex"}
+
     with tempfile.TemporaryDirectory() as directory:
         root = pathlib.Path(directory)
         codex_path = root / "codex" / "hooks.json"
@@ -157,6 +247,16 @@ def run_self_test() -> None:
             json.dumps(
                 {
                     "hooks": {
+                        "UserPromptSubmit": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": legacy_hook_command("ghostnotch-agent-state", "working"),
+                                    }
+                                ]
+                            }
+                        ],
                         "Stop": [
                             {
                                 "hooks": [
@@ -172,35 +272,68 @@ def run_self_test() -> None:
             ),
             encoding="utf-8",
         )
-        claude_path.write_text(json.dumps({"permissions": {"allow": ["mcp__pencil"]}}), encoding="utf-8")
+        claude_path.write_text(
+            json.dumps(
+                {
+                    "permissions": {"allow": ["mcp__pencil"]},
+                    "hooks": {
+                        "Notification": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": legacy_hook_command(
+                                            "ghostnotch-agent-state",
+                                            "attention --when-field notification_type=permission_prompt",
+                                        ),
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
 
-        apply_config(codex_path, CODEX_HOOKS, "install", backup=False)
-        apply_config(codex_path, CODEX_HOOKS, "install", backup=False)
+        apply_config(codex_path, packages["codex"], "install", backup=False)
+        apply_config(codex_path, packages["codex"], "install", backup=False)
         codex = load_json(codex_path)
-        stop_hooks = str(codex["hooks"]["Stop"])
-        assert stop_hooks.count(MANAGED_MARKER) == 1
-        assert "echo existing" in stop_hooks
-        assert MANAGED_MARKER in str(codex["hooks"]["PermissionRequest"])
+        codex_text = json.dumps(codex)
+        assert codex_text.count(f"{PACKAGE_MARKER_NAME}=codex-v1") == len(packages["codex"].hooks)
+        assert "ghostnotch-agent-hook" in codex_text
+        assert "ghostnotch-agent-state" not in codex_text
+        assert "ghostnotch-codex-hook" not in codex_text
+        assert "echo existing" in codex_text
 
-        apply_config(claude_path, CLAUDE_HOOKS, "install", backup=False)
-        apply_config(claude_path, CLAUDE_HOOKS, "install", backup=False)
+        apply_config(claude_path, packages["claude"], "install", backup=False)
+        apply_config(claude_path, packages["claude"], "install", backup=False)
         claude = load_json(claude_path)
+        claude_text = json.dumps(claude)
         assert claude["permissions"]["allow"] == ["mcp__pencil"]
-        assert str(claude["hooks"]["Notification"]).count(MANAGED_MARKER) == 1
-        assert "elicitation_dialog" in str(claude["hooks"]["Notification"])
+        assert claude_text.count(f"{PACKAGE_MARKER_NAME}=claude-v1") == len(packages["claude"].hooks)
+        assert "ghostnotch-agent-hook" in claude_text
+        assert "ghostnotch-agent-state" not in claude_text
+        assert "elicitation_dialog" in claude_text
 
-        apply_config(codex_path, CODEX_HOOKS, "uninstall", backup=False)
-        apply_config(claude_path, CLAUDE_HOOKS, "uninstall", backup=False)
-        assert MANAGED_MARKER not in codex_path.read_text(encoding="utf-8")
-        assert MANAGED_MARKER not in claude_path.read_text(encoding="utf-8")
+        combined = install_package_hooks(codex, packages["claude"])
+        combined = remove_package_hooks(combined, packages["codex"], include_legacy=True)
+        combined_text = json.dumps(combined)
+        assert f"{PACKAGE_MARKER_NAME}=codex-v1" not in combined_text
+        assert f"{PACKAGE_MARKER_NAME}=claude-v1" in combined_text
+
+        apply_config(codex_path, packages["codex"], "uninstall", backup=False)
+        apply_config(claude_path, packages["claude"], "uninstall", backup=False)
+        assert f"{PACKAGE_MARKER_NAME}=codex-v1" not in codex_path.read_text(encoding="utf-8")
+        assert f"{PACKAGE_MARKER_NAME}=claude-v1" not in claude_path.read_text(encoding="utf-8")
         assert "echo existing" in codex_path.read_text(encoding="utf-8")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Install or uninstall GhostNotch Codex/Claude indicator hooks.")
+    parser = argparse.ArgumentParser(description="Install or uninstall GhostNotch agent indicator hooks.")
     parser.add_argument("action", choices=["install", "uninstall", "self-test"])
-    parser.add_argument("--codex-path", type=pathlib.Path, default=pathlib.Path.home() / ".codex" / "hooks.json")
-    parser.add_argument("--claude-path", type=pathlib.Path, default=pathlib.Path.home() / ".claude" / "settings.json")
+    parser.add_argument("--codex-path", type=pathlib.Path)
+    parser.add_argument("--claude-path", type=pathlib.Path)
     parser.add_argument("--force", action="store_true", help="Write config even if the CLI executable is not detected.")
     parser.add_argument("--no-backup", action="store_true")
     return parser.parse_args()
@@ -213,17 +346,13 @@ def main() -> int:
         return 0
 
     backup = not args.no_backup
-    if args.force or shutil.which("codex") or args.codex_path.exists():
-        apply_config(args.codex_path, CODEX_HOOKS, args.action, backup=backup)
-        print(f"{args.action}: Codex hooks at {args.codex_path}")
-    else:
-        print("skip: Codex CLI not found")
-
-    if args.force or shutil.which("claude") or args.claude_path.exists():
-        apply_config(args.claude_path, CLAUDE_HOOKS, args.action, backup=backup)
-        print(f"{args.action}: Claude Code hooks at {args.claude_path}")
-    else:
-        print("skip: Claude Code not found")
+    for package in load_packages():
+        config_path = package_config_path(package, args)
+        if args.force or shutil.which(package.binary_name) or config_path.exists():
+            apply_config(config_path, package, args.action, backup=backup)
+            print(f"{args.action}: {package.display_name} hooks at {config_path}")
+        else:
+            print(f"skip: {package.display_name} not found")
     return 0
 
 

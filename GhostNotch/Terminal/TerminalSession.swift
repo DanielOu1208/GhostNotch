@@ -37,12 +37,15 @@ final class TerminalSession {
     let state: TerminalSessionState
 
     static let defaultStartupTimeout: TimeInterval = 5
+    static let defaultCodexWorkingFreshnessTimeout: TimeInterval = 2.5
 
     private let shellResolver: ShellResolver
     private let workingDirectory: String
     private let startupTimeout: TimeInterval
+    private let codexWorkingFreshnessTimeout: TimeInterval
     private let process: any TerminalProcess
     private let agentStateFileURL: URL
+    private let agentEventLogFileURL: URL
     private var outputObservers: [@MainActor (Data) -> Void] = []
     private var lifecycleGeneration = 0
     private var startupWatchdogTask: Task<Void, Never>?
@@ -53,15 +56,20 @@ final class TerminalSession {
         workingDirectory: String = FileManager.default.homeDirectoryForCurrentUser.path,
         state: TerminalSessionState? = nil,
         process: any TerminalProcess = PTYProcess(),
-        startupTimeout: TimeInterval = TerminalSession.defaultStartupTimeout
+        startupTimeout: TimeInterval = TerminalSession.defaultStartupTimeout,
+        codexWorkingFreshnessTimeout: TimeInterval = TerminalSession.defaultCodexWorkingFreshnessTimeout
     ) {
         self.shellResolver = shellResolver
         self.workingDirectory = workingDirectory
         self.state = state ?? TerminalSessionState()
         self.process = process
         self.startupTimeout = startupTimeout
+        self.codexWorkingFreshnessTimeout = codexWorkingFreshnessTimeout
+        let agentStateIdentifier = UUID().uuidString
         agentStateFileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ghostnotch-agent-state-\(UUID().uuidString)", isDirectory: false)
+            .appendingPathComponent("ghostnotch-agent-state-\(agentStateIdentifier)", isDirectory: false)
+        agentEventLogFileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ghostnotch-agent-events-\(agentStateIdentifier).jsonl", isDirectory: false)
 
         process.onOutput = { [weak self] data in
             self?.state.appendOutput(data)
@@ -166,6 +174,7 @@ final class TerminalSession {
                 rows: rows,
                 environmentOverrides: [
                     "GHOSTNOTCH_AGENT_STATE_FILE": agentStateFileURL.path,
+                    "GHOSTNOTCH_AGENT_EVENT_LOG": agentEventLogFileURL.path,
                 ]
             )
             state.markStarting()
@@ -257,6 +266,22 @@ final class TerminalSession {
             return
         }
 
-        state.updateAgentActivityState(TerminalAgentActivityState(rawFileValue: stateText))
+        let record = TerminalAgentActivityRecord(rawFileValue: stateText)
+        state.updateAgentActivityState(activityState(for: record, now: Date()))
+    }
+
+    private func activityState(
+        for record: TerminalAgentActivityRecord,
+        now: Date
+    ) -> TerminalAgentActivityState {
+        guard record.agent == .codex,
+              record.state == .working,
+              record.isLegacy == false,
+              let timestamp = record.timestamp
+        else {
+            return record.state
+        }
+
+        return now.timeIntervalSince(timestamp) <= codexWorkingFreshnessTimeout ? .working : .idle
     }
 }

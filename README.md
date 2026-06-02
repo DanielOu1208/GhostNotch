@@ -104,6 +104,7 @@ Use the root `GhostNotch.xcodeproj` and root `GhostNotch/` source tree.
 - [Docs index](docs/README.md) is the best starting point for contributors.
 - [Architecture](docs/architecture.md) explains the current app structure and Ghostty boundary.
 - [Testing](docs/testing.md) covers build, automated tests, and manual terminal acceptance.
+- [Agent indicator hooks](docs/agent-indicator-hooks.md) explains Codex and Claude hook setup and indicator state mapping.
 - [MacBook notch geometry](docs/notch-geometry.md) records the notch sizing and positioning assumptions.
 - [Xcode debugging](docs/xcode-debugging.md) covers LLDB task-port attach failures and terminal startup hangs.
 - [Ghostty VT vendor notes](vendor/ghostty-vt/README.md) describe the vendored terminal artifact.
