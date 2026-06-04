@@ -3,6 +3,10 @@ import OSLog
 enum GhostNotchRuntimeMetrics {
     private static let logger = Logger(subsystem: "com.ghostnotch.local", category: "Runtime")
 
+    #if DEBUG
+    nonisolated(unsafe) static var gridInvalidationRecorder: ((Bool, Int) -> Void)?
+    #endif
+
     static func recordHoverEvent(stateChanged: Bool) {
         #if DEBUG
         guard stateChanged else {
@@ -10,12 +14,6 @@ enum GhostNotchRuntimeMetrics {
         }
 
         logger.debug("hover event stateChanged=\(stateChanged)")
-        #endif
-    }
-
-    static func recordSkippedCollapsedSnapshot() {
-        #if DEBUG
-        logger.debug("snapshot skipped while collapsed")
         #endif
     }
 
@@ -36,6 +34,7 @@ enum GhostNotchRuntimeMetrics {
     static func recordGridInvalidation(fullRedraw: Bool, rowCount: Int) {
         #if DEBUG
         logger.debug("grid invalidation fullRedraw=\(fullRedraw) rows=\(rowCount)")
+        gridInvalidationRecorder?(fullRedraw, rowCount)
         #endif
     }
 }

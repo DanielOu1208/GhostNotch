@@ -114,12 +114,12 @@ private struct AgentActivityEnvelope: Decodable {
     let timestamp: String?
 }
 
-enum CodexTerminalAttentionDetector {
-    static func isOptionSelectorVisible(in snapshot: TerminalRenderSnapshot) -> Bool {
-        isOptionSelectorVisible(in: snapshot.plainText)
+enum CodexTerminalQuestionSelectorDetector {
+    static func isQuestionSelectorVisible(in snapshot: TerminalRenderSnapshot) -> Bool {
+        isQuestionSelectorVisible(in: snapshot.plainText)
     }
 
-    static func isOptionSelectorVisible(in text: String) -> Bool {
+    static func isQuestionSelectorVisible(in text: String) -> Bool {
         let normalizedText = text.lowercased()
         guard normalizedText.contains("unanswered"),
               normalizedText.contains("enter to submit answer"),
@@ -157,9 +157,7 @@ final class TerminalSessionState: ObservableObject {
     private var capturedOutput = Data()
     private let outputCaptureLimit: Int?
     private var hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: .idle, isLegacy: true)
-    private var hasCodexVisiblePicker = false
-    private var codexVisiblePickerText: String?
-    private var suppressedCodexPickerText: String?
+    private var hasCodexVisibleQuestionSelector = false
 
     init(outputLimit: Int? = nil) {
         outputCaptureLimit = outputLimit
@@ -228,7 +226,7 @@ final class TerminalSessionState: ObservableObject {
 
     func updateAgentActivityState(_ newState: TerminalAgentActivityState) {
         hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: newState, isLegacy: true)
-        clearCodexPickerOverride()
+        clearCodexQuestionSelectorOverride()
         resolveAgentActivityState()
     }
 
@@ -236,16 +234,9 @@ final class TerminalSessionState: ObservableObject {
         let isNewRecord = record != hookActivityRecord
         hookActivityRecord = record
 
-        if isNewRecord {
-            if hasCodexVisiblePicker {
-                suppressedCodexPickerText = codexVisiblePickerText
-            }
-            hasCodexVisiblePicker = false
-            codexVisiblePickerText = nil
-
-            if record.agent != .codex || record.state != .working || record.isLegacy {
-                suppressedCodexPickerText = nil
-            }
+        if isNewRecord,
+           (record.agent != .codex || record.state != .working || record.isLegacy) {
+            setCodexVisibleQuestionSelector(false)
         }
 
         resolveAgentActivityState()
@@ -257,46 +248,29 @@ final class TerminalSessionState: ObservableObject {
               hookActivityRecord.state == .working,
               hookActivityRecord.isLegacy == false
         else {
-            setCodexVisiblePicker(false)
+            setCodexVisibleQuestionSelector(false)
             return
         }
 
-        if visibleText == suppressedCodexPickerText {
-            setCodexVisiblePicker(false)
-            return
-        }
-
-        let isVisiblePicker = CodexTerminalAttentionDetector.isOptionSelectorVisible(in: visibleText)
-        if !isVisiblePicker {
-            suppressedCodexPickerText = nil
-        }
-
-        setCodexVisiblePicker(isVisiblePicker, text: isVisiblePicker ? visibleText : nil)
+        let isVisibleQuestionSelector = CodexTerminalQuestionSelectorDetector.isQuestionSelectorVisible(in: visibleText)
+        setCodexVisibleQuestionSelector(isVisibleQuestionSelector)
     }
 
     private func resetAgentActivityState() {
         hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: .idle, isLegacy: true)
-        clearCodexPickerOverride()
+        clearCodexQuestionSelectorOverride()
         resolveAgentActivityState()
     }
 
-    private func setCodexVisiblePicker(_ isVisible: Bool, text: String? = nil) {
-        guard hasCodexVisiblePicker != isVisible else {
-            if isVisible {
-                codexVisiblePickerText = text
-            }
-            return
-        }
+    private func setCodexVisibleQuestionSelector(_ isVisible: Bool) {
+        guard hasCodexVisibleQuestionSelector != isVisible else { return }
 
-        hasCodexVisiblePicker = isVisible
-        codexVisiblePickerText = text
+        hasCodexVisibleQuestionSelector = isVisible
         resolveAgentActivityState()
     }
 
-    private func clearCodexPickerOverride() {
-        hasCodexVisiblePicker = false
-        codexVisiblePickerText = nil
-        suppressedCodexPickerText = nil
+    private func clearCodexQuestionSelectorOverride() {
+        hasCodexVisibleQuestionSelector = false
     }
 
     private func resolveAgentActivityState() {
@@ -304,8 +278,8 @@ final class TerminalSessionState: ObservableObject {
         if hookActivityRecord.agent == .codex,
            hookActivityRecord.state == .working,
            hookActivityRecord.isLegacy == false,
-           hasCodexVisiblePicker {
-            resolvedState = .attention
+           hasCodexVisibleQuestionSelector {
+            resolvedState = .idle
         } else {
             resolvedState = hookActivityRecord.state
         }

@@ -37,6 +37,7 @@ struct IslandRootView: View {
                 snapshot: controller.terminalSnapshot,
                 initialLastReportedResize: controller.lastAppliedGridResize,
                 focusRequestID: controller.terminalFocusRequestID,
+                repaintRequestID: controller.terminalSurfaceRepaintRequestID,
                 onInput: controller.writeToTerminal,
                 onKeyEvent: controller.sendTerminalKeyEvent,
                 onScroll: controller.handleTerminalScrollWheel,

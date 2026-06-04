@@ -224,6 +224,12 @@ final class TerminalGridView: NSView {
         }
     }
 
+    func forceFullRedrawForSurfaceActivation() {
+        previousCursorRowForInvalidation = snapshot.cursorVisible ? snapshot.cursorRow : nil
+        GhostNotchRuntimeMetrics.recordGridInvalidation(fullRedraw: true, rowCount: snapshot.rows)
+        needsDisplay = true
+    }
+
     private var measuredCellSize: NSSize {
         typography.cellSize
     }

@@ -8,6 +8,7 @@ struct IslandExpandedView: View {
     let snapshot: TerminalRenderSnapshot
     let initialLastReportedResize: TerminalGridResize?
     let focusRequestID: Int
+    let repaintRequestID: Int
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
     let onScroll: (TerminalScrollEvent) -> Void
@@ -33,6 +34,7 @@ struct IslandExpandedView: View {
                 initialLastReportedResize: initialLastReportedResize,
                 allowsResizeReporting: controller.allowsGridResizeReporting,
                 focusRequestID: focusRequestID,
+                repaintRequestID: repaintRequestID,
                 onInput: onInput,
                 onKeyEvent: onKeyEvent,
                 onScroll: onScroll,

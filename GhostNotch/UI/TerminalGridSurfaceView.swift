@@ -6,6 +6,7 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
     let initialLastReportedResize: TerminalGridResize?
     let allowsResizeReporting: Bool
     let focusRequestID: Int
+    let repaintRequestID: Int
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
     let onScroll: (TerminalScrollEvent) -> Void
@@ -32,6 +33,8 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
             }
             Self.applyFocus(to: view, coordinator: coordinator)
         }
+        view.forceFullRedrawForSurfaceActivation()
+        context.coordinator.lastRepaintRequestID = repaintRequestID
         context.coordinator.view = view
         return view
     }
@@ -44,7 +47,12 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
         view.onMouseEvent = onMouseEvent
         view.onResize = onResize
         view.allowsResizeReporting = allowsResizeReporting
-        view.invalidateRowsFromSnapshot()
+        if context.coordinator.lastRepaintRequestID != repaintRequestID {
+            context.coordinator.lastRepaintRequestID = repaintRequestID
+            view.forceFullRedrawForSurfaceActivation()
+        } else {
+            view.invalidateRowsFromSnapshot()
+        }
         if allowsResizeReporting {
             view.reportSizeIfNeeded()
         }
@@ -82,6 +90,7 @@ struct TerminalGridSurfaceView: NSViewRepresentable {
     final class Coordinator {
         weak var view: TerminalGridView?
         var lastFocusRequestID = 0
+        var lastRepaintRequestID = 0
         var shouldRetryFocusOnWindowAttach = false
     }
 }

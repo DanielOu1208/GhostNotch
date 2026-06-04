@@ -6,6 +6,7 @@ final class IslandPanelController: ObservableObject {
     @Published private(set) var state: IslandState = .collapsed
     @Published private(set) var notchFillMode: NotchFillMode = .black
     @Published private(set) var terminalFocusRequestID = 0
+    @Published private(set) var terminalSurfaceRepaintRequestID = 0
     @Published private(set) var terminalSnapshot = TerminalRenderSnapshot.empty()
     @Published private(set) var terminalSurfacePhase: IslandTerminalSurfacePhase = .idle
 
@@ -49,16 +50,7 @@ final class IslandPanelController: ObservableObject {
         )
 
         terminalSurfaceCoordinator.onSnapshotChange = { [weak self] snapshot in
-            guard let self else {
-                return
-            }
-
-            guard self.state == .expanded || self.terminalSurfacePhase != .idle else {
-                GhostNotchRuntimeMetrics.recordSkippedCollapsedSnapshot()
-                return
-            }
-
-            self.terminalSnapshot = snapshot
+            self?.terminalSnapshot = snapshot
         }
 
         configurePanel()
@@ -228,13 +220,18 @@ final class IslandPanelController: ObservableObject {
     }
 
     private func activateTerminalSurface() {
+        terminalSnapshot = terminalSurfaceCoordinator.currentSnapshot()
+        requestTerminalSurfaceRepaint()
         requestTerminalFocus()
         terminalSurfaceCoordinator.focus()
-        terminalSnapshot = terminalSurfaceCoordinator.currentSnapshot()
     }
 
     private func requestTerminalFocus() {
         terminalFocusRequestID += 1
+    }
+
+    private func requestTerminalSurfaceRepaint() {
+        terminalSurfaceRepaintRequestID += 1
     }
 
     private func transition(to newState: IslandState) {
