@@ -30,6 +30,8 @@ Current automated coverage includes shell resolution, real PTY command output, s
 
 Manual expanded-app acceptance still needs to be run interactively in GhostNotch after renderer or terminal behavior changes.
 
+Latest pre-feature hardening note: [Pre-Feature Hardening Acceptance - 2026-06-10](pre-feature-hardening-acceptance-2026-06-10.md).
+
 Required checks:
 
 - Primary shell scrollback stays on the same visible lines after collapse/reopen.
