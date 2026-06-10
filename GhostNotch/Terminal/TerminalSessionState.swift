@@ -114,9 +114,13 @@ private struct AgentActivityEnvelope: Decodable {
     let timestamp: String?
 }
 
-enum CodexTerminalQuestionSelectorDetector {
-    static func isQuestionSelectorVisible(in snapshot: TerminalRenderSnapshot) -> Bool {
-        isQuestionSelectorVisible(in: snapshot.plainText)
+enum CodexTerminalUserSelectorDetector {
+    static func isUserSelectorVisible(in snapshot: TerminalRenderSnapshot) -> Bool {
+        isUserSelectorVisible(in: snapshot.plainText)
+    }
+
+    static func isUserSelectorVisible(in text: String) -> Bool {
+        isQuestionSelectorVisible(in: text) || isPlanImplementationSelectorVisible(in: text)
     }
 
     static func isQuestionSelectorVisible(in text: String) -> Bool {
@@ -132,6 +136,20 @@ enum CodexTerminalQuestionSelectorDetector {
         return hasNumberedChoices(in: text)
     }
 
+    static func isPlanImplementationSelectorVisible(in text: String) -> Bool {
+        let normalizedText = text.lowercased()
+        guard normalizedText.contains("implement this plan?"),
+              normalizedText.contains("yes, implement this plan"),
+              normalizedText.contains("yes, clear context and implement"),
+              normalizedText.contains("no, stay in plan mode"),
+              normalizedText.contains("press enter to confirm or esc to go back")
+        else {
+            return false
+        }
+
+        return hasPlanImplementationChoices(in: text)
+    }
+
     private static func hasQuestionMarker(in text: String) -> Bool {
         text.range(
             of: #"Question\s+\d+\s*/\s*\d+"#,
@@ -142,6 +160,18 @@ enum CodexTerminalQuestionSelectorDetector {
     private static func hasNumberedChoices(in text: String) -> Bool {
         let matches = text.matches(of: #"(?m)^\s*(?:>\s*)?\d+\.\s+\S"#)
         return matches.count >= 2
+    }
+
+    private static func hasPlanImplementationChoices(in text: String) -> Bool {
+        let choicePatterns = [
+            #"(?m)^\s*(?:>\s*)?1\.\s+Yes,\s+implement\s+this\s+plan\b"#,
+            #"(?m)^\s*(?:>\s*)?2\.\s+Yes,\s+clear\s+context\s+and\s+implement\b"#,
+            #"(?m)^\s*(?:>\s*)?3\.\s+No,\s+stay\s+in\s+Plan\s+mode\b"#
+        ]
+
+        return choicePatterns.allSatisfy { pattern in
+            text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+        }
     }
 }
 
@@ -156,11 +186,18 @@ final class TerminalSessionState: ObservableObject {
 
     private var capturedOutput = Data()
     private let outputCaptureLimit: Int?
+    private let codexSelectorDwellNanoseconds: UInt64
     private var hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: .idle, isLegacy: true)
-    private var hasCodexVisibleQuestionSelector = false
+    private var hasConfirmedCodexVisibleUserSelector = false
+    private var pendingCodexUserSelectorTask: Task<Void, Never>?
+    private var codexUserSelectorGeneration = 0
 
-    init(outputLimit: Int? = nil) {
+    init(
+        outputLimit: Int? = nil,
+        codexSelectorDwellNanoseconds: UInt64 = 200_000_000
+    ) {
         outputCaptureLimit = outputLimit
+        self.codexSelectorDwellNanoseconds = codexSelectorDwellNanoseconds
     }
 
     var outputText: String {
@@ -226,7 +263,7 @@ final class TerminalSessionState: ObservableObject {
 
     func updateAgentActivityState(_ newState: TerminalAgentActivityState) {
         hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: newState, isLegacy: true)
-        clearCodexQuestionSelectorOverride()
+        clearCodexUserSelectorOverride()
         resolveAgentActivityState()
     }
 
@@ -236,7 +273,7 @@ final class TerminalSessionState: ObservableObject {
 
         if isNewRecord,
            (record.agent != .codex || record.state != .working || record.isLegacy) {
-            setCodexVisibleQuestionSelector(false)
+            clearCodexUserSelectorOverride()
         }
 
         resolveAgentActivityState()
@@ -244,33 +281,72 @@ final class TerminalSessionState: ObservableObject {
 
     func updateVisibleTerminalSnapshot(_ snapshot: TerminalRenderSnapshot) {
         let visibleText = snapshot.plainText
-        guard hookActivityRecord.agent == .codex,
-              hookActivityRecord.state == .working,
-              hookActivityRecord.isLegacy == false
+        guard isStructuredCodexWorkingHook
         else {
-            setCodexVisibleQuestionSelector(false)
+            clearCodexUserSelectorOverride()
             return
         }
 
-        let isVisibleQuestionSelector = CodexTerminalQuestionSelectorDetector.isQuestionSelectorVisible(in: visibleText)
-        setCodexVisibleQuestionSelector(isVisibleQuestionSelector)
+        let isVisibleUserSelector = CodexTerminalUserSelectorDetector.isUserSelectorVisible(in: visibleText)
+        if isVisibleUserSelector {
+            scheduleCodexUserSelectorConfirmationIfNeeded()
+        } else {
+            clearCodexUserSelectorOverride()
+        }
     }
 
     private func resetAgentActivityState() {
         hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: .idle, isLegacy: true)
-        clearCodexQuestionSelectorOverride()
+        clearCodexUserSelectorOverride()
         resolveAgentActivityState()
     }
 
-    private func setCodexVisibleQuestionSelector(_ isVisible: Bool) {
-        guard hasCodexVisibleQuestionSelector != isVisible else { return }
-
-        hasCodexVisibleQuestionSelector = isVisible
-        resolveAgentActivityState()
+    private var isStructuredCodexWorkingHook: Bool {
+        hookActivityRecord.agent == .codex &&
+            hookActivityRecord.state == .working &&
+            hookActivityRecord.isLegacy == false
     }
 
-    private func clearCodexQuestionSelectorOverride() {
-        hasCodexVisibleQuestionSelector = false
+    private func scheduleCodexUserSelectorConfirmationIfNeeded() {
+        guard hasConfirmedCodexVisibleUserSelector == false,
+              pendingCodexUserSelectorTask == nil
+        else {
+            return
+        }
+
+        codexUserSelectorGeneration += 1
+        let generation = codexUserSelectorGeneration
+        pendingCodexUserSelectorTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: self?.codexSelectorDwellNanoseconds ?? 0)
+            } catch {
+                return
+            }
+
+            guard let self,
+                  self.codexUserSelectorGeneration == generation,
+                  self.isStructuredCodexWorkingHook
+            else {
+                return
+            }
+
+            self.pendingCodexUserSelectorTask = nil
+            self.setConfirmedCodexVisibleUserSelector(true)
+        }
+    }
+
+    private func clearCodexUserSelectorOverride() {
+        pendingCodexUserSelectorTask?.cancel()
+        pendingCodexUserSelectorTask = nil
+        codexUserSelectorGeneration += 1
+        setConfirmedCodexVisibleUserSelector(false)
+    }
+
+    private func setConfirmedCodexVisibleUserSelector(_ isVisible: Bool) {
+        guard hasConfirmedCodexVisibleUserSelector != isVisible else { return }
+
+        hasConfirmedCodexVisibleUserSelector = isVisible
+        resolveAgentActivityState()
     }
 
     private func resolveAgentActivityState() {
@@ -278,8 +354,8 @@ final class TerminalSessionState: ObservableObject {
         if hookActivityRecord.agent == .codex,
            hookActivityRecord.state == .working,
            hookActivityRecord.isLegacy == false,
-           hasCodexVisibleQuestionSelector {
-            resolvedState = .idle
+           hasConfirmedCodexVisibleUserSelector {
+            resolvedState = .attention
         } else {
             resolvedState = hookActivityRecord.state
         }

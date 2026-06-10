@@ -50,15 +50,21 @@ Current Codex mapping:
 
 Normal Codex replies are not treated as `attention` unless Codex exposes a reliable hook signal for that case.
 
-Codex question selectors do not currently expose a documented hook signal. While the latest structured Codex hook state is `working`, GhostNotch also checks the rendered terminal snapshot for strict Codex question selector markers such as `Question N/N`, `unanswered`, numbered choices, `enter to submit answer`, and `esc to interrupt`. When those markers are visible, the rendered indicator remains `idle` until the visible snapshot no longer matches the question selector.
+Codex user selectors do not currently expose a documented hook signal. While the latest structured Codex hook state is `working`, GhostNotch also checks the rendered terminal snapshot for strict selector markers. Supported selector snapshots are:
+
+- Question selectors with `Question N/N`, `unanswered`, numbered choices, `enter to submit answer`, and `esc to interrupt`.
+- Plan-finished implementation selectors with `Implement this plan?`, the three implementation choices, and `Press enter to confirm or esc to go back`.
+
+When those markers remain visible for the 200ms confirmation window, the rendered indicator becomes `attention` until the visible snapshot no longer matches a supported selector.
 
 ## Recent Implementation Challenges
 
-- Codex question selectors look interactive to the user, but Codex still reports fresh structured `working` hooks while the selector is visible. The rendered snapshot must therefore remain the source of truth for keeping the indicator `idle`; newer `PreToolUse` or `PostToolUse` hooks alone must not clear that override.
+- Codex selectors look interactive to the user, but Codex still reports fresh structured `working` hooks while the selector is visible. The rendered snapshot must therefore remain the source of truth for keeping the indicator `attention`; newer `PreToolUse` or `PostToolUse` hooks alone must not clear that override.
 - Explicit attention hooks still take precedence. A structured Codex `PermissionRequest` clears the visible selector override and renders `attention`, because approval prompts require the user's attention even if the terminal still contains selector-like text.
+- Snapshot-derived Codex selector attention is delayed by 200ms to reduce false positives from transient output that briefly resembles a selector. Hook-derived attention, such as `PermissionRequest`, is not delayed.
 - Picker redraw lag came from treating Ghostty dirty-row metadata as reusable across collapse and expansion. A selector snapshot can be current but already `clean`, so terminal-surface activation now captures the current snapshot and requests a full grid redraw instead of waiting for another dirty row.
-- Terminal snapshots continue flowing through `TerminalSurfaceCoordinator` while collapsed so question-selector detection is not coupled to expansion timing. Avoid storing raw selector text in session state; the override only needs to remember whether a strict selector is visible.
-- Keep this behavior covered by focused tests: visible selectors hold `idle` through fresh Codex `working` hooks, non-selector snapshots return to `working`, `PermissionRequest` returns to `attention`, and clean-snapshot activation forces a full redraw.
+- Terminal snapshots continue flowing through `TerminalSurfaceCoordinator` while collapsed so selector detection is not coupled to expansion timing. Avoid storing raw selector text in session state; the override only needs to remember whether a strict selector is visible.
+- Keep this behavior covered by focused tests: visible selectors hold `attention` through fresh Codex `working` hooks, non-selector snapshots return to `working`, `PermissionRequest` remains `attention`, and clean-snapshot activation forces a full redraw.
 
 ## Claude Hooks
 

@@ -15,13 +15,41 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
         tab to add notes | enter to submit answer | esc to interrupt
         """
 
-        XCTAssertTrue(CodexTerminalQuestionSelectorDetector.isQuestionSelectorVisible(in: questionSelectorText))
-        XCTAssertFalse(CodexTerminalQuestionSelectorDetector.isQuestionSelectorVisible(in: "Question 1/1\n1. Not enough\n2. Markers"))
-        XCTAssertFalse(CodexTerminalQuestionSelectorDetector.isQuestionSelectorVisible(in: "enter to submit answer\nesc to interrupt\nno question marker"))
+        XCTAssertTrue(CodexTerminalUserSelectorDetector.isQuestionSelectorVisible(in: questionSelectorText))
+        XCTAssertTrue(CodexTerminalUserSelectorDetector.isUserSelectorVisible(in: questionSelectorText))
+        XCTAssertFalse(CodexTerminalUserSelectorDetector.isQuestionSelectorVisible(in: "Question 1/1\n1. Not enough\n2. Markers"))
+        XCTAssertFalse(CodexTerminalUserSelectorDetector.isQuestionSelectorVisible(in: "enter to submit answer\nesc to interrupt\nno question marker"))
     }
 
-    func testCodexVisibleQuestionSelectorOverridesWorkingStateToIdle() {
-        let state = TerminalSessionState()
+    func testCodexPlanImplementationSelectorDetectorRequiresStrictMarkers() {
+        let planSelectorText = """
+        Implement this plan?
+
+        > 1. Yes, implement this plan          Switch to Default and start coding.
+          2. Yes, clear context and implement  Fresh thread. Context: 6% used.
+          3. No, stay in Plan mode             Continue planning with the model.
+
+        Press enter to confirm or esc to go back
+        """
+
+        XCTAssertTrue(CodexTerminalUserSelectorDetector.isPlanImplementationSelectorVisible(in: planSelectorText))
+        XCTAssertTrue(CodexTerminalUserSelectorDetector.isUserSelectorVisible(in: planSelectorText))
+        XCTAssertFalse(
+            CodexTerminalUserSelectorDetector.isPlanImplementationSelectorVisible(
+                in: "Implement this plan?\n1. Yes\n2. No\nPress enter to confirm or esc to go back"
+            )
+        )
+        XCTAssertFalse(
+            CodexTerminalUserSelectorDetector.isPlanImplementationSelectorVisible(
+                in: "The implementation plan says to press enter to confirm or esc to go back later."
+            )
+        )
+    }
+
+    private let selectorDwellNanoseconds: UInt64 = 20_000_000
+
+    func testCodexVisibleQuestionSelectorOverridesWorkingStateToAttention() async throws {
+        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
         state.updateAgentActivityRecord(
             TerminalAgentActivityRecord(
                 agent: .codex,
@@ -34,11 +62,32 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
 
         state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
 
-        XCTAssertEqual(state.agentActivityState, .idle)
+        XCTAssertEqual(state.agentActivityState, .working)
+        try await waitForSelectorDwell()
+        XCTAssertEqual(state.agentActivityState, .attention)
+    }
+
+    func testCodexPlanImplementationSelectorOverridesWorkingStateToAttention() async throws {
+        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .codex,
+                state: .working,
+                event: "PostToolUse",
+                timestamp: Date(),
+                isLegacy: false
+            )
+        )
+
+        state.updateVisibleTerminalSnapshot(codexPlanImplementationSelectorSnapshot())
+
+        XCTAssertEqual(state.agentActivityState, .working)
+        try await waitForSelectorDwell()
+        XCTAssertEqual(state.agentActivityState, .attention)
     }
 
     func testPermissionRequestOverridesVisibleQuestionSelectorToAttention() {
-        let state = TerminalSessionState()
+        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
         state.updateAgentActivityRecord(
             TerminalAgentActivityRecord(
                 agent: .codex,
@@ -49,7 +98,7 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
             )
         )
         state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .idle)
+        XCTAssertEqual(state.agentActivityState, .working)
 
         state.updateAgentActivityRecord(
             TerminalAgentActivityRecord(
@@ -65,7 +114,7 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
     }
 
     func testNonCodexAndNonQuestionSelectorSnapshotsDoNotOverrideHookState() {
-        let state = TerminalSessionState()
+        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
         state.updateAgentActivityRecord(
             TerminalAgentActivityRecord(
                 agent: .claude,
@@ -77,6 +126,8 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
         )
 
         state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
+        XCTAssertEqual(state.agentActivityState, .working)
+        state.updateVisibleTerminalSnapshot(codexPlanImplementationSelectorSnapshot())
         XCTAssertEqual(state.agentActivityState, .working)
 
         state.updateAgentActivityRecord(
@@ -93,8 +144,8 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
         XCTAssertEqual(state.agentActivityState, .working)
     }
 
-    func testFreshCodexWorkingHooksKeepVisibleQuestionSelectorIdle() {
-        let state = TerminalSessionState()
+    func testFreshCodexWorkingHooksKeepVisibleQuestionSelectorAttention() async throws {
+        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
         let firstRecord = TerminalAgentActivityRecord(
             agent: .codex,
             state: .working,
@@ -104,7 +155,7 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
         )
         state.updateAgentActivityRecord(firstRecord)
         state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .idle)
+        XCTAssertEqual(state.agentActivityState, .working)
 
         state.updateAgentActivityRecord(
             TerminalAgentActivityRecord(
@@ -115,7 +166,10 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
                 isLegacy: false
             )
         )
-        XCTAssertEqual(state.agentActivityState, .idle)
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        try await waitForSelectorDwell()
+        XCTAssertEqual(state.agentActivityState, .attention)
 
         state.updateAgentActivityRecord(
             TerminalAgentActivityRecord(
@@ -126,26 +180,76 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
                 isLegacy: false
             )
         )
-        XCTAssertEqual(state.agentActivityState, .idle)
+        XCTAssertEqual(state.agentActivityState, .attention)
 
         state.updateVisibleTerminalSnapshot(.message("Codex is working", columns: 120, rows: 12))
         XCTAssertEqual(state.agentActivityState, .working)
     }
 
-    func testStopFailureAndClearOutputClearCodexQuestionSelectorOverride() {
-        let state = TerminalSessionState()
+    func testFreshCodexWorkingHooksKeepVisiblePlanImplementationSelectorAttention() async throws {
+        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
+        state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date()))
+        state.updateVisibleTerminalSnapshot(codexPlanImplementationSelectorSnapshot())
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .codex,
+                state: .working,
+                event: "PostToolUse",
+                timestamp: Date().addingTimeInterval(1),
+                isLegacy: false
+            )
+        )
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        try await waitForSelectorDwell()
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .codex,
+                state: .working,
+                event: "PreToolUse",
+                timestamp: Date().addingTimeInterval(2),
+                isLegacy: false
+            )
+        )
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.updateVisibleTerminalSnapshot(.message("Codex is working", columns: 120, rows: 12))
+        XCTAssertEqual(state.agentActivityState, .working)
+    }
+
+    func testTransientCodexUserSelectorClearsBeforeDwellWithoutAttention() async throws {
+        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
+        state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date()))
+        state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        state.updateVisibleTerminalSnapshot(.message("Codex is working", columns: 120, rows: 12))
+        try await waitForSelectorDwell()
+
+        XCTAssertEqual(state.agentActivityState, .working)
+    }
+
+    func testStopFailureAndClearOutputClearCodexUserSelectorOverride() async throws {
+        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
         state.markRunning()
         state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date()))
         state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .idle)
+        XCTAssertEqual(state.agentActivityState, .working)
 
         state.markStopped()
+        try await waitForSelectorDwell()
         XCTAssertEqual(state.agentActivityState, .idle)
 
         state.markRunning()
         state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date().addingTimeInterval(1)))
-        state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .idle)
+        state.updateVisibleTerminalSnapshot(codexPlanImplementationSelectorSnapshot())
+        XCTAssertEqual(state.agentActivityState, .working)
+        try await waitForSelectorDwell()
+        XCTAssertEqual(state.agentActivityState, .attention)
 
         state.recordError("boom")
         XCTAssertEqual(state.agentActivityState, .idle)
@@ -153,7 +257,9 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
         state.markRunning()
         state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date().addingTimeInterval(2)))
         state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .idle)
+        XCTAssertEqual(state.agentActivityState, .working)
+        try await waitForSelectorDwell()
+        XCTAssertEqual(state.agentActivityState, .attention)
 
         state.clearOutput()
         XCTAssertEqual(state.agentActivityState, .idle)
@@ -167,6 +273,10 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
             timestamp: timestamp,
             isLegacy: false
         )
+    }
+
+    private func waitForSelectorDwell() async throws {
+        try await Task.sleep(nanoseconds: selectorDwellNanoseconds + 30_000_000)
     }
 
     private func codexQuestionSelectorSnapshot(
@@ -185,6 +295,22 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
             """,
             columns: 120,
             rows: 12
+        )
+    }
+
+    private func codexPlanImplementationSelectorSnapshot() -> TerminalRenderSnapshot {
+        TerminalRenderSnapshot.message(
+            """
+            Implement this plan?
+
+            > 1. Yes, implement this plan          Switch to Default and start coding.
+              2. Yes, clear context and implement  Fresh thread. Context: 6% used.
+              3. No, stay in Plan mode             Continue planning with the model.
+
+            Press enter to confirm or esc to go back
+            """,
+            columns: 120,
+            rows: 10
         )
     }
 }
