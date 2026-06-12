@@ -18,6 +18,7 @@ final class IslandPanelController: ObservableObject {
     private let terminalSurfaceCoordinator: TerminalSurfaceCoordinator
     private var localMouseMonitor: Any?
     private var globalMouseMonitor: Any?
+    private var pendingAgentLaunchTask: Task<Void, Never>?
     private var lastHoverContainment: Bool?
     private lazy var outsideClickMonitor = OutsideClickMonitor(
         shouldCollapse: { [weak self] in self?.state == .expanded },
@@ -70,6 +71,7 @@ final class IslandPanelController: ObservableObject {
     }
 
     func tearDown() {
+        pendingAgentLaunchTask?.cancel()
         outsideClickMonitor.stop()
         stopHoverMonitoring()
         terminalSurfaceCoordinator.stop()
@@ -77,6 +79,34 @@ final class IslandPanelController: ObservableObject {
     }
 
     func expand() {
+        expand(startTerminal: true)
+    }
+
+    func launchAgent(_ launcher: AgentLauncher) {
+        pendingAgentLaunchTask?.cancel()
+
+        expand(startTerminal: false)
+        let launchSnapshot = terminalSurfaceCoordinator.currentSnapshot()
+
+        pendingAgentLaunchTask = Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            await self.terminalSurfaceCoordinator.launchAgent(
+                launcher,
+                currentSnapshot: launchSnapshot
+            )
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            self.activateTerminalSurface()
+        }
+    }
+
+    private func expand(startTerminal: Bool) {
         if state == .expanded {
             activateTerminalSurface()
             return
@@ -86,7 +116,9 @@ final class IslandPanelController: ObservableObject {
         panel.shouldAcceptKeyFocus = true
         panel.styleMask.remove(.nonactivatingPanel)
         NSApp.activate()
-        startTerminalIfNeeded()
+        if startTerminal {
+            startTerminalIfNeeded()
+        }
         transition(to: .expanded)
         panel.makeKeyAndOrderFront(nil)
     }

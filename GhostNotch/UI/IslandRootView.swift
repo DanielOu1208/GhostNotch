@@ -29,7 +29,9 @@ struct IslandRootView: View {
         case .collapsed, .hover:
             IslandIndicatorView(
                 sessionState: controller.terminalState,
-                isHovering: controller.state == .hover
+                isHovering: controller.state == .hover,
+                launchers: AgentLauncher.all,
+                onLaunchAgent: controller.launchAgent
             )
         case .expanded:
             IslandExpandedView(

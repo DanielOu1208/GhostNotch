@@ -4,6 +4,8 @@ struct IslandIndicatorView: View {
     @ObservedObject var sessionState: TerminalSessionState
 
     let isHovering: Bool
+    let launchers: [AgentLauncher]
+    let onLaunchAgent: (AgentLauncher) -> Void
 
     var body: some View {
         if isHovering {
@@ -89,22 +91,41 @@ struct IslandIndicatorView: View {
     }
 
     private var hoverIndicator: some View {
-        VStack(spacing: 6) {
+        HStack(alignment: .center, spacing: 16) {
+            hoverStatus
+
+            Spacer(minLength: 10)
+
+            HStack(alignment: .center, spacing: 8) {
+                ForEach(launchers) { launcher in
+                    AgentLauncherButton(launcher: launcher) {
+                        onLaunchAgent(launcher)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 15)
+        .animation(.easeInOut(duration: 0.2), value: isHovering)
+    }
+
+    private var hoverStatus: some View {
+        VStack(alignment: .leading, spacing: 6) {
             Text("default shell ready")
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.48))
+                .lineLimit(1)
                 .transition(.opacity.combined(with: .move(edge: .top)))
 
             HStack(alignment: .center, spacing: 9) {
                 hoverStatusDot
 
                 HoverStatusText(state: renderedAgentActivityState)
+                    .lineLimit(1)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .padding(.bottom, 15)
-        .animation(.easeInOut(duration: 0.2), value: isHovering)
     }
 
     @ViewBuilder
@@ -127,6 +148,35 @@ struct IslandIndicatorView: View {
                 diameter: 7
             )
         }
+    }
+}
+
+private struct AgentLauncherButton: View {
+    let launcher: AgentLauncher
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(launcher.assetName)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(.white.opacity(0.82))
+                .frame(width: 17, height: 17)
+                .frame(width: 32, height: 32)
+                .background {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(.white.opacity(0.08))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(.white.opacity(0.14), lineWidth: 1)
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(launcher.accessibilityLabel)
+        .help(launcher.helpText)
     }
 }
 

@@ -9,6 +9,7 @@ final class TerminalSurfaceCoordinator {
 
     private var pendingOutput = Data()
     private var isOutputFlushScheduled = false
+    private let agentLaunchReadinessPollNanoseconds: UInt64 = 10_000_000
 
     init(
         session: TerminalSession = TerminalSession(),
@@ -102,6 +103,24 @@ final class TerminalSurfaceCoordinator {
         }
     }
 
+    func launchAgent(
+        _ launcher: AgentLauncher,
+        currentSnapshot: TerminalRenderSnapshot,
+        startupTimeout: TimeInterval = TerminalSession.defaultStartupTimeout
+    ) async {
+        startFreshSessionForAgentLaunch(currentSnapshot: currentSnapshot)
+
+        guard await waitForRunningSession(timeout: startupTimeout) else {
+            return
+        }
+
+        guard !Task.isCancelled else {
+            return
+        }
+
+        sendInput(Data(launcher.commandLine.utf8))
+    }
+
     func focus() {
         engine.focus()
     }
@@ -116,6 +135,41 @@ final class TerminalSurfaceCoordinator {
 
     func flushPendingOutputForTesting() {
         flushPendingOutput()
+    }
+
+    private func startFreshSessionForAgentLaunch(currentSnapshot: TerminalRenderSnapshot) {
+        if session.isRunning || session.state.hasReceivedOutput || session.state.phase == .failed {
+            restartPreservingGrid(currentSnapshot: currentSnapshot)
+        } else {
+            startIfNeeded()
+        }
+    }
+
+    private func waitForRunningSession(timeout: TimeInterval) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while Date() < deadline {
+            if Task.isCancelled {
+                return false
+            }
+
+            switch session.state.phase {
+            case .running:
+                return true
+            case .failed, .stopped:
+                return false
+            case .starting:
+                break
+            }
+
+            do {
+                try await Task.sleep(nanoseconds: agentLaunchReadinessPollNanoseconds)
+            } catch {
+                return false
+            }
+        }
+
+        return session.state.phase == .running && !Task.isCancelled
     }
 
     private func enqueueOutput(_ data: Data) {
