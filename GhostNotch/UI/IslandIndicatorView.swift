@@ -111,21 +111,14 @@ struct IslandIndicatorView: View {
     }
 
     private var hoverStatus: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("default shell ready")
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.48))
+        HStack(alignment: .center, spacing: 9) {
+            hoverStatusDot
+
+            HoverStatusText(state: renderedAgentActivityState)
                 .lineLimit(1)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-
-            HStack(alignment: .center, spacing: 9) {
-                hoverStatusDot
-
-                HoverStatusText(state: renderedAgentActivityState)
-                    .lineLimit(1)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-            }
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
         }
+        .frame(height: 32, alignment: .center)
     }
 
     @ViewBuilder
