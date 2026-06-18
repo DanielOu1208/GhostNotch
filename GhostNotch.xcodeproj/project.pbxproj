@@ -67,6 +67,8 @@
 		1A00011D0000000000000001 /* GhosttyTerminalCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000170000000000000001 /* GhosttyTerminalCoreTests.swift */; };
 		1A0009040000000000000001 /* CodexQuestionSelectorIndicatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0009060000000000000001 /* CodexQuestionSelectorIndicatorTests.swift */; };
 		1A0009050000000000000001 /* TerminalGridViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0009070000000000000001 /* TerminalGridViewTests.swift */; };
+		1A0009080000000000000001 /* AgentLauncherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00090A0000000000000001 /* AgentLauncherTests.swift */; };
+		1A0009090000000000000001 /* TerminalSurfaceCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00090B0000000000000001 /* TerminalSurfaceCoordinatorTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -113,6 +115,8 @@
 		1A0000170000000000000001 /* GhosttyTerminalCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyTerminalCoreTests.swift; sourceTree = "<group>"; };
 		1A0009060000000000000001 /* CodexQuestionSelectorIndicatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexQuestionSelectorIndicatorTests.swift; sourceTree = "<group>"; };
 		1A0009070000000000000001 /* TerminalGridViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalGridViewTests.swift; sourceTree = "<group>"; };
+		1A00090A0000000000000001 /* AgentLauncherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLauncherTests.swift; sourceTree = "<group>"; };
+		1A00090B0000000000000001 /* TerminalSurfaceCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSurfaceCoordinatorTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -244,6 +248,8 @@
 				1A0000170000000000000001 /* GhosttyTerminalCoreTests.swift */,
 				1A0009060000000000000001 /* CodexQuestionSelectorIndicatorTests.swift */,
 				1A0009070000000000000001 /* TerminalGridViewTests.swift */,
+				1A00090A0000000000000001 /* AgentLauncherTests.swift */,
+				1A00090B0000000000000001 /* TerminalSurfaceCoordinatorTests.swift */,
 			);
 			path = GhostNotchTests;
 			sourceTree = "<group>";
@@ -410,6 +416,8 @@
 				1A00011D0000000000000001 /* GhosttyTerminalCoreTests.swift in Sources */,
 				1A0009040000000000000001 /* CodexQuestionSelectorIndicatorTests.swift in Sources */,
 				1A0009050000000000000001 /* TerminalGridViewTests.swift in Sources */,
+				1A0009080000000000000001 /* AgentLauncherTests.swift in Sources */,
+				1A0009090000000000000001 /* TerminalSurfaceCoordinatorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

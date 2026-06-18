@@ -7,7 +7,6 @@ struct AgentLauncher: Identifiable, Equatable, Sendable {
     }
 
     let id: ID
-    let displayName: String
     let command: String
     let assetName: String
     let accessibilityLabel: String
@@ -19,7 +18,6 @@ struct AgentLauncher: Identifiable, Equatable, Sendable {
 
     static let codex = AgentLauncher(
         id: .codex,
-        displayName: "Codex",
         command: "codex",
         assetName: "OpenAILogo",
         accessibilityLabel: "Launch Codex",
@@ -28,7 +26,6 @@ struct AgentLauncher: Identifiable, Equatable, Sendable {
 
     static let claude = AgentLauncher(
         id: .claude,
-        displayName: "Claude",
         command: "claude",
         assetName: "ClaudeLogo",
         accessibilityLabel: "Launch Claude",

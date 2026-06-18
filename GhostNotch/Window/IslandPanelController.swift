@@ -97,12 +97,6 @@ final class IslandPanelController: ObservableObject {
                 launcher,
                 currentSnapshot: launchSnapshot
             )
-
-            guard !Task.isCancelled else {
-                return
-            }
-
-            self.activateTerminalSurface()
         }
     }
 

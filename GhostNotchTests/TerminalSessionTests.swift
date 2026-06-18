@@ -594,142 +594,6 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(coordinator.state.currentWorkingDirectory, "/tmp/project")
     }
 
-    func testAgentLauncherDefinitionsUsePlainCommandsAndAssets() {
-        XCTAssertEqual(AgentLauncher.all.map(\.id), [.codex, .claude])
-        XCTAssertEqual(AgentLauncher.codex.command, "codex")
-        XCTAssertEqual(AgentLauncher.claude.command, "claude")
-        XCTAssertEqual(AgentLauncher.codex.commandLine, "codex\n")
-        XCTAssertEqual(AgentLauncher.claude.commandLine, "claude\n")
-        XCTAssertEqual(AgentLauncher.codex.assetName, "OpenAILogo")
-        XCTAssertEqual(AgentLauncher.claude.assetName, "ClaudeLogo")
-        XCTAssertFalse(AgentLauncher.codex.accessibilityLabel.isEmpty)
-        XCTAssertFalse(AgentLauncher.claude.accessibilityLabel.isEmpty)
-        XCTAssertFalse(AgentLauncher.codex.helpText.isEmpty)
-        XCTAssertFalse(AgentLauncher.claude.helpText.isEmpty)
-    }
-
-    func testCoordinatorLaunchesAgentAfterFreshShellReportsRunning() async throws {
-        let state = TerminalSessionState()
-        let process = FakeTerminalProcess()
-        let session = TerminalSession(
-            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
-            state: state,
-            process: process
-        )
-        let engine = SpyRenderingEngine()
-        let coordinator = TerminalSurfaceCoordinator(session: session, engine: engine)
-
-        let launchTask = Task {
-            await coordinator.launchAgent(
-                .codex,
-                currentSnapshot: .empty(columns: 80, rows: 24),
-                startupTimeout: 1
-            )
-        }
-
-        try await waitForStartCallCount(1, in: process)
-        XCTAssertEqual(engine.sentInputs, [])
-
-        process.emitOutput("$ ")
-        await launchTask.value
-
-        XCTAssertEqual(process.startCallCount, 1)
-        XCTAssertEqual(process.stopCallCount, 0)
-        XCTAssertEqual(engine.sentInputs, [Data("codex\n".utf8)])
-    }
-
-    func testCoordinatorRestartsRunningShellBeforeLaunchingAgent() async throws {
-        let state = TerminalSessionState()
-        let process = FakeTerminalProcess()
-        let session = TerminalSession(
-            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
-            state: state,
-            process: process
-        )
-        let engine = SpyRenderingEngine()
-        let coordinator = TerminalSurfaceCoordinator(session: session, engine: engine)
-
-        try session.start(cols: 80, rows: 24)
-        process.emitOutput("$ ")
-        XCTAssertEqual(state.phase, .running)
-
-        let launchTask = Task {
-            await coordinator.launchAgent(
-                .claude,
-                currentSnapshot: .empty(columns: 100, rows: 28),
-                startupTimeout: 1
-            )
-        }
-
-        try await waitForStartCallCount(2, in: process)
-        XCTAssertEqual(process.stopCallCount, 1)
-        XCTAssertEqual(engine.sentInputs, [])
-
-        process.emitOutput("$ ")
-        await launchTask.value
-
-        XCTAssertEqual(engine.resetRequests, [TerminalGridSize(columns: 100, rows: 28)])
-        XCTAssertEqual(engine.sentInputs, [Data("claude\n".utf8)])
-    }
-
-    func testCanceledAgentLaunchDoesNotWriteCommandAfterShellBecomesReady() async throws {
-        let state = TerminalSessionState()
-        let process = FakeTerminalProcess()
-        let session = TerminalSession(
-            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
-            state: state,
-            process: process
-        )
-        let engine = SpyRenderingEngine()
-        let coordinator = TerminalSurfaceCoordinator(session: session, engine: engine)
-
-        let launchTask = Task {
-            await coordinator.launchAgent(
-                .codex,
-                currentSnapshot: .empty(columns: 80, rows: 24),
-                startupTimeout: 1
-            )
-        }
-
-        try await waitForStartCallCount(1, in: process)
-        launchTask.cancel()
-        process.emitOutput("$ ")
-        await launchTask.value
-
-        XCTAssertEqual(engine.sentInputs, [])
-    }
-
-    func testCoordinatorResetsStoppedSessionWithPreviousOutputBeforeLaunchingAgent() async throws {
-        let state = TerminalSessionState()
-        let process = FakeTerminalProcess()
-        let session = TerminalSession(
-            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
-            state: state,
-            process: process
-        )
-        let engine = SpyRenderingEngine()
-        let coordinator = TerminalSurfaceCoordinator(session: session, engine: engine)
-
-        try session.start(cols: 80, rows: 24)
-        process.emitOutput("old shell output")
-        session.stop()
-
-        let launchTask = Task {
-            await coordinator.launchAgent(
-                .codex,
-                currentSnapshot: .empty(columns: 90, rows: 22),
-                startupTimeout: 1
-            )
-        }
-
-        try await waitForStartCallCount(2, in: process)
-        process.emitOutput("$ ")
-        await launchTask.value
-
-        XCTAssertEqual(engine.resetRequests, [TerminalGridSize(columns: 90, rows: 22)])
-        XCTAssertEqual(engine.sentInputs, [Data("codex\n".utf8)])
-    }
-
     func testStoppingSessionMarksItStopped() throws {
         let state = TerminalSessionState(outputLimit: 16 * 1024)
         let session = TerminalSession(
@@ -805,22 +669,6 @@ final class TerminalSessionTests: XCTestCase {
         }
 
         XCTFail("Agent activity state did not become \(expectedValue). Current value: \(state.agentActivityState)")
-    }
-
-    private func waitForStartCallCount(
-        _ expectedValue: Int,
-        in process: FakeTerminalProcess
-    ) async throws {
-        let deadline = Date().addingTimeInterval(1)
-        while Date() < deadline {
-            if process.startCallCount == expectedValue {
-                return
-            }
-
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
-
-        XCTFail("Terminal process start count did not become \(expectedValue). Current value: \(process.startCallCount)")
     }
 
     private func agentActivityEnvelope(
@@ -905,7 +753,6 @@ private final class SpyRenderingEngine: TerminalRenderingEngine {
     var onSnapshotChange: ((TerminalRenderSnapshot) -> Void)?
     private(set) var processedOutput: [Data] = []
     private(set) var resetRequests: [TerminalGridSize] = []
-    private(set) var sentInputs: [Data] = []
 
     func start(session: TerminalSession) {}
 
@@ -914,9 +761,7 @@ private final class SpyRenderingEngine: TerminalRenderingEngine {
         onSnapshotChange?(snapshot)
     }
 
-    func sendInput(_ input: Data) {
-        sentInputs.append(input)
-    }
+    func sendInput(_ input: Data) {}
 
     func sendKeyEvent(_ event: TerminalKeyEvent) {}
 
