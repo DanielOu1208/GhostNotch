@@ -21,11 +21,12 @@ enum TerminalAgentActivityState: String, Equatable {
 enum TerminalAgentActivityAgent: String, Equatable {
     case codex
     case claude
+    case opencode
     case unknown
 }
 
 struct TerminalAgentActivityRecord: Equatable {
-    private static let supportedAgents = Set(["codex", "claude"])
+    private static let supportedAgents = Set(["codex", "claude", "opencode"])
 
     let agent: TerminalAgentActivityAgent
     let state: TerminalAgentActivityState

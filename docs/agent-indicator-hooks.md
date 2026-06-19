@@ -1,6 +1,6 @@
 # Agent Indicator Hooks
 
-GhostNotch drives the collapsed agent indicator from explicit Codex CLI and Claude Code hook state. It does not infer agent work from PTY output.
+GhostNotch drives the collapsed agent indicator from explicit Codex CLI, Claude Code, and OpenCode activity state. It does not infer agent work from PTY output.
 
 ## Indicator States
 
@@ -21,9 +21,13 @@ The installer merges GhostNotch hook entries into:
 - `~/.codex/hooks.json`
 - `~/.claude/settings.json`
 
-It preserves existing hooks, avoids duplicate GhostNotch entries, and creates timestamped backups before writing.
+The installer also copies the managed OpenCode plugin to:
 
-Hook package definitions live in `scripts/agent-hook-packages/`. Adding another supported agent should start with a new manifest instead of adding another hardcoded installer branch.
+- `~/.config/opencode/plugins/ghostnotch-agent-indicator.js`
+
+It preserves existing Codex and Claude hooks, avoids duplicate GhostNotch entries, and creates timestamped backups before writing. For OpenCode, it only overwrites or removes the managed GhostNotch plugin file; an unrelated file at the same path is left untouched and reported as a collision.
+
+Hook package definitions live in `scripts/agent-hook-packages/`. Adding another supported agent should start with a new manifest instead of adding another hardcoded installer branch. A hook package can install command hooks into a JSON config file or install a managed plugin file, depending on the agent's extension model.
 
 Codex requires hook trust for changed command definitions. After installing or updating GhostNotch hooks, open `/hooks` in Codex CLI and trust the GhostNotch-managed entries if Codex reports that review is needed.
 
@@ -33,7 +37,7 @@ Codex requires hook trust for changed command definitions. After installing or u
 python3 scripts/install-agent-hooks.py uninstall
 ```
 
-The uninstaller removes only hook commands marked for the matching GhostNotch hook package. It also removes legacy GhostNotch-managed entries listed by that package manifest.
+The uninstaller removes only hook commands marked for the matching GhostNotch hook package. It also removes legacy GhostNotch-managed entries listed by that package manifest. For OpenCode, it removes only the managed plugin file.
 
 ## Codex Hooks
 
@@ -82,9 +86,25 @@ Current Claude mapping:
 - `Elicitation`: `attention`
 - `ElicitationResult`: `working`
 
+## OpenCode Plugin
+
+OpenCode uses JavaScript plugins for lifecycle events instead of Codex or Claude-style command-hook config. GhostNotch installs a managed plugin file that listens for OpenCode events, then calls the same bundled `ghostnotch-agent-hook` helper used by the other agents.
+
+Current OpenCode mapping:
+
+- `PluginStart`: `idle`
+- `session.status` with `busy` or `retry`: `working`
+- `session.status` with `idle`: `idle`
+- `session.idle`: `idle`
+- `session.error`: `idle`
+- `permission.asked`, `permission.updated`, or `question.asked`: `attention`
+- `permission.replied`, `question.replied`, or `question.rejected`: `working`
+
+`permission.updated` is kept for the older installed OpenCode event shape, while `permission.asked` matches the newer event name in the current OpenCode docs.
+
 ## State Envelope
 
-Codex and Claude state files are JSON envelopes:
+Codex, Claude, and OpenCode state files are JSON envelopes:
 
 ```json
 {
@@ -100,7 +120,7 @@ Codex and Claude state files are JSON envelopes:
 }
 ```
 
-GhostNotch accepts structured envelopes where `agent` is `codex` or `claude` and `state` is `idle`, `working`, or `attention`. Invalid JSON, unknown agents, unknown states, missing state files, and stopped sessions resolve to `idle`.
+GhostNotch accepts structured envelopes where `agent` is `codex`, `claude`, or `opencode` and `state` is `idle`, `working`, or `attention`. Invalid JSON, unknown agents, unknown states, missing state files, and stopped sessions resolve to `idle`.
 
 Legacy raw state files are still accepted during migration:
 

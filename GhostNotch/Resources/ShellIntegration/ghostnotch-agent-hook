@@ -9,7 +9,7 @@ import sys
 import tempfile
 
 
-VALID_AGENTS = {"codex", "claude"}
+VALID_AGENTS = {"codex", "claude", "opencode"}
 VALID_STATES = {"idle", "working", "attention"}
 SAFE_PAYLOAD_VALUE_FIELDS = {"hook_event_name", "notification_type", "tool_name"}
 
@@ -130,12 +130,15 @@ def run_self_test() -> None:
     }
     codex_envelope = state_envelope("codex", "UserPromptSubmit", "working", payload)
     claude_envelope = state_envelope("claude", "Notification", "attention", payload)
-    serialized = json.dumps([codex_envelope, claude_envelope], sort_keys=True)
+    opencode_envelope = state_envelope("opencode", "session.status", "working", payload)
+    serialized = json.dumps([codex_envelope, claude_envelope, opencode_envelope], sort_keys=True)
 
     assert codex_envelope["agent"] == "codex"
     assert codex_envelope["state"] == "working"
     assert claude_envelope["agent"] == "claude"
     assert claude_envelope["state"] == "attention"
+    assert opencode_envelope["agent"] == "opencode"
+    assert opencode_envelope["state"] == "working"
     assert codex_envelope["payloadKeys"] == ["command", "hook_event_name", "nested", "notification_type", "prompt"]
     assert codex_envelope["payloadTypes"]["nested"] == "dict"
     assert codex_envelope["payloadValues"] == {

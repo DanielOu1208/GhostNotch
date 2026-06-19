@@ -246,6 +246,18 @@ final class TerminalSessionTests: XCTestCase {
         )
         XCTAssertEqual(
             TerminalAgentActivityState(
+                rawFileValue: #"{"version":1,"agent":"opencode","state":"working","event":"session.status"}"#
+            ),
+            .working
+        )
+        XCTAssertEqual(
+            TerminalAgentActivityState(
+                rawFileValue: #"{"version":1,"agent":"OpenCode","state":"ATTENTION","event":"permission.asked"}"#
+            ),
+            .attention
+        )
+        XCTAssertEqual(
+            TerminalAgentActivityState(
                 rawFileValue: #"{"version":1,"agent":"pi","state":"working","event":"UserPromptSubmit"}"#
             ),
             .idle
@@ -275,6 +287,19 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(codexRecord.event, "PreToolUse")
         XCTAssertEqual(codexRecord.timestamp?.timeIntervalSince1970 ?? 0, timestamp.timeIntervalSince1970, accuracy: 0.001)
         XCTAssertFalse(codexRecord.isLegacy)
+
+        let opencodeRecord = TerminalAgentActivityRecord(
+            rawFileValue: agentActivityEnvelope(
+                agent: "opencode",
+                state: "attention",
+                event: "permission.asked",
+                timestamp: timestamp
+            )
+        )
+        XCTAssertEqual(opencodeRecord.agent, .opencode)
+        XCTAssertEqual(opencodeRecord.state, .attention)
+        XCTAssertEqual(opencodeRecord.event, "permission.asked")
+        XCTAssertFalse(opencodeRecord.isLegacy)
 
         let legacyRecord = TerminalAgentActivityRecord(rawFileValue: "working\n")
         XCTAssertEqual(legacyRecord.agent, .unknown)
@@ -374,6 +399,18 @@ final class TerminalSessionTests: XCTestCase {
         try await waitForAgentActivityState(.working, in: state)
 
         try #"{"version":1,"agent":"claude","state":"idle","event":"Stop"}"#
+            .write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.idle, in: state)
+
+        try #"{"version":1,"agent":"opencode","state":"working","event":"session.status"}"#
+            .write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.working, in: state)
+
+        try #"{"version":1,"agent":"opencode","state":"attention","event":"permission.asked"}"#
+            .write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.attention, in: state)
+
+        try #"{"version":1,"agent":"opencode","state":"idle","event":"session.idle"}"#
             .write(toFile: stateFilePath, atomically: true, encoding: .utf8)
         try await waitForAgentActivityState(.idle, in: state)
     }

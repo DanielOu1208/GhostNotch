@@ -1,0 +1,11 @@
+{
+  "id": "opencode",
+  "packageVersion": 1,
+  "displayName": "OpenCode",
+  "binaryName": "opencode",
+  "integration": "pluginFile",
+  "defaultConfigPath": "~/.config/opencode/plugins/ghostnotch-agent-indicator.js",
+  "pluginResourcePath": "GhostNotch/Resources/ShellIntegration/ghostnotch-opencode-plugin.js",
+  "helperName": "ghostnotch-agent-hook",
+  "legacyHelperNames": []
+}

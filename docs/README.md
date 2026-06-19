@@ -6,7 +6,7 @@ Start here if you want to understand, build, test, or contribute to GhostNotch.
 
 - [Architecture](architecture.md) explains the app structure, terminal lifecycle, and Ghostty VT boundary.
 - [Testing](testing.md) covers local builds, automated tests, and manual terminal acceptance checks.
-- [Agent indicator hooks](agent-indicator-hooks.md) explains Codex and Claude hook setup, indicator state mapping, and the state-file contract.
+- [Agent indicator hooks](agent-indicator-hooks.md) explains Codex, Claude, and OpenCode hook setup, indicator state mapping, and the state-file contract.
 - [MacBook notch geometry](notch-geometry.md) records the AppKit notch measurement approach and sizing assumptions.
 - [Xcode debugging](xcode-debugging.md) covers common local debugger attach and terminal startup issues.
 - [Ghostty VT vendor notes](../vendor/ghostty-vt/README.md) describe the vendored terminal artifact.
