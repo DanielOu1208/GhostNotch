@@ -69,6 +69,10 @@
 		1A0009050000000000000001 /* TerminalGridViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0009070000000000000001 /* TerminalGridViewTests.swift */; };
 		1A0009080000000000000001 /* AgentLauncherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00090A0000000000000001 /* AgentLauncherTests.swift */; };
 		1A0009090000000000000001 /* TerminalSurfaceCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00090B0000000000000001 /* TerminalSurfaceCoordinatorTests.swift */; };
+		1A000B010000000000000001 /* AgentPresetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000B050000000000000001 /* AgentPresetStore.swift */; };
+		1A000B020000000000000001 /* AgentPresetSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000B060000000000000001 /* AgentPresetSettingsView.swift */; };
+		1A000B030000000000000001 /* AgentPresetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000B050000000000000001 /* AgentPresetStore.swift */; };
+		1A000B040000000000000001 /* AgentPresetStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000B070000000000000001 /* AgentPresetStoreTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -117,6 +121,9 @@
 		1A0009070000000000000001 /* TerminalGridViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalGridViewTests.swift; sourceTree = "<group>"; };
 		1A00090A0000000000000001 /* AgentLauncherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLauncherTests.swift; sourceTree = "<group>"; };
 		1A00090B0000000000000001 /* TerminalSurfaceCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSurfaceCoordinatorTests.swift; sourceTree = "<group>"; };
+		1A000B050000000000000001 /* AgentPresetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPresetStore.swift; sourceTree = "<group>"; };
+		1A000B060000000000000001 /* AgentPresetSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPresetSettingsView.swift; sourceTree = "<group>"; };
+		1A000B070000000000000001 /* AgentPresetStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPresetStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -158,6 +165,7 @@
 				1A00013C0000000000000001 /* ShellIntegration */,
 				1A000A050000000000000001 /* Assets.xcassets */,
 				1A0001400000000000000001 /* Diagnostics */,
+				1A000B080000000000000001 /* Settings */,
 				1A0003060000000000000001 /* Terminal */,
 				1A0003040000000000000001 /* Window */,
 				1A0003050000000000000001 /* UI */,
@@ -232,6 +240,15 @@
 			path = Diagnostics;
 			sourceTree = "<group>";
 		};
+		1A000B080000000000000001 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				1A000B050000000000000001 /* AgentPresetStore.swift */,
+				1A000B060000000000000001 /* AgentPresetSettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
 		1A0003080000000000000001 /* Vendor */ = {
 			isa = PBXGroup;
 			children = (
@@ -249,6 +266,7 @@
 				1A0009060000000000000001 /* CodexQuestionSelectorIndicatorTests.swift */,
 				1A0009070000000000000001 /* TerminalGridViewTests.swift */,
 				1A00090A0000000000000001 /* AgentLauncherTests.swift */,
+				1A000B070000000000000001 /* AgentPresetStoreTests.swift */,
 				1A00090B0000000000000001 /* TerminalSurfaceCoordinatorTests.swift */,
 			);
 			path = GhostNotchTests;
@@ -355,6 +373,8 @@
 			files = (
 				1A0001010000000000000001 /* GhostNotchApp.swift in Sources */,
 				1A0001020000000000000001 /* AppDelegate.swift in Sources */,
+				1A000B010000000000000001 /* AgentPresetStore.swift in Sources */,
+				1A000B020000000000000001 /* AgentPresetSettingsView.swift in Sources */,
 				1A0001030000000000000001 /* IslandPanel.swift in Sources */,
 				1A0001040000000000000001 /* IslandPanelController.swift in Sources */,
 				1A0001050000000000000001 /* WindowPositioner.swift in Sources */,
@@ -395,6 +415,7 @@
 				1A0001100000000000000001 /* PTYProcess.swift in Sources */,
 				1A0001110000000000000001 /* TerminalSession.swift in Sources */,
 				1A0001120000000000000001 /* TerminalSessionState.swift in Sources */,
+				1A000B030000000000000001 /* AgentPresetStore.swift in Sources */,
 				1A000A020000000000000001 /* AgentLauncher.swift in Sources */,
 				1A0001130000000000000001 /* TerminalRenderingEngine.swift in Sources */,
 				1A00011A0000000000000001 /* TerminalRenderModel.swift in Sources */,
@@ -417,6 +438,7 @@
 				1A0009040000000000000001 /* CodexQuestionSelectorIndicatorTests.swift in Sources */,
 				1A0009050000000000000001 /* TerminalGridViewTests.swift in Sources */,
 				1A0009080000000000000001 /* AgentLauncherTests.swift in Sources */,
+				1A000B040000000000000001 /* AgentPresetStoreTests.swift in Sources */,
 				1A0009090000000000000001 /* TerminalSurfaceCoordinatorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -124,6 +124,33 @@ final class TerminalSurfaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(engine.sentInputs, [Data("codex\n".utf8)])
     }
 
+    func testCoordinatorLaunchesAgentInSelectedDirectory() async throws {
+        let state = TerminalSessionState()
+        let process = CoordinatorTestTerminalProcess()
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: process
+        )
+        let engine = CoordinatorTestRenderingEngine()
+        let coordinator = TerminalSurfaceCoordinator(session: session, engine: engine)
+
+        let launchTask = Task {
+            await coordinator.launchAgent(
+                .codex,
+                currentSnapshot: .empty(columns: 80, rows: 24),
+                directoryPath: "/Users/danielou/My Project",
+                startupTimeout: 1
+            )
+        }
+
+        try await waitForStartCallCount(1, in: process)
+        process.emitOutput("$ ")
+        await launchTask.value
+
+        XCTAssertEqual(engine.sentInputs, [Data("cd '/Users/danielou/My Project' && codex\n".utf8)])
+    }
+
     private func waitForStartCallCount(
         _ expectedValue: Int,
         in process: CoordinatorTestTerminalProcess

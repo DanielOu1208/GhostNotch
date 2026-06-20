@@ -37,6 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         toggleItem.keyEquivalentModifierMask = [.option]
         toggleItem.target = self
         menu.addItem(toggleItem)
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
         menu.addItem(NSMenuItem.separator())
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
@@ -48,6 +51,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openGhostNotch() {
         islandController?.expand()
+    }
+
+    @objc private func openSettings() {
+        NSApp.activate()
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
     @objc private func toggleTerminal() {

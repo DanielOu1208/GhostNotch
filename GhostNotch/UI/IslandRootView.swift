@@ -29,8 +29,10 @@ struct IslandRootView: View {
         case .collapsed, .hover:
             IslandIndicatorView(
                 sessionState: controller.terminalState,
+                presetStore: controller.agentPresetStore,
                 isHovering: controller.state == .hover,
-                launchers: AgentLauncher.all,
+                selectedDirectoryPresetID: controller.selectedLaunchDirectoryPresetID,
+                onSelectDirectory: controller.selectLaunchDirectory,
                 onLaunchAgent: controller.launchAgent
             )
         case .expanded:

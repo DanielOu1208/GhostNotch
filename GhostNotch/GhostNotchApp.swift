@@ -6,7 +6,7 @@ struct GhostNotchApp: App {
 
     var body: some Scene {
         Settings {
-            EmptyView()
+            AgentPresetSettingsView(store: .shared)
         }
     }
 }

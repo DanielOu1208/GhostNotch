@@ -106,6 +106,7 @@ final class TerminalSurfaceCoordinator {
     func launchAgent(
         _ launcher: AgentLauncher,
         currentSnapshot: TerminalRenderSnapshot,
+        directoryPath: String? = nil,
         startupTimeout: TimeInterval = TerminalSession.defaultStartupTimeout
     ) async {
         startFreshSessionForAgentLaunch(currentSnapshot: currentSnapshot)
@@ -118,7 +119,7 @@ final class TerminalSurfaceCoordinator {
             return
         }
 
-        sendInput(Data(launcher.commandLine.utf8))
+        sendInput(Data(launcher.commandLine(directoryPath: directoryPath).utf8))
     }
 
     func focus() {

@@ -2,9 +2,11 @@ import SwiftUI
 
 struct IslandIndicatorView: View {
     @ObservedObject var sessionState: TerminalSessionState
+    @ObservedObject var presetStore: AgentPresetStore
 
     let isHovering: Bool
-    let launchers: [AgentLauncher]
+    let selectedDirectoryPresetID: AgentLaunchDirectoryPreset.ID?
+    let onSelectDirectory: (AgentLaunchDirectoryPreset) -> Void
     let onLaunchAgent: (AgentLauncher) -> Void
 
     var body: some View {
@@ -91,13 +93,27 @@ struct IslandIndicatorView: View {
     }
 
     private var hoverIndicator: some View {
-        HStack(alignment: .center, spacing: 16) {
+        HStack(alignment: .center, spacing: 12) {
             hoverStatus
+                .layoutPriority(1)
 
-            Spacer(minLength: 10)
+            Spacer(minLength: 6)
+
+            if !visibleDirectoryPresets.isEmpty {
+                HStack(alignment: .center, spacing: 6) {
+                    ForEach(visibleDirectoryPresets) { preset in
+                        DirectoryPresetButton(
+                            preset: preset,
+                            isSelected: preset.id == selectedDirectoryPresetID
+                        ) {
+                            onSelectDirectory(preset)
+                        }
+                    }
+                }
+            }
 
             HStack(alignment: .center, spacing: 8) {
-                ForEach(launchers) { launcher in
+                ForEach(presetStore.enabledLaunchers) { launcher in
                     AgentLauncherButton(launcher: launcher) {
                         onLaunchAgent(launcher)
                     }
@@ -108,6 +124,14 @@ struct IslandIndicatorView: View {
         .padding(.horizontal, 24)
         .padding(.bottom, 15)
         .animation(.easeInOut(duration: 0.2), value: isHovering)
+    }
+
+    private var visibleDirectoryPresets: [AgentLaunchDirectoryPreset] {
+        Array(
+            presetStore.directoryPresets
+                .filter { $0.directoryExists() }
+                .prefix(AgentPresetStore.maximumDirectoryPresets)
+        )
     }
 
     private var hoverStatus: some View {
@@ -141,6 +165,35 @@ struct IslandIndicatorView: View {
                 diameter: 7
             )
         }
+    }
+}
+
+private struct DirectoryPresetButton: View {
+    let preset: AgentLaunchDirectoryPreset
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(preset.displayLabel)
+                .font(.system(size: 10, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .foregroundStyle(isSelected ? .black.opacity(0.86) : .white.opacity(0.82))
+                .frame(width: 58, height: 32)
+                .background {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(isSelected ? .white.opacity(0.82) : .white.opacity(0.08))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(isSelected ? .white.opacity(0.9) : .white.opacity(0.14), lineWidth: 1)
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Use \(preset.displayLabel) folder")
+        .help(preset.path)
     }
 }
 

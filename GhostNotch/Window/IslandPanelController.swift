@@ -9,10 +9,13 @@ final class IslandPanelController: ObservableObject {
     @Published private(set) var terminalSurfaceRepaintRequestID = 0
     @Published private(set) var terminalSnapshot = TerminalRenderSnapshot.empty()
     @Published private(set) var terminalSurfacePhase: IslandTerminalSurfacePhase = .idle
+    @Published private(set) var selectedLaunchDirectoryPresetID: AgentLaunchDirectoryPreset.ID?
 
     var allowsGridResizeReporting: Bool {
         terminalSurfacePhase == .ready
     }
+
+    let agentPresetStore: AgentPresetStore
 
     private let panel: IslandPanel
     private let terminalSurfaceCoordinator: TerminalSurfaceCoordinator
@@ -36,8 +39,10 @@ final class IslandPanelController: ObservableObject {
 
     init(
         terminalSession: TerminalSession = TerminalSession(),
-        terminalEngine: TerminalRenderingEngine = GhosttyTerminalEngine()
+        terminalEngine: TerminalRenderingEngine = GhosttyTerminalEngine(),
+        agentPresetStore: AgentPresetStore = .shared
     ) {
+        self.agentPresetStore = agentPresetStore
         terminalSurfaceCoordinator = TerminalSurfaceCoordinator(
             session: terminalSession,
             engine: terminalEngine
@@ -87,6 +92,8 @@ final class IslandPanelController: ObservableObject {
 
         expand(startTerminal: false)
         let launchSnapshot = terminalSurfaceCoordinator.currentSnapshot()
+        let directoryPath = selectedLaunchDirectoryPath()
+        selectedLaunchDirectoryPresetID = nil
 
         pendingAgentLaunchTask = Task { @MainActor [weak self] in
             guard let self else {
@@ -95,9 +102,18 @@ final class IslandPanelController: ObservableObject {
 
             await self.terminalSurfaceCoordinator.launchAgent(
                 launcher,
-                currentSnapshot: launchSnapshot
+                currentSnapshot: launchSnapshot,
+                directoryPath: directoryPath
             )
         }
+    }
+
+    func selectLaunchDirectory(_ preset: AgentLaunchDirectoryPreset) {
+        guard preset.directoryExists() else {
+            return
+        }
+
+        selectedLaunchDirectoryPresetID = preset.id
     }
 
     private func expand(startTerminal: Bool) {
@@ -243,6 +259,16 @@ final class IslandPanelController: ObservableObject {
 
     private func startTerminalIfNeeded() {
         terminalSurfaceCoordinator.startIfNeeded()
+    }
+
+    private func selectedLaunchDirectoryPath() -> String? {
+        guard let selectedLaunchDirectoryPresetID,
+              let preset = agentPresetStore.directoryPresets.first(where: { $0.id == selectedLaunchDirectoryPresetID }),
+              preset.directoryExists() else {
+            return nil
+        }
+
+        return preset.path
     }
 
     private func activateTerminalSurface() {
