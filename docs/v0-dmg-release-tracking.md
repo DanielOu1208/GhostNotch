@@ -58,39 +58,26 @@ Current high-level status:
 - The repo is already public on GitHub.
 - There are no Git tags and no GitHub Releases yet.
 - Automated tests and Release builds have passed recently on this checkout.
-- The app has no downloadable packaging flow yet.
-- The app is currently configured for local builds, not public distribution.
+- The hover-clearance fix is included in the v0 scope baseline.
+- The app has stable v0 bundle identity metadata, version fields, and an app
+  icon.
+- The repo has a manual self-signed DMG packaging script at
+  `scripts/package-dmg.sh`.
+- The app still does not have Developer ID signing, notarization, auto-update,
+  Homebrew, or App Store distribution.
 
-Current uncommitted local changes must be intentionally handled before release:
+Known release gaps before publishing:
 
-- `GhostNotch.xcodeproj/project.pbxproj`
-- `GhostNotch/UI/IslandIndicatorView.swift`
-- `GhostNotch/Window/WindowPositioner.swift`
-- `GhostNotchTests/AgentPresetStoreTests.swift`
-
-These local changes appear to be the notch hover clearance fix and tests. They
-should either be committed before v0 or deliberately left out of the v0 tag.
-
-Known public-doc drift:
-
-- `README.md` still says preferences/settings UI is not ready.
-- The app now has a real SwiftUI `Settings` scene backed by
-  `AgentPresetSettingsView`.
-- Public docs do not yet describe the v0 DMG distribution model or the expected
-  Gatekeeper friction for self-signed builds.
-
-Known release gaps:
-
-- No `LICENSE` file.
-- No app icon set in `Assets.xcassets`.
-- No `CHANGELOG.md` or release notes file.
-- No packaging script.
-- No checksum generation.
-- No signed/notarized distribution path.
-- Bundle ID is still `com.ghostnotch.local`.
-- Xcode signing is disabled and `ENABLE_HARDENED_RUNTIME` is off.
-- Version fields are not explicitly tracked through `MARKETING_VERSION` and
-  `CURRENT_PROJECT_VERSION`.
+- No `v0.1.0` Git tag yet.
+- No GitHub Release yet.
+- The self-signed release certificate still needs to exist locally before
+  running `scripts/package-dmg.sh`.
+- The generated DMG still needs the packaging verification and manual app
+  acceptance pass.
+- The exact Gatekeeper warning from a browser-downloaded DMG still needs to be
+  recorded in the GitHub Release notes.
+- Xcode project signing remains disabled for normal local builds; the packaging
+  script applies the v0 self-signature with hardened runtime signing options.
 
 ## Track 1: Freeze v0 Scope
 
@@ -98,7 +85,7 @@ Goal: Decide exactly what code will be included in `v0.1.0`.
 
 Recommended work:
 
-- Commit the current notch hover clearance fix if it is intended for v0.
+- Keep the committed notch hover clearance fix in the v0 baseline.
 - Keep v0 focused on the current usable app: notch-attached terminal, hover
   controls, Codex/Claude launch buttons, directory presets, and existing
   terminal rendering baseline.
@@ -206,33 +193,24 @@ Goal: Produce a repeatable `GhostNotch-v0.1.0.dmg` locally.
 
 Recommended work:
 
-- Add a manual packaging script later, likely `scripts/package-dmg.sh`.
+- Use the manual packaging script at `scripts/package-dmg.sh`.
 - Build Release into a clean `dist/` staging folder.
 - Self-sign the `.app` with a local certificate.
 - Create a DMG containing:
   - `GhostNotch.app`
   - an `/Applications` shortcut
-- Self-sign the DMG if the tooling supports it.
+- Self-sign the DMG.
 - Generate a SHA-256 checksum file.
 
-Recommended DMG tool:
-
-```text
-create-dmg
-```
-
-Reason: It supports the conventional drag-to-Applications layout and is easier
-than hand-building a polished Finder window with `hdiutil` and AppleScript.
-
-Fallback:
+DMG tool:
 
 ```text
 hdiutil
 ```
 
 Reason: It is built into macOS and avoids adding a third-party packaging
-dependency, but the resulting DMG will be plainer unless extra Finder layout
-work is scripted.
+dependency for v0. The resulting DMG is plain, but still contains the app and
+an `/Applications` shortcut.
 
 Self-signing setup:
 
@@ -254,6 +232,12 @@ Suggested checksum command:
 
 ```sh
 shasum -a 256 dist/GhostNotch-v0.1.0.dmg > dist/GhostNotch-v0.1.0.dmg.sha256
+```
+
+Repeatable script command:
+
+```sh
+scripts/package-dmg.sh
 ```
 
 Definition of done:

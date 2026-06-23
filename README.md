@@ -13,6 +13,10 @@ It sits flush with the top of the built-in display, looks like a small extension
 - Run commands in your default shell.
 - Collapse the island without killing the shell session.
 - Reopen it later and continue from the same session.
+- Launch Codex or Claude from the hover controls.
+- Save up to three directory presets and launch an agent inside one of them.
+- Open native Settings to choose visible agents and manage directory presets.
+- Install optional Codex and Claude hooks so the island can show when an agent is working or needs attention.
 - Use keyboard input, paste, terminal resize, scrollback, selection, and common terminal UI programs while the renderer continues to improve.
 
 GhostNotch has three visible states:
@@ -23,23 +27,29 @@ GhostNotch has three visible states:
 
 ## Project Status
 
-GhostNotch is a prototype. It is useful for local development and testing, but it is not packaged, signed, or distributed as a normal app yet.
+GhostNotch is a prototype moving toward a `v0.1.0` public preview. The v0 release path targets a downloadable GitHub DMG, but that DMG is self-signed and not notarized.
+
+That means macOS Gatekeeper may warn that the app is from an unidentified developer. Gatekeeper is the macOS safety check that runs when you open downloaded apps. This v0 path is meant to make testing easier, not to present GhostNotch as a normal trusted production app yet.
 
 Ready today:
 
 - Native macOS notch-attached panel.
 - Persistent default-shell PTY session.
+- Hover controls with Codex and Claude launcher buttons.
+- Directory presets for launching agents inside saved folders.
+- Native Settings UI for visible agents and directory presets.
+- Optional Codex and Claude shell hooks for working/attention indicators.
 - Ghostty-backed terminal parsing/state through a vendored `libghostty-vt` artifact.
 - App-owned AppKit/CoreText terminal grid renderer.
 - ANSI styles, cursor movement, alternate-screen support, primary-screen scrollback, grapheme-aware snapshots, wide-cell metadata, and text selection/copy.
 - Runtime notch measurement on notch displays, with a synthetic fallback on non-notch displays.
+- Stable v0 app identity metadata, version fields, and app icon.
 
 Not ready yet:
 
-- A downloadable release.
-- Public install or update flow.
-- Code signing, notarization, or App Store distribution.
-- Preferences/settings UI.
+- A published GitHub Release.
+- Auto-update, Homebrew, or App Store distribution.
+- Developer ID signing or notarization.
 - Full Ghostty renderer, configuration, shell integration, or terminal-app parity.
 - Final manual acceptance across real terminal programs after the latest renderer hardening.
 
@@ -65,7 +75,25 @@ You can also build from the command line:
 xcodebuild -project GhostNotch.xcodeproj -scheme GhostNotch -configuration Debug build
 ```
 
-The app currently launches as a local development build. Because it is not signed or packaged for public distribution, expect normal macOS development-build friction.
+Running from Xcode still uses local development build settings. For a distributable preview build, use the local DMG packaging script below.
+
+## Package a Local DMG
+
+The v0 packaging script builds a Release app, signs it with a local self-signed certificate, creates a DMG with an `/Applications` shortcut, and writes a SHA-256 checksum.
+
+Before running it, create a local code-signing certificate in Keychain Access named:
+
+```text
+GhostNotch Self-Signed Release
+```
+
+Then run:
+
+```sh
+scripts/package-dmg.sh
+```
+
+Outputs are written to `dist/`, which is intentionally ignored by git.
 
 ## How It Works
 
@@ -104,10 +132,16 @@ Use the root `GhostNotch.xcodeproj` and root `GhostNotch/` source tree.
 - [Docs index](docs/README.md) is the best starting point for contributors.
 - [Architecture](docs/architecture.md) explains the current app structure and Ghostty boundary.
 - [Testing](docs/testing.md) covers build, automated tests, and manual terminal acceptance.
+- [v0.1.0 release notes](docs/releases/v0.1.0.md) summarize the planned public preview release.
+- [v0 DMG release tracking](docs/v0-dmg-release-tracking.md) tracks the self-signed DMG release path.
 - [Agent indicator hooks](docs/agent-indicator-hooks.md) explains Codex and Claude hook setup and indicator state mapping.
 - [MacBook notch geometry](docs/notch-geometry.md) records the notch sizing and positioning assumptions.
 - [Xcode debugging](docs/xcode-debugging.md) covers LLDB task-port attach failures and terminal startup hangs.
 - [Ghostty VT vendor notes](vendor/ghostty-vt/README.md) describe the vendored terminal artifact.
+
+## License
+
+GhostNotch is available under the [MIT License](LICENSE).
 
 ## Contributing
 

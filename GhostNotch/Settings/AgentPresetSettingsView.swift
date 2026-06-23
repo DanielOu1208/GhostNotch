@@ -147,7 +147,7 @@ private struct DirectoryPresetRow: View {
     }
 }
 
-private func chooseDirectory() -> URL? {
+@MainActor private func chooseDirectory() -> URL? {
     let panel = NSOpenPanel()
     panel.canChooseFiles = false
     panel.canChooseDirectories = true

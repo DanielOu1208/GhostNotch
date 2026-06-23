@@ -5,3 +5,4 @@ xcuserdata/
 *.swo
 vendor/ghostty-vt/_build/
 build/
+dist/
