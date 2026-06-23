@@ -6,6 +6,10 @@ struct IslandMetrics {
     static let collapsedFallbackSize = NSSize(width: 280, height: 38)
     static let hoverFallbackSize = NSSize(width: 420, height: 72)
     static let expandedSize = NSSize(width: 822.8, height: 562)
+    static let minimumHoverHeight: CGFloat = 88
+    static let hoverNotchClearance: CGFloat = 8
+    static let hoverControlHeight: CGFloat = 32
+    static let hoverControlBottomPadding: CGFloat = 12
 
     static var currentNotchReferenceWidth: CGFloat {
         notchReferenceWidth(on: WindowPositioner.notchScreen)
@@ -24,7 +28,17 @@ struct IslandMetrics {
     }
 
     static func hoverSize(on screen: NSScreen) -> NSSize {
-        NSSize(width: max(notchReferenceWidth(on: screen) + 200, hoverFallbackSize.width), height: hoverFallbackSize.height)
+        NSSize(
+            width: max(notchReferenceWidth(on: screen) + 200, hoverFallbackSize.width),
+            height: hoverHeight(forNotchHeight: notchHeight(on: screen))
+        )
+    }
+
+    static func hoverHeight(forNotchHeight notchHeight: CGFloat) -> CGFloat {
+        max(
+            minimumHoverHeight,
+            notchHeight + hoverNotchClearance + hoverControlHeight + hoverControlBottomPadding
+        )
     }
 
     static func notchReferenceWidth(on screen: NSScreen) -> CGFloat {

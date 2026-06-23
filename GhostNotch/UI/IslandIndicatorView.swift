@@ -122,7 +122,7 @@ struct IslandIndicatorView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .padding(.horizontal, 24)
-        .padding(.bottom, 15)
+        .padding(.bottom, IslandMetrics.hoverControlBottomPadding)
         .animation(.easeInOut(duration: 0.2), value: isHovering)
     }
 

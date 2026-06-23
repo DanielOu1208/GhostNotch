@@ -73,6 +73,7 @@
 		1A000B020000000000000001 /* AgentPresetSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000B060000000000000001 /* AgentPresetSettingsView.swift */; };
 		1A000B030000000000000001 /* AgentPresetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000B050000000000000001 /* AgentPresetStore.swift */; };
 		1A000B040000000000000001 /* AgentPresetStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000B070000000000000001 /* AgentPresetStoreTests.swift */; };
+		1A000B090000000000000001 /* WindowPositioner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000050000000000000001 /* WindowPositioner.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -412,6 +413,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1A00010F0000000000000001 /* ShellResolver.swift in Sources */,
+				1A000B090000000000000001 /* WindowPositioner.swift in Sources */,
 				1A0001100000000000000001 /* PTYProcess.swift in Sources */,
 				1A0001110000000000000001 /* TerminalSession.swift in Sources */,
 				1A0001120000000000000001 /* TerminalSessionState.swift in Sources */,
