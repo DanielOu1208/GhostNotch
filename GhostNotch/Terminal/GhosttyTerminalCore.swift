@@ -327,6 +327,10 @@ final class GhosttyTerminalCore {
             return .clear
         }
 
+        guard !payloadBytes.contains(where: isControlByte) else {
+            return nil
+        }
+
         guard let payload = String(data: Data(payloadBytes), encoding: .utf8),
               let components = URLComponents(string: payload),
               components.scheme == "file" || components.scheme == "kitty-shell-cwd"
@@ -339,7 +343,15 @@ final class GhosttyTerminalCore {
             return .clear
         }
 
+        guard !path.containsControlCharacter else {
+            return nil
+        }
+
         return .path(path)
+    }
+
+    private static func isControlByte(_ byte: UInt8) -> Bool {
+        byte < 0x20 || byte == 0x7F
     }
 
     private func loadSnapshot(graphemeCapacity: Int) -> GhosttySnapshotLoadResult {
@@ -635,5 +647,13 @@ private extension TerminalCell {
 private extension TerminalColor {
     init(ghosttyColor: GNVTColor) {
         self.init(red: ghosttyColor.red, green: ghosttyColor.green, blue: ghosttyColor.blue)
+    }
+}
+
+private extension String {
+    var containsControlCharacter: Bool {
+        unicodeScalars.contains { scalar in
+            scalar.value < 0x20 || scalar.value == 0x7F
+        }
     }
 }

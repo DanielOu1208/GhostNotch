@@ -144,6 +144,35 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
         XCTAssertEqual(state.agentActivityState, .working)
     }
 
+    func testNonCodexSnapshotsSkipVisibleTextExtraction() {
+        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
+        var didExtractVisibleText = false
+
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .claude,
+                state: .working,
+                event: "ElicitationResult",
+                timestamp: Date(),
+                isLegacy: false
+            )
+        )
+        state.updateVisibleTerminalSnapshot(.empty(), visibleText: {
+            didExtractVisibleText = true
+            return ""
+        })
+
+        XCTAssertFalse(didExtractVisibleText)
+
+        state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date()))
+        state.updateVisibleTerminalSnapshot(.empty(), visibleText: {
+            didExtractVisibleText = true
+            return ""
+        })
+
+        XCTAssertTrue(didExtractVisibleText)
+    }
+
     func testFreshCodexWorkingHooksKeepVisibleQuestionSelectorAttention() async throws {
         let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
         let firstRecord = TerminalAgentActivityRecord(

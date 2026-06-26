@@ -94,9 +94,7 @@ enum TerminalCellGlyphRenderer {
         return rects
     }
 
-    static func powerlineFallbackCharacters() -> Set<Character> {
-        ["\u{E0B0}", "\u{E0B1}", "\u{E0B2}", "\u{E0B3}"]
-    }
+    static let powerlineFallbackCharacters: Set<Character> = ["\u{E0B0}", "\u{E0B1}", "\u{E0B2}", "\u{E0B3}"]
 
     private static func drawBox(_ character: Character, foreground: NSColor, in rect: NSRect, scale: CGFloat) -> Bool {
         guard let strokeRects = boxStrokeRects(for: character, in: rect, scale: scale) else {
@@ -116,7 +114,7 @@ enum TerminalCellGlyphRenderer {
     }
 
     private static func drawPowerline(_ character: Character, foreground: NSColor, in rect: NSRect, scale: CGFloat) -> Bool {
-        guard powerlineFallbackCharacters().contains(character) else {
+        guard powerlineFallbackCharacters.contains(character) else {
             return false
         }
 

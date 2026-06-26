@@ -106,7 +106,10 @@ echo "Signing DMG with identity: $SIGN_IDENTITY"
 codesign --force --timestamp=none --sign "$SIGN_IDENTITY" "$DMG_PATH"
 
 echo "Writing checksum..."
-shasum -a 256 "$DMG_PATH" > "$CHECKSUM_PATH"
+(
+  cd "$DIST_DIR"
+  shasum -a 256 "$DMG_NAME" > "$(basename "$CHECKSUM_PATH")"
+)
 
 echo
 echo "Created:"

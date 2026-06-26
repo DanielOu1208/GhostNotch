@@ -280,14 +280,17 @@ final class TerminalSessionState: ObservableObject {
     }
 
     func updateVisibleTerminalSnapshot(_ snapshot: TerminalRenderSnapshot) {
-        let visibleText = snapshot.plainText
+        updateVisibleTerminalSnapshot(snapshot, visibleText: { snapshot.plainText })
+    }
+
+    func updateVisibleTerminalSnapshot(_: TerminalRenderSnapshot, visibleText: () -> String) {
         guard isStructuredCodexWorkingHook
         else {
             clearCodexUserSelectorOverride()
             return
         }
 
-        let isVisibleUserSelector = CodexTerminalUserSelectorDetector.isUserSelectorVisible(in: visibleText)
+        let isVisibleUserSelector = CodexTerminalUserSelectorDetector.isUserSelectorVisible(in: visibleText())
         if isVisibleUserSelector {
             scheduleCodexUserSelectorConfirmationIfNeeded()
         } else {

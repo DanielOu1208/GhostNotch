@@ -266,7 +266,7 @@ Required packaging checks:
 ```sh
 codesign --verify --deep --strict --verbose=2 dist/GhostNotch.app
 hdiutil verify dist/GhostNotch-v0.1.0.dmg
-shasum -a 256 -c dist/GhostNotch-v0.1.0.dmg.sha256
+(cd dist && shasum -a 256 -c GhostNotch-v0.1.0.dmg.sha256)
 ```
 
 Expected `spctl` result for v0:

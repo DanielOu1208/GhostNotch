@@ -480,6 +480,19 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertEqual(core.snapshot.currentWorkingDirectory, "/Users/danielou/project")
     }
 
+    func testOsc7WorkingDirectoryRejectsControlCharacters() {
+        let core = GhosttyTerminalCore(columns: 8, rows: 2)
+
+        core.processOutput(Data("\u{1B}]7;file://localhost/Users/danielou/project\u{07}".utf8))
+        XCTAssertEqual(core.snapshot.currentWorkingDirectory, "/Users/danielou/project")
+
+        core.processOutput(Data("\u{1B}]7;file://localhost/tmp/%1Bbad\u{07}".utf8))
+        XCTAssertEqual(core.snapshot.currentWorkingDirectory, "/Users/danielou/project")
+
+        core.processOutput(Data("\u{1B}]7;file://localhost/tmp/\u{1B}[31mbad\u{07}".utf8))
+        XCTAssertEqual(core.snapshot.currentWorkingDirectory, "/Users/danielou/project")
+    }
+
     func testGhosttyKeyEncodingHandlesEscapeAndArrows() {
         let core = GhosttyTerminalCore()
 
@@ -640,7 +653,7 @@ final class GhosttyTerminalCoreTests: XCTestCase {
 
     func testPowerlineFallbackScopeIsLimitedToCommonSeparators() {
         XCTAssertEqual(
-            TerminalCellGlyphRenderer.powerlineFallbackCharacters(),
+            TerminalCellGlyphRenderer.powerlineFallbackCharacters,
             Set(["\u{E0B0}", "\u{E0B1}", "\u{E0B2}", "\u{E0B3}"])
         )
     }
