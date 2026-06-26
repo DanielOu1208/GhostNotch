@@ -175,12 +175,12 @@ private struct DirectoryPresetButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text(preset.displayLabel)
-                .font(.system(size: 10, weight: .semibold))
+            Text(preset.displayIcon)
+                .font(iconFont)
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(0.85)
                 .foregroundStyle(isSelected ? .black.opacity(0.86) : .white.opacity(0.82))
-                .frame(width: 58, height: 32)
+                .frame(width: 32, height: 32)
                 .background {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(isSelected ? .white.opacity(0.82) : .white.opacity(0.08))
@@ -193,7 +193,11 @@ private struct DirectoryPresetButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Use \(preset.displayLabel) folder")
-        .help(preset.path)
+        .help("\(preset.displayLabel) - \(preset.path)")
+    }
+
+    private var iconFont: Font {
+        .system(size: preset.displayIcon.count == 1 ? 15 : 11, weight: .semibold)
     }
 }
 

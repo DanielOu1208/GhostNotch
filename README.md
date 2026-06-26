@@ -14,8 +14,8 @@ It sits flush with the top of the built-in display, looks like a small extension
 - Collapse the island without killing the shell session.
 - Reopen it later and continue from the same session.
 - Launch Codex or Claude from the hover controls.
-- Save up to three directory presets and launch an agent inside one of them.
-- Open native Settings to choose visible agents and manage directory presets.
+- Save up to three directory presets with compact hover icons and launch an agent inside one of them.
+- Open native Settings to choose visible agents and manage directory preset labels, icons, and folders.
 - Install optional Codex and Claude hooks so the island can show when an agent is working or needs attention.
 - Use keyboard input, paste, terminal resize, scrollback, selection, and common terminal UI programs while the renderer continues to improve.
 
@@ -36,8 +36,8 @@ Ready today:
 - Native macOS notch-attached panel.
 - Persistent default-shell PTY session.
 - Hover controls with Codex and Claude launcher buttons.
-- Directory presets for launching agents inside saved folders.
-- Native Settings UI for visible agents and directory presets.
+- Directory presets with compact hover icons for launching agents inside saved folders.
+- Native Settings UI for visible agents and directory preset labels, icons, and folders.
 - Optional Codex and Claude shell hooks for working/attention indicators.
 - Ghostty-backed terminal parsing/state through a vendored `libghostty-vt` artifact.
 - App-owned AppKit/CoreText terminal grid renderer.

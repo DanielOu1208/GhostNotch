@@ -45,7 +45,7 @@ struct AgentPresetSettingsView: View {
         }
         .formStyle(.grouped)
         .padding(20)
-        .frame(width: 520)
+        .frame(width: 560)
     }
 
     private func addFolder() {
@@ -83,6 +83,16 @@ private struct DirectoryPresetRow: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 120)
 
+                TextField(
+                    "Icon",
+                    text: Binding(
+                        get: { preset.icon },
+                        set: { update(icon: $0) }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 56)
+
                 Text(preset.path)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -118,6 +128,8 @@ private struct DirectoryPresetRow: View {
                 .help("Remove folder")
             }
 
+            iconHelpText
+
             if !preset.directoryExists() {
                 Text("Folder cannot be found. It will not appear in hover quick launch.")
                     .font(.caption)
@@ -127,13 +139,30 @@ private struct DirectoryPresetRow: View {
         .padding(.vertical, 4)
     }
 
-    private func update(label: String? = nil, path: String? = nil) {
+    @ViewBuilder
+    private var iconHelpText: some View {
+        let sanitizedIcon = AgentLaunchDirectoryPreset.sanitizedIcon(preset.icon)
+        if sanitizedIcon.isEmpty {
+            Text("Icon: emoji or 1-3 characters. Blank uses Auto: \(preset.automaticIcon).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            Text("Icon: emoji or 1-3 characters.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func update(label: String? = nil, path: String? = nil, icon: String? = nil) {
         var updatedPreset = preset
         if let label {
             updatedPreset.label = label
         }
         if let path {
             updatedPreset.path = path
+        }
+        if let icon {
+            updatedPreset.icon = AgentLaunchDirectoryPreset.sanitizedIcon(icon)
         }
         onUpdate(updatedPreset)
     }

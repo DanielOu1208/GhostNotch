@@ -4,11 +4,15 @@ struct AgentLaunchDirectoryPreset: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     var label: String
     var path: String
+    var icon: String
 
-    init(id: UUID = UUID(), label: String, path: String) {
+    static let maximumIconCharacterCount = 3
+
+    init(id: UUID = UUID(), label: String, path: String, icon: String = "") {
         self.id = id
         self.label = label
         self.path = path
+        self.icon = Self.sanitizedIcon(icon)
     }
 
     var displayLabel: String {
@@ -21,6 +25,30 @@ struct AgentLaunchDirectoryPreset: Codable, Equatable, Identifiable, Sendable {
         return lastPathComponent.isEmpty ? "Folder" : lastPathComponent
     }
 
+    var displayIcon: String {
+        let trimmedIcon = Self.sanitizedIcon(icon)
+        return trimmedIcon.isEmpty ? automaticIcon : trimmedIcon
+    }
+
+    var automaticIcon: String {
+        let source = displayLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !source.isEmpty else {
+            return "F"
+        }
+
+        let words = Self.iconWords(from: source)
+        if words.count > 1 {
+            let initials = words
+                .prefix(Self.maximumIconCharacterCount)
+                .compactMap(\.first)
+                .map { String($0) }
+                .joined()
+            return initials.uppercased()
+        }
+
+        return String(source.prefix(Self.maximumIconCharacterCount)).uppercased()
+    }
+
     var fileURL: URL {
         URL(fileURLWithPath: path, isDirectory: true)
     }
@@ -28,6 +56,81 @@ struct AgentLaunchDirectoryPreset: Codable, Equatable, Identifiable, Sendable {
     func directoryExists(fileManager: FileManager = .default) -> Bool {
         var isDirectory: ObjCBool = false
         return fileManager.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
+    }
+
+    static func sanitizedIcon(_ icon: String) -> String {
+        let trimmedIcon = icon.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedIcon.isEmpty else {
+            return ""
+        }
+
+        let characters = Array(trimmedIcon)
+        if characters.first?.containsEmoji == true {
+            return String(characters.prefix(1))
+        }
+
+        return String(characters.prefix(maximumIconCharacterCount))
+    }
+
+    fileprivate func normalizedForStorage() -> AgentLaunchDirectoryPreset {
+        AgentLaunchDirectoryPreset(id: id, label: label, path: path, icon: icon)
+    }
+
+    private static func iconWords(from source: String) -> [String] {
+        source
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .flatMap(camelCaseWords)
+    }
+
+    private static func camelCaseWords(from word: String) -> [String] {
+        var words: [String] = []
+        var currentWord = ""
+        var previousWasLowercase = false
+
+        for character in word {
+            let characterString = String(character)
+            let isUppercase = characterString.rangeOfCharacter(from: .uppercaseLetters) != nil
+            let isLowercase = characterString.rangeOfCharacter(from: .lowercaseLetters) != nil
+
+            if isUppercase, previousWasLowercase, !currentWord.isEmpty {
+                words.append(currentWord)
+                currentWord = characterString
+            } else {
+                currentWord.append(character)
+            }
+
+            previousWasLowercase = isLowercase
+        }
+
+        if !currentWord.isEmpty {
+            words.append(currentWord)
+        }
+
+        return words
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case path
+        case icon
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        path = try container.decode(String.self, forKey: .path)
+        icon = Self.sanitizedIcon(try container.decodeIfPresent(String.self, forKey: .icon) ?? "")
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(label, forKey: .label)
+        try container.encode(path, forKey: .path)
+        try container.encode(Self.sanitizedIcon(icon), forKey: .icon)
     }
 }
 
@@ -43,6 +146,7 @@ struct AgentPresetConfiguration: Codable, Equatable, Sendable {
     func normalized() -> AgentPresetConfiguration {
         var seenPresetIDs = Set<UUID>()
         let normalizedPresets = directoryPresets
+            .map { $0.normalizedForStorage() }
             .filter { seenPresetIDs.insert($0.id).inserted }
             .prefix(AgentPresetStore.maximumDirectoryPresets)
 
@@ -56,6 +160,14 @@ struct AgentPresetConfiguration: Codable, Equatable, Sendable {
             directoryPresets: Array(normalizedPresets),
             enabledAgentIDs: Array(normalizedAgentIDs)
         )
+    }
+}
+
+private extension Character {
+    var containsEmoji: Bool {
+        String(self).unicodeScalars.contains { scalar in
+            scalar.properties.isEmojiPresentation || (scalar.properties.isEmoji && scalar.value > 0x238C)
+        }
     }
 }
 
@@ -92,14 +204,14 @@ final class AgentPresetStore: ObservableObject {
         AgentLauncher.launchers(for: enabledAgentIDs)
     }
 
-    func addDirectoryPreset(label: String, path: String) {
+    func addDirectoryPreset(label: String, path: String, icon: String = "") {
         guard configuration.directoryPresets.count < Self.maximumDirectoryPresets else {
             return
         }
 
         var updatedConfiguration = configuration
         updatedConfiguration.directoryPresets.append(
-            AgentLaunchDirectoryPreset(label: label, path: path)
+            AgentLaunchDirectoryPreset(label: label, path: path, icon: icon)
         )
         configuration = updatedConfiguration.normalized()
     }

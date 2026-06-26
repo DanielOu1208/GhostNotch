@@ -113,7 +113,11 @@ final class IslandPanelController: ObservableObject {
             return
         }
 
-        selectedLaunchDirectoryPresetID = preset.id
+        if selectedLaunchDirectoryPresetID == preset.id {
+            selectedLaunchDirectoryPresetID = nil
+        } else {
+            selectedLaunchDirectoryPresetID = preset.id
+        }
     }
 
     private func expand(startTerminal: Bool) {
