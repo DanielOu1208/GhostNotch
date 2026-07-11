@@ -18,6 +18,21 @@
       "state": "working"
     },
     {
+      "event": "PreToolUse",
+      "matcher": "*",
+      "state": "working"
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "*",
+      "state": "working"
+    },
+    {
+      "event": "PostToolUseFailure",
+      "matcher": "*",
+      "state": "working"
+    },
+    {
       "event": "Stop",
       "state": "idle"
     },
@@ -37,7 +52,7 @@
     {
       "event": "Notification",
       "state": "attention",
-      "whenField": "notification_type=permission_prompt,idle_prompt,elicitation_dialog"
+      "whenField": "notification_type=permission_prompt,elicitation_dialog"
     },
     {
       "event": "Elicitation",

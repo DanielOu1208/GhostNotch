@@ -173,6 +173,44 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
         XCTAssertTrue(didExtractVisibleText)
     }
 
+    func testClaudeAttentionReturnsToWorkingThenIdleFromHooks() {
+        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
+        state.markRunning()
+
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .claude,
+                state: .attention,
+                event: "PermissionRequest",
+                timestamp: Date(),
+                isLegacy: false
+            )
+        )
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .claude,
+                state: .working,
+                event: "PreToolUse",
+                timestamp: Date().addingTimeInterval(1),
+                isLegacy: false
+            )
+        )
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: .claude,
+                state: .idle,
+                event: "Stop",
+                timestamp: Date().addingTimeInterval(2),
+                isLegacy: false
+            )
+        )
+        XCTAssertEqual(state.agentActivityState, .idle)
+    }
+
     func testFreshCodexWorkingHooksKeepVisibleQuestionSelectorAttention() async throws {
         let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
         let firstRecord = TerminalAgentActivityRecord(

@@ -74,13 +74,18 @@ Current Claude mapping:
 
 - `SessionStart`: `idle`
 - `UserPromptSubmit`: `working`
+- `PreToolUse`: `working`
+- `PostToolUse`: `working`
+- `PostToolUseFailure`: `working`
 - `Stop`: `idle`
 - `StopFailure`: `idle`
 - `SessionEnd`: `idle`
 - `PermissionRequest`: `attention`
-- `Notification` with `permission_prompt`, `idle_prompt`, or `elicitation_dialog`: `attention`
+- `Notification` with `permission_prompt` or `elicitation_dialog`: `attention`
 - `Elicitation`: `attention`
 - `ElicitationResult`: `working`
+
+Claude `idle_prompt` notifications are intentionally ignored so a completed turn does not keep flashing blue while Claude is simply waiting for the next instruction. `ElicitationResult` applies to MCP elicitation results; normal tool progress is covered by the `PreToolUse`, `PostToolUse`, and `PostToolUseFailure` hooks.
 
 ## State Envelope
 

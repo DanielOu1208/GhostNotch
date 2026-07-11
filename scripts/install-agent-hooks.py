@@ -314,6 +314,11 @@ def run_self_test() -> None:
         assert claude_text.count(f"{PACKAGE_MARKER_NAME}=claude-v1") == len(packages["claude"].hooks)
         assert "ghostnotch-agent-hook" in claude_text
         assert "ghostnotch-agent-state" not in claude_text
+        assert "PreToolUse" in claude["hooks"]
+        assert "PostToolUse" in claude["hooks"]
+        assert "PostToolUseFailure" in claude["hooks"]
+        assert "idle_prompt" not in claude_text
+        assert "permission_prompt" in claude_text
         assert "elicitation_dialog" in claude_text
 
         combined = install_package_hooks(codex, packages["claude"])
