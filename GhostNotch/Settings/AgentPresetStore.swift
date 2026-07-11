@@ -6,13 +6,11 @@ struct AgentLaunchDirectoryPreset: Codable, Equatable, Identifiable, Sendable {
     var path: String
     var icon: String
 
-    static let maximumIconCharacterCount = 3
-
     init(id: UUID = UUID(), label: String, path: String, icon: String = "") {
         self.id = id
         self.label = label
         self.path = path
-        self.icon = Self.sanitizedIcon(icon)
+        self.icon = DirectoryPresetIcon.sanitized(icon)
     }
 
     var displayLabel: String {
@@ -25,30 +23,6 @@ struct AgentLaunchDirectoryPreset: Codable, Equatable, Identifiable, Sendable {
         return lastPathComponent.isEmpty ? "Folder" : lastPathComponent
     }
 
-    var displayIcon: String {
-        let trimmedIcon = Self.sanitizedIcon(icon)
-        return trimmedIcon.isEmpty ? automaticIcon : trimmedIcon
-    }
-
-    var automaticIcon: String {
-        let source = displayLabel.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !source.isEmpty else {
-            return "F"
-        }
-
-        let words = Self.iconWords(from: source)
-        if words.count > 1 {
-            let initials = words
-                .prefix(Self.maximumIconCharacterCount)
-                .compactMap(\.first)
-                .map { String($0) }
-                .joined()
-            return initials.uppercased()
-        }
-
-        return String(source.prefix(Self.maximumIconCharacterCount)).uppercased()
-    }
-
     var fileURL: URL {
         URL(fileURLWithPath: path, isDirectory: true)
     }
@@ -58,22 +32,73 @@ struct AgentLaunchDirectoryPreset: Codable, Equatable, Identifiable, Sendable {
         return fileManager.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
-    static func sanitizedIcon(_ icon: String) -> String {
+    fileprivate func normalizedForStorage() -> AgentLaunchDirectoryPreset {
+        AgentLaunchDirectoryPreset(id: id, label: label, path: path, icon: icon)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case path
+        case icon
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        path = try container.decode(String.self, forKey: .path)
+        icon = DirectoryPresetIcon.sanitized(try container.decodeIfPresent(String.self, forKey: .icon) ?? "")
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(label, forKey: .label)
+        try container.encode(path, forKey: .path)
+        try container.encode(DirectoryPresetIcon.sanitized(icon), forKey: .icon)
+    }
+}
+
+enum DirectoryPresetIcon {
+    static let maximumCharacterCount = 3
+
+    static func sanitized(_ icon: String) -> String {
         let trimmedIcon = icon.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedIcon.isEmpty else {
             return ""
         }
 
         let characters = Array(trimmedIcon)
-        if characters.first?.containsEmoji == true {
+        if characters.first?.containsEmojiStyleScalar == true {
             return String(characters.prefix(1))
         }
 
-        return String(characters.prefix(maximumIconCharacterCount))
+        return String(characters.prefix(maximumCharacterCount))
     }
 
-    fileprivate func normalizedForStorage() -> AgentLaunchDirectoryPreset {
-        AgentLaunchDirectoryPreset(id: id, label: label, path: path, icon: icon)
+    static func displayValue(icon: String, fallbackSource: String) -> String {
+        let sanitizedIcon = sanitized(icon)
+        return sanitizedIcon.isEmpty ? automaticValue(fallbackSource: fallbackSource) : sanitizedIcon
+    }
+
+    static func automaticValue(fallbackSource: String) -> String {
+        let source = fallbackSource.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !source.isEmpty else {
+            return "F"
+        }
+
+        let words = iconWords(from: source)
+        if words.count > 1 {
+            let initials = words
+                .prefix(maximumCharacterCount)
+                .compactMap(\.first)
+                .map { String($0) }
+                .joined()
+            return initials.uppercased()
+        }
+
+        return String(source.prefix(maximumCharacterCount)).uppercased()
     }
 
     private static func iconWords(from source: String) -> [String] {
@@ -109,28 +134,14 @@ struct AgentLaunchDirectoryPreset: Codable, Equatable, Identifiable, Sendable {
 
         return words
     }
+}
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case label
-        case path
-        case icon
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        label = try container.decode(String.self, forKey: .label)
-        path = try container.decode(String.self, forKey: .path)
-        icon = Self.sanitizedIcon(try container.decodeIfPresent(String.self, forKey: .icon) ?? "")
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(label, forKey: .label)
-        try container.encode(path, forKey: .path)
-        try container.encode(Self.sanitizedIcon(icon), forKey: .icon)
+enum DirectoryPresetSelection {
+    static func toggled(
+        currentSelection: AgentLaunchDirectoryPreset.ID?,
+        selectedPresetID: AgentLaunchDirectoryPreset.ID
+    ) -> AgentLaunchDirectoryPreset.ID? {
+        currentSelection == selectedPresetID ? nil : selectedPresetID
     }
 }
 
@@ -164,9 +175,9 @@ struct AgentPresetConfiguration: Codable, Equatable, Sendable {
 }
 
 private extension Character {
-    var containsEmoji: Bool {
+    var containsEmojiStyleScalar: Bool {
         String(self).unicodeScalars.contains { scalar in
-            scalar.properties.isEmojiPresentation || (scalar.properties.isEmoji && scalar.value > 0x238C)
+            scalar.properties.isEmojiPresentation || scalar.properties.generalCategory == .otherSymbol
         }
     }
 }

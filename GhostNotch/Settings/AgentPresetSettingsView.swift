@@ -141,9 +141,9 @@ private struct DirectoryPresetRow: View {
 
     @ViewBuilder
     private var iconHelpText: some View {
-        let sanitizedIcon = AgentLaunchDirectoryPreset.sanitizedIcon(preset.icon)
+        let sanitizedIcon = DirectoryPresetIcon.sanitized(preset.icon)
         if sanitizedIcon.isEmpty {
-            Text("Icon: emoji or 1-3 characters. Blank uses Auto: \(preset.automaticIcon).")
+            Text("Icon: emoji or 1-3 characters. Blank uses Auto: \(automaticIcon).")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else {
@@ -151,6 +151,10 @@ private struct DirectoryPresetRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var automaticIcon: String {
+        DirectoryPresetIcon.automaticValue(fallbackSource: preset.displayLabel)
     }
 
     private func update(label: String? = nil, path: String? = nil, icon: String? = nil) {
@@ -162,7 +166,7 @@ private struct DirectoryPresetRow: View {
             updatedPreset.path = path
         }
         if let icon {
-            updatedPreset.icon = AgentLaunchDirectoryPreset.sanitizedIcon(icon)
+            updatedPreset.icon = DirectoryPresetIcon.sanitized(icon)
         }
         onUpdate(updatedPreset)
     }

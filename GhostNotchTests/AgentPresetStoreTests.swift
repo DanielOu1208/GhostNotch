@@ -48,7 +48,7 @@ final class AgentPresetStoreTests: XCTestCase {
         let secondStore = AgentPresetStore(userDefaults: userDefaults)
 
         XCTAssertEqual(secondStore.directoryPresets.map(\.icon), ["GN"])
-        XCTAssertEqual(secondStore.directoryPresets.map(\.displayIcon), ["GN"])
+        XCTAssertEqual(secondStore.directoryPresets.map { displayIcon(for: $0) }, ["GN"])
     }
 
     func testStoreLoadsLegacyConfigurationWithoutDirectoryPresetIcon() throws {
@@ -74,28 +74,63 @@ final class AgentPresetStoreTests: XCTestCase {
         let preset = try XCTUnwrap(store.directoryPresets.first)
         XCTAssertEqual(preset.id, presetID)
         XCTAssertEqual(preset.icon, "")
-        XCTAssertEqual(preset.displayIcon, "GN")
+        XCTAssertEqual(DirectoryPresetIcon.displayValue(icon: preset.icon, fallbackSource: preset.displayLabel), "GN")
         XCTAssertEqual(store.enabledAgentIDs, [.codex])
     }
 
     func testDirectoryPresetIconSanitizesInput() {
-        XCTAssertEqual(AgentLaunchDirectoryPreset.sanitizedIcon("  API  "), "API")
-        XCTAssertEqual(AgentLaunchDirectoryPreset.sanitizedIcon("abcd"), "abc")
-        XCTAssertEqual(AgentLaunchDirectoryPreset.sanitizedIcon("🚀Launch"), "🚀")
+        XCTAssertEqual(DirectoryPresetIcon.sanitized("  API  "), "API")
+        XCTAssertEqual(DirectoryPresetIcon.sanitized("abcd"), "abc")
+        XCTAssertEqual(DirectoryPresetIcon.sanitized("1234"), "123")
+        XCTAssertEqual(DirectoryPresetIcon.sanitized("🚀Launch"), "🚀")
+        XCTAssertEqual(DirectoryPresetIcon.sanitized("☕️Coffee"), "☕️")
     }
 
     func testDirectoryPresetDisplayIconUsesAutomaticInitialsWhenIconIsBlank() {
         XCTAssertEqual(
-            AgentLaunchDirectoryPreset(label: "Project Docs", path: "/tmp/project-docs").displayIcon,
+            displayIcon(for: AgentLaunchDirectoryPreset(label: "Project Docs", path: "/tmp/project-docs")),
             "PD"
         )
         XCTAssertEqual(
-            AgentLaunchDirectoryPreset(label: "GhostNotch", path: "/tmp/GhostNotch").displayIcon,
+            displayIcon(for: AgentLaunchDirectoryPreset(label: "GhostNotch", path: "/tmp/GhostNotch")),
             "GN"
         )
         XCTAssertEqual(
-            AgentLaunchDirectoryPreset(label: "", path: "/tmp/web-final").displayIcon,
+            displayIcon(for: AgentLaunchDirectoryPreset(label: "", path: "/tmp/web-final")),
             "WF"
+        )
+    }
+
+    func testDirectoryPresetDisplayIconUsesStoredIconWhenPresent() {
+        let preset = AgentLaunchDirectoryPreset(label: "GhostNotch", path: "/tmp/GhostNotch", icon: "gn")
+
+        XCTAssertEqual(displayIcon(for: preset), "gn")
+    }
+
+    func testDirectoryPresetSelectionTogglesFromNoSelection() {
+        let presetID = UUID()
+
+        XCTAssertEqual(
+            DirectoryPresetSelection.toggled(currentSelection: nil, selectedPresetID: presetID),
+            presetID
+        )
+    }
+
+    func testDirectoryPresetSelectionClearsMatchingSelection() {
+        let presetID = UUID()
+
+        XCTAssertNil(
+            DirectoryPresetSelection.toggled(currentSelection: presetID, selectedPresetID: presetID)
+        )
+    }
+
+    func testDirectoryPresetSelectionReplacesDifferentSelection() {
+        let firstPresetID = UUID()
+        let secondPresetID = UUID()
+
+        XCTAssertEqual(
+            DirectoryPresetSelection.toggled(currentSelection: firstPresetID, selectedPresetID: secondPresetID),
+            secondPresetID
         )
     }
 
@@ -118,6 +153,10 @@ final class AgentPresetStoreTests: XCTestCase {
         let userDefaults = UserDefaults(suiteName: suiteName)!
         userDefaults.removePersistentDomain(forName: suiteName)
         return (userDefaults, suiteName)
+    }
+
+    private func displayIcon(for preset: AgentLaunchDirectoryPreset) -> String {
+        DirectoryPresetIcon.displayValue(icon: preset.icon, fallbackSource: preset.displayLabel)
     }
 }
 

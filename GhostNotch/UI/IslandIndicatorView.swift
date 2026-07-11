@@ -175,7 +175,7 @@ private struct DirectoryPresetButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text(preset.displayIcon)
+            Text(displayIcon)
                 .font(iconFont)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
@@ -197,7 +197,11 @@ private struct DirectoryPresetButton: View {
     }
 
     private var iconFont: Font {
-        .system(size: preset.displayIcon.count == 1 ? 15 : 11, weight: .semibold)
+        .system(size: displayIcon.count == 1 ? 15 : 11, weight: .semibold)
+    }
+
+    private var displayIcon: String {
+        DirectoryPresetIcon.displayValue(icon: preset.icon, fallbackSource: preset.displayLabel)
     }
 }
 
