@@ -17,7 +17,7 @@ case "$(uname -m)" in
     ;;
 esac
 
-ZIG_TARGET="${ZIG_TARGET:-${ZIG_ARCH}-macos.14.0}"
+ZIG_TARGET="${ZIG_TARGET:-${ZIG_ARCH}-macos.26.0}"
 ZIG_NAME="zig-${ZIG_ARCH}-macos-${ZIG_VERSION}"
 ZIG_URL="https://ziglang.org/download/${ZIG_VERSION}/${ZIG_NAME}.tar.xz"
 if [[ "$GHOSTTY_VERSION" == "tip" ]]; then

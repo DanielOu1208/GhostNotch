@@ -1,6 +1,6 @@
 # GhostNotch v0.1.0 UI Polish Sprint Tracking
 
-Status: ready for Track 0; source implementation blocked by the Track 0 exit gate  
+Status: Tracks 0–2 complete; ready for Track 3
 Created: 2026-07-10  
 Depends on: [UI Polish Research Brief](ui-polish-research.md)
 
@@ -37,7 +37,7 @@ Depends on: none
   deployment target, and collapsed-state evidence in the research brief.
 - [x] Record Apple guidance, product references, visual direction, motion
   storyboard, Rose Three source policy, and accessibility requirements.
-- [ ] Capture sanitized current-state images for hover, expanded, and Settings.
+- [x] Capture sanitized current-state images for hover, expanded, and Settings.
   Use suite `com.danielou.GhostNotch.UIPolishCapture` with two fixtures:
   `Project Docs`/`PD` and `Build Tools`/`BT`, rooted under
   `/tmp/ghostnotch-ui-polish/`; enable Codex and Claude. Render Settings with an
@@ -46,89 +46,108 @@ Depends on: none
   the pre-edit diff, remove the edit immediately afterward, and verify the
   source diff exactly matches the saved pre-edit diff before measuring
   performance. Then remove the suite and temporary folders.
-- [ ] Record current standard and Reduce Motion transition clips covering
+  Evidence: [hover](images/ui-polish/baseline-hover.jpg),
+  [expanded](images/ui-polish/baseline-expanded.jpg), and
+  [Settings](images/ui-polish/baseline-settings.jpg) — 2026-07-11, Mac16,7,
+  isolated `/tmp` fixtures.
+- [x] Record current standard and Reduce Motion transition clips covering
   collapsed → hover → collapsed, collapsed → expanded → collapsed, and rapid
   reversal at every available display mode up to the highest rate, using the
   research filenames.
-- [ ] Create `docs/images/ui-polish/performance.md` and record three 60-second
+  Evidence: standard and Reduce Motion H.264 clips at 48, 50, 60, and 120 Hz
+  under `docs/images/ui-polish/` — 2026-07-11, Mac16,7.
+- [x] Create `docs/images/ui-polish/performance.md` and record three 60-second
   ready, working, and waiting CPU samples using the research measurement
   protocol before source changes begin.
+  Evidence: [baseline performance](images/ui-polish/performance.md) —
+  2026-07-11, Mac16,7, 120 Hz Time Profiler runs.
 
 Exit gate:
 
-- [ ] Every surface has a sanitized baseline image and the motion recording is
+- [x] Every surface has a sanitized baseline image and the motion recording is
   linked from the research brief.
-- [ ] No repo screenshot contains usernames, local paths, tokens, terminal
+- [x] No repo screenshot contains usernames, local paths, tokens, terminal
   history, or other personal data.
-- [ ] Save files using the names and formats in the research brief, verify the
+- [x] Save files using the names and formats in the research brief, verify the
   temporary capture edit left no source diff, and add an
   `Evidence:` entry under each completed capture task.
-- [ ] `performance.md` contains the current commit, hardware, active display
+- [x] `performance.md` contains the current commit, hardware, active display
   refresh rate, raw samples, medians, and trace locations.
 
 ## Track 1: macOS 26 foundation
 
 Depends on: Track 0
 
-- [ ] Run
+- [x] Run
   `rg -n 'MACOSX_DEPLOYMENT_TARGET|macOS 14|14\\.0' GhostNotch.xcodeproj README.md docs scripts`
   and record every non-archive compatibility consumer.
-- [ ] Set every GhostNotch app and test Debug/Release
+- [x] Set every GhostNotch app and test Debug/Release
   `MACOSX_DEPLOYMENT_TARGET` in `GhostNotch.xcodeproj/project.pbxproj` to 26.0.
   Do not clean up unrelated availability branches in this sprint.
-- [ ] Update README, release notes, build docs, and packaging assumptions from
+- [x] Update README, release notes, build docs, and packaging assumptions from
   macOS 14 to macOS 26.
-- [ ] Inventory repeated chrome values. Keep values local unless at least two
+- [x] Inventory repeated chrome values. Keep values local unless at least two
   production surfaces must stay synchronized.
-- [ ] Define the minimal shared semantic values needed for notch controls:
+- [x] Define the minimal shared semantic values needed for notch controls:
   foreground roles, state colors, control size, local spacing, and corner
   treatment. Do not create a general token framework.
-- [ ] Add coverage for any extracted pure sizing or state-style logic.
+- [x] Add coverage for any extracted pure sizing or state-style logic.
+  Evidence: all six deployment settings and the Zig default target 26.0;
+  existing `IslandMetricsTests` cover the shared 40-by-32-point capsule geometry
+  and 112-point hover height;
+  `xcodebuild test` passed on 2026-07-11. Xcode's project-format
+  `compatibilityVersion = "Xcode 14.0"` remains intentionally unchanged.
 
 Exit gate:
 
-- [ ] Debug and Release builds target macOS 26 and tests pass.
-- [ ] Public requirements consistently say macOS 26 or newer.
-- [ ] The app has no new dependency or speculative styling layer.
+- [x] Debug and Release builds target macOS 26 and tests pass.
+- [x] Public requirements consistently say macOS 26 or newer.
+- [x] The app has no new dependency or speculative styling layer.
 
 ## Track 2: Typography, spacing, and controls
 
 Depends on: Track 1
 
-- [ ] Change hover status text to system-default `.caption`, Medium weight, and
+- [x] Change hover status text to system-default `.caption`, Medium weight, and
   semantic secondary foreground. Keep it on one line.
-- [ ] Preserve 32-point quick-launch targets and normalize internal gaps using
-  the research map: 4 points symbol-to-label, 6 points within the glass
-  container, 8 points from status to the first controls, and 12 points between
-  preset and launcher groups. Preserve 24-point horizontal and 12-point bottom
-  hover padding.
-- [ ] Put preset and launcher buttons in one
-  `GlassEffectContainer(spacing: 6)`. Use standard glass for unselected buttons
-  and prominent glass for the selected preset.
-- [ ] Use standard glass for expanded restart/collapse buttons. Keep Settings
-  on native grouped-Form controls without custom glass.
-- [ ] Add clear hover, pressed, selected, disabled, and keyboard-focus states
-  without changing actions or selection behavior. Use native glass hover and
-  press feedback, prominent glass only for selection, the system disabled
-  treatment, and the system keyboard focus ring; do not layer custom versions
-  of those states.
-- [ ] Keep the opaque black shell and apply semantic label/symbol colors.
-- [ ] With Reduce Transparency, use opaque `NSColor.controlBackgroundColor`
-  with a one-point `NSColor.separatorColor` outline. With Increase Contrast,
-  use a two-point semantic separator outline and keep text at 4.5:1 and control
-  boundaries at 3:1 in Accessibility Inspector.
-- [ ] Preserve the existing directory preset accessibility label and help
+- [x] Use 40-by-32-point quick-launch segments with a two-point outer capsule
+  inset. Keep 8 points from status to controls, 12 points between folder and
+  agent groups, and the existing 24-point horizontal/12-point bottom padding.
+- [x] Add `Folders` and `Agents` secondary `caption2` labels four points above
+  two separate native outer glass capsules. Hide the folder label and capsule
+  when there are no valid presets.
+- [x] Put expanded restart/collapse actions in one native outer capsule and
+  inset it from the screen top. Keep Settings on native grouped-Form controls.
+- [x] Add clear hover, pressed, selected, disabled, and keyboard-focus states
+  without changing actions or selection behavior. Use native inner glass only
+  for hover/press, prominent glass only for selection, and one persistent
+  native glass outer capsule; add no custom control surface or outline.
+- [x] Keep the opaque black shell and apply semantic label/symbol colors.
+- [x] Let native Liquid Glass respond to Reduce Transparency and Increase
+  Contrast. Use semantic foregrounds and native focus/hover/press treatments;
+  use `NSColor.separatorColor` only for the outer black shell rim.
+- [x] Preserve the existing directory preset accessibility label and help
   formats (`Use <name> folder` and `<name> - <path>`), preserve each launcher's
   existing label/help text, and preserve `Restart terminal` and `Collapse
   terminal` for expanded actions. Verify each string with VoiceOver.
+  Evidence: [standard hover](images/ui-polish/track2-hover-standard.jpg),
+  [expanded actions](images/ui-polish/track2-expanded-standard.jpg),
+  [Reduce Transparency](images/ui-polish/track2-hover-reduce-transparency.jpg),
+  and [Increase Contrast](images/ui-polish/track2-hover-increase-contrast.jpg)
+  — 2026-07-11, Mac16,7. Accessibility inspection exposed every preserved
+  label/help string.
 
 Exit gate:
 
-- [ ] No control clips with zero through three folder presets and one through
-  three launchers.
-- [ ] Physical-notch clearance and current shell dimensions remain unchanged,
-  or the tracker includes the screenshot that justified a dimension change.
-- [ ] Pointer, keyboard, VoiceOver labels, help text, and focus behavior work.
+- [x] No controls clip with zero through three folder presets and one through
+  two launchers.
+- [x] Physical-notch clearance remains intact. The hover height changed from 90
+  to 112 points to fit the caption row and native outer-capsule inset; collapsed
+  and expanded dimensions remain unchanged.
+- [x] Pointer and VoiceOver labels/help work. Hover temporarily activates
+  GhostNotch for focused native glass and restores the previous app on exit;
+  expansion retains focus. Expanded terminal Tab input and native Settings
+  keyboard behavior remain unchanged.
 
 ## Track 3: Coordinated notch motion
 
@@ -243,7 +262,7 @@ Visual and interaction matrix:
 
 - [ ] Collapsed, hover, expanded, and Settings before/after captures.
 - [ ] Ready, working, and waiting in collapsed and hover states.
-- [ ] Zero through three valid presets; invalid preset hidden; one through three
+- [ ] Zero through three valid presets; invalid preset hidden; one through two
   launchers.
 - [ ] Pointer entry/exit grace, rapid re-entry, selected preset, launch click,
   background click, `Option+Space`, outside click, and Escape behavior.

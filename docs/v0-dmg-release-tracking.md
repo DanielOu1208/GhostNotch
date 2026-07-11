@@ -63,15 +63,17 @@ Current high-level status:
   icon.
 - The repo has a manual self-signed DMG packaging script at
   `scripts/package-dmg.sh`.
-- The approved macOS 26 UI polish research and implementation tracker are now
-  part of the v0.1.0 release scope.
+- The macOS 26 UI polish baseline, platform foundation, and native capsule
+  control layer are implemented; motion, Rose Three, and final acceptance
+  remain in scope.
 - The app still does not have Developer ID signing, notarization, auto-update,
   Homebrew, or App Store distribution.
 
 Known release gaps before publishing:
 
-- The [UI polish sprint](ui-polish-sprint-tracking.md) is not implemented or
-  accepted yet. It raises the planned v0.1.0 minimum requirement to macOS 26.
+- The [UI polish sprint](ui-polish-sprint-tracking.md) has completed Tracks 0–2.
+  Coordinated motion, Rose Three, Settings integration, and final acceptance
+  remain before release.
 - No `v0.1.0` Git tag yet.
 - No GitHub Release yet.
 - The self-signed release certificate still needs to exist locally before
@@ -286,7 +288,8 @@ Manual app checks:
 
 - Open the app from the copied `/Applications/GhostNotch.app`.
 - Confirm collapsed island appears on the built-in display.
-- Confirm hover state appears and does not steal keyboard focus.
+- Confirm hover takes focus for native glass and restores the previous app when
+  the pointer exits without expanding.
 - Confirm `Option+Space` expands and collapses the terminal.
 - Run a simple shell command.
 - Confirm collapse/reopen preserves the shell session.

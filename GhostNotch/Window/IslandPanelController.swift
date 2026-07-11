@@ -23,6 +23,7 @@ final class IslandPanelController: ObservableObject {
     private var globalMouseMonitor: Any?
     private var pendingAgentLaunchTask: Task<Void, Never>?
     private var lastHoverContainment: Bool?
+    private var applicationBeforeHover: NSRunningApplication?
     private lazy var outsideClickMonitor = OutsideClickMonitor(
         shouldCollapse: { [weak self] in self?.state == .expanded },
         isPointInsidePanel: { [weak self] point in self?.panel.frame.contains(point) ?? false },
@@ -77,6 +78,7 @@ final class IslandPanelController: ObservableObject {
 
     func tearDown() {
         pendingAgentLaunchTask?.cancel()
+        restoreApplicationAfterHover()
         outsideClickMonitor.stop()
         stopHoverMonitoring()
         terminalSurfaceCoordinator.stop()
@@ -126,6 +128,7 @@ final class IslandPanelController: ObservableObject {
         }
 
         terminalSurfacePhase = .expanding
+        applicationBeforeHover = nil
         panel.shouldAcceptKeyFocus = true
         panel.styleMask.remove(.nonactivatingPanel)
         NSApp.activate()
@@ -244,7 +247,38 @@ final class IslandPanelController: ObservableObject {
             return
         }
 
-        transition(to: isHovering ? .hover : .collapsed)
+        if isHovering {
+            activateHoverPanel()
+            transition(to: .hover)
+        } else {
+            transition(to: .collapsed)
+            deactivateHoverPanel()
+        }
+    }
+
+    private func activateHoverPanel() {
+        if let frontmostApplication = NSWorkspace.shared.frontmostApplication,
+           frontmostApplication.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+            applicationBeforeHover = frontmostApplication
+        }
+
+        panel.shouldAcceptKeyFocus = true
+        panel.styleMask.remove(.nonactivatingPanel)
+        NSApp.activate()
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    private func deactivateHoverPanel() {
+        panel.shouldAcceptKeyFocus = false
+        panel.resignKey()
+        panel.styleMask.insert(.nonactivatingPanel)
+        restoreApplicationAfterHover()
+    }
+
+    private func restoreApplicationAfterHover() {
+        let application = applicationBeforeHover
+        applicationBeforeHover = nil
+        application?.activate(options: [.activateIgnoringOtherApps])
     }
 
     private func configurePanel() {

@@ -162,11 +162,11 @@ final class AgentPresetStoreTests: XCTestCase {
 
 final class IslandMetricsTests: XCTestCase {
     func testHoverHeightLeavesControlsBelowPhysicalNotch() {
-        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 38), 90)
+        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 38), 112)
     }
 
     func testHoverHeightUsesMinimumForShortOrMissingNotch() {
-        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 0), 88)
-        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 20), 88)
+        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 0), 112)
+        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 20), 112)
     }
 }

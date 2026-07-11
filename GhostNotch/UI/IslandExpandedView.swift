@@ -49,16 +49,20 @@ struct IslandExpandedView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: 0) {
             Spacer()
 
-            headerButton(systemName: "arrow.clockwise", action: onRestart)
-                .accessibilityLabel("Restart terminal")
-                .help("Restart terminal")
+            HStack(alignment: .center, spacing: 0) {
+                headerButton(systemName: "arrow.clockwise", action: onRestart)
+                    .accessibilityLabel("Restart terminal")
+                    .help("Restart terminal")
 
-            headerButton(systemName: "xmark", action: onCollapse)
-                .accessibilityLabel("Collapse terminal")
-                .help("Collapse terminal")
+                headerButton(systemName: "xmark", action: onCollapse)
+                    .accessibilityLabel("Collapse terminal")
+                    .help("Collapse terminal")
+            }
+            .notchCapsuleGroupStyle()
+            .padding(.top, 2)
         }
         .padding(.horizontal, 22)
         .frame(height: notchReservedHeight, alignment: .center)
@@ -68,10 +72,15 @@ struct IslandExpandedView: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white.opacity(0.56))
-                .frame(width: 28, height: 28, alignment: .center)
-                .contentShape(Rectangle())
+                .foregroundStyle(.primary)
+                .frame(
+                    width: IslandMetrics.notchControlWidth,
+                    height: IslandMetrics.notchControlHeight,
+                    alignment: .center
+                )
+                .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
+        .notchControlStyle()
     }
 }

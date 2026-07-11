@@ -1,6 +1,6 @@
 # GhostNotch v0.1.0 UI Polish Research Brief
 
-Status: approved direction; visual evidence baseline partially complete  
+Status: approved direction; Tracks 0–2 implemented
 Reviewed: 2026-07-10  
 Primary audience: coding agents
 
@@ -39,9 +39,9 @@ Out of scope:
 
 ## Verified current baseline
 
-The baseline was inspected on macOS 26.4 with Xcode 26.4.1. The project still
-declares `MACOSX_DEPLOYMENT_TARGET = 14.0`; raising it to 26 is future work, not
-part of this documentation pass.
+The baseline was inspected on macOS 26.4 with Xcode 26.4.1. Before source work,
+the project declared `MACOSX_DEPLOYMENT_TARGET = 14.0`; Track 1 raised every
+app and test configuration to macOS 26.0.
 
 | Surface | Current implementation | Main polish issue |
 | --- | --- | --- |
@@ -56,6 +56,17 @@ part of this documentation pass.
 
 ![Current collapsed GhostNotch notch showing the white Ghostty mark on the left and the green ready dot on the right.](images/ui-polish/baseline-collapsed.jpg)
 
+![Current hover state with sanitized Project Docs and Build Tools presets.](images/ui-polish/baseline-hover.jpg)
+
+![Current expanded state with a sanitized stopped-shell surface.](images/ui-polish/baseline-expanded.jpg)
+
+![Current native Settings form backed by isolated temporary presets.](images/ui-polish/baseline-settings.jpg)
+
+Evidence: sanitized baseline screenshots, standard and Reduce Motion H.264
+transition clips at 48, 50, 60, and 120 Hz, and
+[baseline performance](images/ui-polish/performance.md) — 2026-07-11,
+Mac16,7. The temporary capture wiring was removed before performance sampling.
+
 Numbered observations:
 
 1. The physical camera housing correctly remains an uninterrupted black center;
@@ -64,12 +75,10 @@ Numbered observations:
    the initial maximum to test without changing the collapsed width.
 3. The current glow is visible at this scale, but the dot has no recognizable
    shape beyond color.
-4. The live Settings window was inspected but not stored because it displays
-   private local folder paths. The implementation sprint must capture a
-   sanitized Settings image using an isolated `UserDefaults` suite.
-5. Fresh hover and expanded screenshots are required at Track 0 because those
-   custom surfaces cannot currently be driven into every state through the
-   accessibility capture tool.
+4. Settings evidence uses an isolated `UserDefaults` suite so no private local
+   folder paths enter the repository.
+5. Hover and expanded baselines were captured with temporary Debug-only state
+   wiring that was removed before performance sampling.
 
 ## Research sources and conclusions
 
@@ -129,15 +138,17 @@ assets, layout measurements, or product-specific animation choreography.
 
 ### Spacing and dimensions
 
-- Preserve collapsed, hover, and expanded shell dimensions by default.
-- Keep the 32-point quick-launch targets; they exceed Apple's 20-point macOS
-  minimum and match a compact desktop control.
+- Preserve collapsed and expanded shell dimensions. Track 2 raises the hover
+  shell from 90 to 112 points so the group captions and native outer capsule
+  remain below the physical notch without crowding.
+- Use 40-by-32-point quick-launch targets with a two-point outer capsule inset;
+  they exceed Apple's 20-point macOS minimum and read as compact pills rather
+  than rounded squares.
 - Normalize internal gaps around a small set of local values instead of adding
-  a global token system. Use 4 points between a symbol and its label, 6 points
-  between controls inside the shared glass container, 8 points between the
-  status group and the first control group, and 12 points between the preset
-  and launcher groups. Preserve the existing 24-point horizontal and 12-point
-  bottom hover padding.
+  a global token system. Use zero points between actions inside a capsule, 4
+  points from each caption to its capsule, 8 points between the status and
+  first control group, and 12 points between the folder and agent capsules.
+  Preserve the existing 24-point horizontal and 12-point bottom hover padding.
 - Keep notch clearance calculations shared between rendered controls and
   `WindowPositioner`.
 - Change an outer dimension only when a captured state proves clipping,
@@ -151,21 +162,19 @@ assets, layout measurements, or product-specific animation choreography.
   waiting. Preserve these meanings.
 - Reduce glow to a small state accent. Increase Contrast must strengthen the
   mark or outline without relying on glow.
-- Put directory-preset and agent-launch buttons in one
-  `GlassEffectContainer(spacing: 6)`. Use the standard glass button style for
-  unselected controls and the prominent glass style for the selected directory
-  preset. Do not apply glass to the black shell, terminal canvas, status mark,
-  or Settings form.
-- Use the standard glass style for expanded restart/collapse buttons.
-- Let the native glass button style provide hover and pressed feedback. Use the
-  system focus ring for keyboard focus and the system disabled treatment; do
-  not add a second custom overlay. Selection is expressed only by the prominent
-  glass style. Under Increase Contrast, use a two-point semantic separator
-  outline around control boundaries.
-- With Reduce Transparency, replace glass with opaque
-  `NSColor.controlBackgroundColor` and a one-point `NSColor.separatorColor`
-  outline. Verify labels at 4.5:1 and control boundaries at 3:1 using
-  Accessibility Inspector.
+- Give folders, agents, and expanded actions one persistent native
+  `glassEffect(.regular.interactive(), in: Capsule())` surface per group. Keep
+  unselected inner actions plain at rest, materialize the native `.glass`
+  subcapsule on pointer hover, and use `.glassProminent` for the selected
+  directory preset. Do not apply glass to the black shell, terminal canvas,
+  status mark, or Settings form.
+- Let macOS own glass focus, hover, press, Reduce Transparency, and Increase
+  Contrast rendering. Add no custom control fill, stroke, blur, or material.
+  Activate the hover panel on pointer entry so macOS renders genuine focused
+  glass, then restore the previously active app on pointer exit. Expansion keeps
+  GhostNotch focused.
+- Draw the black shell's faint rim with native `NSColor.separatorColor`, not a
+  hand-tuned white opacity.
 
 ## Motion direction
 

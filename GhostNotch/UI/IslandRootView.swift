@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct IslandRootView: View {
@@ -54,6 +55,48 @@ struct IslandRootView: View {
     }
 }
 
+private struct NotchControlStyle: ViewModifier {
+    @State private var isHovering = false
+
+    let isSelected: Bool
+
+    func body(content: Content) -> some View {
+        Group {
+            if isSelected {
+                content
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.capsule)
+            } else if isHovering {
+                content
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.capsule)
+            } else {
+                content
+                    .buttonStyle(.plain)
+            }
+        }
+        .onHover { isHovering = $0 }
+    }
+}
+
+extension View {
+    func notchControlStyle(isSelected: Bool = false) -> some View {
+        modifier(NotchControlStyle(isSelected: isSelected))
+    }
+
+    func notchCapsuleGroupStyle() -> some View {
+        modifier(NotchCapsuleGroupStyle())
+    }
+}
+
+private struct NotchCapsuleGroupStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(IslandMetrics.notchCapsuleGroupInset)
+            .glassEffect(.regular.interactive(), in: Capsule())
+    }
+}
+
 private struct CollapsedIslandTapToExpand: ViewModifier {
     let onClick: () -> Void
     let isEnabled: Bool
@@ -95,7 +138,7 @@ private struct NotchRimOverlay: View {
     var body: some View {
         if state.showsNotchRim {
             NotchRimShape(cornerRadius: state.notchCornerRadius, lineWidth: rimLineWidth)
-                .stroke(.white.opacity(state.notchRimOpacity), lineWidth: rimLineWidth)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: rimLineWidth)
                 .allowsHitTesting(false)
         }
     }
@@ -140,16 +183,6 @@ private extension IslandState {
         }
     }
 
-    var notchRimOpacity: Double {
-        switch self {
-        case .collapsed:
-            0
-        case .hover:
-            0.16
-        case .expanded:
-            0.24
-        }
-    }
 }
 
 private struct NotchExtensionShape: Shape {

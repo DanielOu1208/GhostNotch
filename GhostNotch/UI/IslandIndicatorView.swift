@@ -93,29 +93,49 @@ struct IslandIndicatorView: View {
     }
 
     private var hoverIndicator: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .bottom, spacing: 0) {
             hoverStatus
                 .layoutPriority(1)
 
-            Spacer(minLength: 6)
+            Spacer(minLength: 8)
 
-            if !visibleDirectoryPresets.isEmpty {
-                HStack(alignment: .center, spacing: 6) {
-                    ForEach(visibleDirectoryPresets) { preset in
-                        DirectoryPresetButton(
-                            preset: preset,
-                            isSelected: preset.id == selectedDirectoryPresetID
-                        ) {
-                            onSelectDirectory(preset)
+            HStack(alignment: .bottom, spacing: 12) {
+                if !visibleDirectoryPresets.isEmpty {
+                    VStack(spacing: IslandMetrics.hoverControlLabelSpacing) {
+                        Text("Folders")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .frame(height: IslandMetrics.hoverControlLabelHeight)
+
+                        HStack(alignment: .center, spacing: 0) {
+                            ForEach(visibleDirectoryPresets) { preset in
+                                DirectoryPresetButton(
+                                    preset: preset,
+                                    isSelected: preset.id == selectedDirectoryPresetID
+                                ) {
+                                    onSelectDirectory(preset)
+                                }
+                            }
                         }
+                        .notchCapsuleGroupStyle()
                     }
                 }
-            }
 
-            HStack(alignment: .center, spacing: 8) {
-                ForEach(presetStore.enabledLaunchers) { launcher in
-                    AgentLauncherButton(launcher: launcher) {
-                        onLaunchAgent(launcher)
+                if !presetStore.enabledLaunchers.isEmpty {
+                    VStack(spacing: IslandMetrics.hoverControlLabelSpacing) {
+                        Text("Agents")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .frame(height: IslandMetrics.hoverControlLabelHeight)
+
+                        HStack(alignment: .center, spacing: 0) {
+                            ForEach(presetStore.enabledLaunchers) { launcher in
+                                AgentLauncherButton(launcher: launcher) {
+                                    onLaunchAgent(launcher)
+                                }
+                            }
+                        }
+                        .notchCapsuleGroupStyle()
                     }
                 }
             }
@@ -135,14 +155,14 @@ struct IslandIndicatorView: View {
     }
 
     private var hoverStatus: some View {
-        HStack(alignment: .center, spacing: 9) {
+        HStack(alignment: .center, spacing: 4) {
             hoverStatusDot
 
             HoverStatusText(state: renderedAgentActivityState)
                 .lineLimit(1)
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
         }
-        .frame(height: 32, alignment: .center)
+        .frame(height: IslandMetrics.notchControlHeight, alignment: .center)
     }
 
     @ViewBuilder
@@ -179,19 +199,12 @@ private struct DirectoryPresetButton: View {
                 .font(iconFont)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
-                .foregroundStyle(isSelected ? .black.opacity(0.86) : .white.opacity(0.82))
-                .frame(width: 32, height: 32)
-                .background {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isSelected ? .white.opacity(0.82) : .white.opacity(0.08))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(isSelected ? .white.opacity(0.9) : .white.opacity(0.14), lineWidth: 1)
-                }
-                .contentShape(Rectangle())
+                .foregroundStyle(.primary)
+                .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
+                .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
+        .notchControlStyle(isSelected: isSelected)
         .accessibilityLabel("Use \(preset.displayLabel) folder")
         .help("\(preset.displayLabel) - \(preset.path)")
     }
@@ -215,20 +228,13 @@ private struct AgentLauncherButton: View {
                 .renderingMode(.template)
                 .resizable()
                 .scaledToFit()
-                .foregroundStyle(.white.opacity(0.82))
+                .foregroundStyle(.primary)
                 .frame(width: 17, height: 17)
-                .frame(width: 32, height: 32)
-                .background {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.white.opacity(0.08))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(.white.opacity(0.14), lineWidth: 1)
-                }
-                .contentShape(Rectangle())
+                .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
+                .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
+        .notchControlStyle()
         .accessibilityLabel(launcher.accessibilityLabel)
         .help(launcher.helpText)
     }
@@ -323,7 +329,7 @@ private struct HoverStatusText: View {
     private func statusText(_ text: String) -> some View {
         Text(text)
             .font(Self.font)
-            .foregroundStyle(.white.opacity(0.68))
+            .foregroundStyle(.secondary)
     }
 
     private func animatedStatusText(_ text: String) -> some View {
@@ -337,7 +343,7 @@ private struct HoverStatusText: View {
                     .frame(width: 18, alignment: .leading)
             }
             .font(Self.font)
-            .foregroundStyle(.white.opacity(0.68))
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -346,7 +352,7 @@ private struct HoverStatusText: View {
         return Int(elapsed / Self.dotStepDuration) % 4
     }
 
-    private static let font = Font.system(size: 12, weight: .semibold, design: .rounded)
+    private static let font = Font.caption.weight(.medium)
     private static let dotStepDuration: TimeInterval = 0.42
 }
 

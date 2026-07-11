@@ -22,7 +22,8 @@ It sits flush with the top of the built-in display, looks like a small extension
 GhostNotch has three visible states:
 
 - **Collapsed:** a subtle active notch extension.
-- **Hover:** a larger preview state that does not take keyboard focus.
+- **Hover:** a larger preview state that temporarily takes focus for native
+  macOS controls, then returns focus to the previous app when the pointer exits.
 - **Expanded:** a compact terminal panel with keyboard focus.
 
 ## Project Status
@@ -57,8 +58,8 @@ Not ready yet:
 
 Requirements:
 
-- macOS
-- Xcode
+- macOS 26.0 or newer
+- Xcode 26.0 or newer
 - A local checkout of this repository
 
 Open the root project in Xcode:

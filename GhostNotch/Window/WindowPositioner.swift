@@ -4,11 +4,15 @@ import CoreGraphics
 struct IslandMetrics {
     static let physicalNotchReferenceWidth: CGFloat = 220
     static let collapsedFallbackSize = NSSize(width: 280, height: 38)
-    static let hoverFallbackSize = NSSize(width: 420, height: 72)
+    static let hoverFallbackSize = NSSize(width: 420, height: 112)
     static let expandedSize = NSSize(width: 822.8, height: 562)
-    static let minimumHoverHeight: CGFloat = 88
+    static let minimumHoverHeight: CGFloat = 112
     static let hoverNotchClearance: CGFloat = 8
-    static let hoverControlHeight: CGFloat = 32
+    static let notchControlWidth: CGFloat = 40
+    static let notchControlHeight: CGFloat = 32
+    static let notchCapsuleGroupInset: CGFloat = 2
+    static let hoverControlLabelHeight: CGFloat = 14
+    static let hoverControlLabelSpacing: CGFloat = 4
     static let hoverControlBottomPadding: CGFloat = 12
 
     static var currentNotchReferenceWidth: CGFloat {
@@ -37,7 +41,13 @@ struct IslandMetrics {
     static func hoverHeight(forNotchHeight notchHeight: CGFloat) -> CGFloat {
         max(
             minimumHoverHeight,
-            notchHeight + hoverNotchClearance + hoverControlHeight + hoverControlBottomPadding
+            notchHeight
+                + hoverNotchClearance
+                + hoverControlLabelHeight
+                + hoverControlLabelSpacing
+                + notchControlHeight
+                + notchCapsuleGroupInset * 2
+                + hoverControlBottomPadding
         )
     }
 
