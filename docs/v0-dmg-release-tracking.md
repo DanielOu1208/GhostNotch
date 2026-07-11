@@ -50,7 +50,7 @@ catching signature problems, but it does not make the app trusted by other Macs.
 
 ## Current Repo State
 
-Last reviewed: 2026-06-22.
+Last reviewed: 2026-07-10.
 
 Current high-level status:
 
@@ -63,11 +63,15 @@ Current high-level status:
   icon.
 - The repo has a manual self-signed DMG packaging script at
   `scripts/package-dmg.sh`.
+- The approved macOS 26 UI polish research and implementation tracker are now
+  part of the v0.1.0 release scope.
 - The app still does not have Developer ID signing, notarization, auto-update,
   Homebrew, or App Store distribution.
 
 Known release gaps before publishing:
 
+- The [UI polish sprint](ui-polish-sprint-tracking.md) is not implemented or
+  accepted yet. It raises the planned v0.1.0 minimum requirement to macOS 26.
 - No `v0.1.0` Git tag yet.
 - No GitHub Release yet.
 - The self-signed release certificate still needs to exist locally before
@@ -119,8 +123,8 @@ Recommended work:
   - `MARKETING_VERSION = 0.1.0`
   - `CURRENT_PROJECT_VERSION = 1`
 - Add an app icon set to `GhostNotch/Resources/Assets.xcassets`.
-- Keep the minimum macOS deployment target at `14.0` unless there is a tested
-  reason to lower it.
+- Raise the minimum macOS deployment target to `26.0` as part of the approved
+  [UI polish sprint](ui-polish-sprint-tracking.md).
 
 Recommended bundle ID:
 

@@ -9,6 +9,8 @@ Start here if you want to understand, build, test, or contribute to GhostNotch.
 - [v0.1.0 release notes](releases/v0.1.0.md) summarize the planned public-preview DMG release.
 - [Agent indicator hooks](agent-indicator-hooks.md) explains Codex and Claude hook setup, indicator state mapping, and the state-file contract.
 - [MacBook notch geometry](notch-geometry.md) records the AppKit notch measurement approach and sizing assumptions.
+- [UI polish research](ui-polish-research.md) records the approved macOS 26 visual, motion, accessibility, and Rose Three direction for v0.1.0.
+- [UI polish sprint tracking](ui-polish-sprint-tracking.md) is the agent-oriented execution tracker for that work.
 - [v0 DMG release tracking](v0-dmg-release-tracking.md) tracks the self-signed public-preview DMG release path.
 - [Xcode debugging](xcode-debugging.md) covers common local debugger attach and terminal startup issues.
 - [Ghostty VT vendor notes](../vendor/ghostty-vt/README.md) describe the vendored terminal artifact.
