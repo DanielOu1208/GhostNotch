@@ -150,8 +150,8 @@ final class TerminalGridTypography {
 
     private static func preferredInstalledFontNames() -> [String] {
         let explicitNames = [
-            "MesloLGS NF",
-            "MesloLGS NF Regular",
+            "MesloLGS Nerd Font Mono",
+            "MesloLGSNFM-Regular",
             "JetBrainsMono Nerd Font",
             "JetBrains Mono Nerd Font",
             "JetBrains Mono NL",

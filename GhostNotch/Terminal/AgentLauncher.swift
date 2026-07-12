@@ -17,14 +17,6 @@ struct AgentLauncher: Identifiable, Equatable, Sendable {
         "\(command)\n"
     }
 
-    func commandLine(directoryPath: String?) -> String {
-        guard let directoryPath, !directoryPath.isEmpty else {
-            return commandLine
-        }
-
-        return "cd \(ShellCommandEscaper.singleQuoted(directoryPath)) && \(command)\n"
-    }
-
     static let codex = AgentLauncher(
         id: .codex,
         command: "codex",
@@ -52,11 +44,5 @@ struct AgentLauncher: Identifiable, Equatable, Sendable {
         enabledIDs.compactMap { enabledID in
             all.first { $0.id == enabledID }
         }
-    }
-}
-
-enum ShellCommandEscaper {
-    static func singleQuoted(_ value: String) -> String {
-        "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 }

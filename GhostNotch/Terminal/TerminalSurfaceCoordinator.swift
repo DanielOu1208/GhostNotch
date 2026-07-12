@@ -45,13 +45,13 @@ final class TerminalSurfaceCoordinator {
         session.isRunning
     }
 
-    func startIfNeeded(cols: Int = 80, rows: Int = 18) {
+    func startIfNeeded(cols: Int = 80, rows: Int = 18, workingDirectory: String? = nil) {
         guard !session.isRunning else {
             return
         }
 
         do {
-            try session.start(cols: cols, rows: rows)
+            try session.start(cols: cols, rows: rows, workingDirectory: workingDirectory)
         } catch {
             NSLog("GhostNotch failed to start terminal session: \(error.localizedDescription)")
         }
@@ -86,7 +86,7 @@ final class TerminalSurfaceCoordinator {
         )
     }
 
-    func restartPreservingGrid(currentSnapshot: TerminalRenderSnapshot) {
+    func restartPreservingGrid(currentSnapshot: TerminalRenderSnapshot, workingDirectory: String? = nil) {
         let resize = lastAppliedGridResize ?? TerminalGridResize.normalized(
             columns: currentSnapshot.columns,
             rows: currentSnapshot.rows,
@@ -97,7 +97,7 @@ final class TerminalSurfaceCoordinator {
         engine.reset(cols: resize.columns, rows: resize.rows)
 
         do {
-            try session.restart(cols: resize.columns, rows: resize.rows)
+            try session.restart(cols: resize.columns, rows: resize.rows, workingDirectory: workingDirectory)
         } catch {
             NSLog("GhostNotch failed to restart terminal session: \(error.localizedDescription)")
         }
@@ -109,7 +109,10 @@ final class TerminalSurfaceCoordinator {
         directoryPath: String? = nil,
         startupTimeout: TimeInterval = TerminalSession.defaultStartupTimeout
     ) async {
-        startFreshSessionForAgentLaunch(currentSnapshot: currentSnapshot)
+        startFreshSessionForAgentLaunch(
+            currentSnapshot: currentSnapshot,
+            workingDirectory: directoryPath
+        )
 
         guard await waitForRunningSession(timeout: startupTimeout) else {
             return
@@ -119,7 +122,7 @@ final class TerminalSurfaceCoordinator {
             return
         }
 
-        sendInput(Data(launcher.commandLine(directoryPath: directoryPath).utf8))
+        sendInput(Data(launcher.commandLine.utf8))
     }
 
     func focus() {
@@ -138,11 +141,17 @@ final class TerminalSurfaceCoordinator {
         flushPendingOutput()
     }
 
-    private func startFreshSessionForAgentLaunch(currentSnapshot: TerminalRenderSnapshot) {
+    private func startFreshSessionForAgentLaunch(
+        currentSnapshot: TerminalRenderSnapshot,
+        workingDirectory: String?
+    ) {
         if session.isRunning || session.state.hasReceivedOutput || session.state.phase == .failed {
-            restartPreservingGrid(currentSnapshot: currentSnapshot)
+            restartPreservingGrid(
+                currentSnapshot: currentSnapshot,
+                workingDirectory: workingDirectory
+            )
         } else {
-            startIfNeeded()
+            startIfNeeded(workingDirectory: workingDirectory)
         }
     }
 

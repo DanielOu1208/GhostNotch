@@ -29,6 +29,7 @@ final class TerminalSurfaceCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(process.startCallCount, 1)
         XCTAssertEqual(process.stopCallCount, 0)
+        XCTAssertEqual(process.startWorkingDirectories, [FileManager.default.homeDirectoryForCurrentUser.path])
         XCTAssertEqual(engine.sentInputs, [Data("codex\n".utf8)])
     }
 
@@ -51,6 +52,7 @@ final class TerminalSurfaceCoordinatorTests: XCTestCase {
             await coordinator.launchAgent(
                 .claude,
                 currentSnapshot: .empty(columns: 100, rows: 28),
+                directoryPath: "/tmp/project",
                 startupTimeout: 1
             )
         }
@@ -63,6 +65,10 @@ final class TerminalSurfaceCoordinatorTests: XCTestCase {
         await launchTask.value
 
         XCTAssertEqual(engine.resetRequests, [CoordinatorTestTerminalGridSize(columns: 100, rows: 28)])
+        XCTAssertEqual(
+            process.startWorkingDirectories,
+            [FileManager.default.homeDirectoryForCurrentUser.path, "/tmp/project"]
+        )
         XCTAssertEqual(engine.sentInputs, [Data("claude\n".utf8)])
     }
 
@@ -148,7 +154,8 @@ final class TerminalSurfaceCoordinatorTests: XCTestCase {
         process.emitOutput("$ ")
         await launchTask.value
 
-        XCTAssertEqual(engine.sentInputs, [Data("cd '/Users/danielou/My Project' && codex\n".utf8)])
+        XCTAssertEqual(process.startWorkingDirectories, ["/Users/danielou/My Project"])
+        XCTAssertEqual(engine.sentInputs, [Data("codex\n".utf8)])
     }
 
     private func waitForStartCallCount(
@@ -175,6 +182,7 @@ private final class CoordinatorTestTerminalProcess: @MainActor TerminalProcess {
     private(set) var isRunning = false
     private(set) var startCallCount = 0
     private(set) var stopCallCount = 0
+    private(set) var startWorkingDirectories: [String] = []
 
     func start(
         shell: String,
@@ -184,6 +192,7 @@ private final class CoordinatorTestTerminalProcess: @MainActor TerminalProcess {
         environmentOverrides: [String: String]
     ) throws {
         startCallCount += 1
+        startWorkingDirectories.append(workingDirectory)
         isRunning = true
     }
 

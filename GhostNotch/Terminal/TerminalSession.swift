@@ -39,7 +39,7 @@ final class TerminalSession {
     static let defaultStartupTimeout: TimeInterval = 5
 
     private let shellResolver: ShellResolver
-    private let workingDirectory: String
+    private let defaultWorkingDirectory: String
     private let startupTimeout: TimeInterval
     private let process: any TerminalProcess
     private let agentStateFileURL: URL
@@ -57,7 +57,7 @@ final class TerminalSession {
         startupTimeout: TimeInterval = TerminalSession.defaultStartupTimeout
     ) {
         self.shellResolver = shellResolver
-        self.workingDirectory = workingDirectory
+        defaultWorkingDirectory = workingDirectory
         self.state = state ?? TerminalSessionState()
         self.process = process
         self.startupTimeout = startupTimeout
@@ -85,9 +85,14 @@ final class TerminalSession {
         process.isRunning
     }
 
-    func start(cols: Int = 80, rows: Int = 24) throws {
+    func start(cols: Int = 80, rows: Int = 24, workingDirectory: String? = nil) throws {
         lifecycleGeneration += 1
-        try launch(cols: cols, rows: rows, generation: lifecycleGeneration)
+        try launch(
+            cols: cols,
+            rows: rows,
+            workingDirectory: workingDirectory,
+            generation: lifecycleGeneration
+        )
     }
 
     func stop() {
@@ -99,7 +104,7 @@ final class TerminalSession {
         state.markStopped()
     }
 
-    func restart(cols: Int = 80, rows: Int = 24) throws {
+    func restart(cols: Int = 80, rows: Int = 24, workingDirectory: String? = nil) throws {
         cancelStartupWatchdog()
         stopAgentStateMonitoring()
         lifecycleGeneration += 1
@@ -108,7 +113,12 @@ final class TerminalSession {
         resetAgentActivityState()
         _ = process.stop()
 
-        try launch(cols: cols, rows: rows, generation: generation)
+        try launch(
+            cols: cols,
+            rows: rows,
+            workingDirectory: workingDirectory,
+            generation: generation
+        )
     }
 
     func write(_ data: Data) throws {
@@ -158,14 +168,14 @@ final class TerminalSession {
         resetAgentActivityState()
     }
 
-    private func launch(cols: Int, rows: Int, generation: Int) throws {
+    private func launch(cols: Int, rows: Int, workingDirectory: String?, generation: Int) throws {
         let shell = shellResolver.resolve()
         resetAgentActivityState()
 
         do {
             try process.start(
                 shell: shell,
-                workingDirectory: workingDirectory,
+                workingDirectory: workingDirectory ?? defaultWorkingDirectory,
                 cols: cols,
                 rows: rows,
                 environmentOverrides: [
