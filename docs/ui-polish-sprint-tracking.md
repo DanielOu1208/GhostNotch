@@ -113,8 +113,9 @@ Depends on: Track 1
 - [x] Use 40-by-32-point quick-launch segments with a two-point outer capsule
   inset. Keep 8 points from status to controls, 12 points between folder and
   agent groups, and the existing 24-point horizontal/12-point bottom padding.
-  Keep every native hover/press subcapsule centered at 36 by 28 points so it
-  remains inside the outer capsule while preserving the full click target.
+  Keep every native hover/press subcapsule centered at 36 by 28 points with a
+  14% white tint so it remains visible inside the outer capsule while
+  preserving the full click target.
 - [x] Add `Folders` and `Agents` secondary `caption2` labels four points above
   two separate native outer glass capsules. Hide the folder label and capsule
   when there are no valid presets.
@@ -123,9 +124,10 @@ Depends on: Track 1
 - [x] Add clear hover, pressed, selected, disabled, and keyboard-focus states
   without changing actions or selection behavior. Use exact-size native inner
   glass only for hover/press. Put the selected folder's 40-by-32-point system
-  blue backing beneath the persistent outer glass so native refraction reaches
-  only sibling folder segments; use an exact-size native tinted segment when
-  Reduce Transparency is enabled. Add no imitation glass surface or outline.
+  blue backing, mixed 18% toward white, beneath the persistent outer glass so
+  native refraction reaches only sibling folder segments; use the same brighter
+  blue in an exact-size native tinted segment when Reduce Transparency is
+  enabled. Add no imitation glass surface or outline.
 - [x] Keep the opaque black shell and apply semantic label/symbol colors.
 - [x] Let native Liquid Glass respond to Reduce Transparency and Increase
   Contrast. Use semantic foregrounds and native focus/hover/press treatments;

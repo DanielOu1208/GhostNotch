@@ -199,14 +199,18 @@ struct IslandIndicatorView: View {
         if usesOpaqueGlass {
             Color.clear
                 .glassEffect(
-                    .regular.tint(Color(nsColor: .systemBlue)),
+                    .regular.tint(directorySelectionColor),
                     in: Capsule()
                 )
                 .clipShape(Capsule())
         } else {
             Capsule()
-                .fill(Color(nsColor: .systemBlue))
+                .fill(directorySelectionColor)
         }
+    }
+
+    private var directorySelectionColor: Color {
+        Color(nsColor: .systemBlue).mix(with: .white, by: 0.18)
     }
 
     private var directorySelectionAnimation: Animation? {

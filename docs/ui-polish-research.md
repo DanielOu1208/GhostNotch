@@ -166,14 +166,15 @@ assets, layout measurements, or product-specific animation choreography.
 - Give folders, agents, and expanded actions one persistent native
   `glassEffect(.regular.interactive(), in: Capsule())` surface per group. Keep
   inner actions plain at rest and materialize a centered 36-by-28-point native
-  `glassEffect` subcapsule on pointer hover. Render the selected folder as one
-  40-by-32-point `NSColor.systemBlue` content layer beneath the outer folder
-  glass so native refraction can reach sibling folder segments without
-  reaching the separate Agents capsule. Move it with a 0.18-second `snappy`
-  spring and fade it in or out over 0.12 seconds. Reduce Motion removes the
-  translation and uses a 0.08-second fade; Reduce Transparency replaces the
-  hidden backing with an exact-size native tinted glass segment. Do not apply
-  glass to the black shell, terminal canvas, status mark, or Settings form.
+  `glassEffect` subcapsule with a 14% white tint on pointer hover. Render the
+  selected folder as one 40-by-32-point `NSColor.systemBlue` content layer
+  mixed 18% toward white beneath the outer folder glass so native refraction
+  can reach sibling folder segments without reaching the separate Agents
+  capsule. Move it with a 0.18-second `snappy` spring and fade it in or out over
+  0.12 seconds. Reduce Motion removes the translation and uses a 0.08-second
+  fade; Reduce Transparency replaces the hidden backing with an exact-size
+  native tinted glass segment using the same brighter blue. Do not apply glass
+  to the black shell, terminal canvas, status mark, or Settings form.
 - Let macOS own glass focus, hover, press, Reduce Transparency, and Increase
   Contrast rendering. Add no imitation glass fill, stroke, blur, or material.
   Activate the hover panel on pointer entry so macOS renders genuine focused

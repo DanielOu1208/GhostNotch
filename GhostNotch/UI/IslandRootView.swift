@@ -69,7 +69,10 @@ private struct NotchControlStyle: ViewModifier {
                             width: IslandMetrics.notchControlWidth - 4,
                             height: IslandMetrics.notchControlHeight - 4
                         )
-                        .glassEffect(.regular.interactive(), in: Capsule())
+                        .glassEffect(
+                            .regular.tint(.white.opacity(0.14)).interactive(),
+                            in: Capsule()
+                        )
                         .glassEffectTransition(.materialize)
                         .clipShape(Capsule())
                 }
