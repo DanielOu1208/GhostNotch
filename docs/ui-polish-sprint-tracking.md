@@ -113,15 +113,19 @@ Depends on: Track 1
 - [x] Use 40-by-32-point quick-launch segments with a two-point outer capsule
   inset. Keep 8 points from status to controls, 12 points between folder and
   agent groups, and the existing 24-point horizontal/12-point bottom padding.
+  Keep every native hover/press subcapsule centered at 36 by 28 points so it
+  remains inside the outer capsule while preserving the full click target.
 - [x] Add `Folders` and `Agents` secondary `caption2` labels four points above
   two separate native outer glass capsules. Hide the folder label and capsule
   when there are no valid presets.
 - [x] Put expanded restart/collapse actions in one native outer capsule and
   inset it from the screen top. Keep Settings on native grouped-Form controls.
 - [x] Add clear hover, pressed, selected, disabled, and keyboard-focus states
-  without changing actions or selection behavior. Use native inner glass only
-  for hover/press, prominent glass only for selection, and one persistent
-  native glass outer capsule; add no custom control surface or outline.
+  without changing actions or selection behavior. Use exact-size native inner
+  glass only for hover/press. Put the selected folder's 40-by-32-point system
+  blue backing beneath the persistent outer glass so native refraction reaches
+  only sibling folder segments; use an exact-size native tinted segment when
+  Reduce Transparency is enabled. Add no imitation glass surface or outline.
 - [x] Keep the opaque black shell and apply semantic label/symbol colors.
 - [x] Let native Liquid Glass respond to Reduce Transparency and Increase
   Contrast. Use semantic foregrounds and native focus/hover/press treatments;
@@ -134,8 +138,10 @@ Depends on: Track 1
   [expanded actions](images/ui-polish/track2-expanded-standard.jpg),
   [Reduce Transparency](images/ui-polish/track2-hover-reduce-transparency.jpg),
   and [Increase Contrast](images/ui-polish/track2-hover-increase-contrast.jpg)
-  — 2026-07-11, Mac16,7. Accessibility inspection exposed every preserved
-  label/help string.
+  — refreshed 2026-07-11, Mac16,7. The hover captures show the second folder
+  selected and the first hovered; the expanded capture shows the contained
+  restart hover. Accessibility inspection exposed every preserved label/help
+  string.
 
 Exit gate:
 

@@ -56,32 +56,32 @@ struct IslandRootView: View {
 }
 
 private struct NotchControlStyle: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
 
-    let isSelected: Bool
-
     func body(content: Content) -> some View {
-        Group {
-            if isSelected {
-                content
-                    .buttonStyle(.glassProminent)
-                    .buttonBorderShape(.capsule)
-            } else if isHovering {
-                content
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.capsule)
-            } else {
-                content
-                    .buttonStyle(.plain)
+        content
+            .buttonStyle(.plain)
+            .background {
+                if isHovering {
+                    Color.clear
+                        .frame(
+                            width: IslandMetrics.notchControlWidth - 4,
+                            height: IslandMetrics.notchControlHeight - 4
+                        )
+                        .glassEffect(.regular.interactive(), in: Capsule())
+                        .glassEffectTransition(.materialize)
+                        .clipShape(Capsule())
+                }
             }
-        }
-        .onHover { isHovering = $0 }
+            .animation(reduceMotion ? nil : .snappy(duration: 0.12), value: isHovering)
+            .onHover { isHovering = $0 }
     }
 }
 
 extension View {
-    func notchControlStyle(isSelected: Bool = false) -> some View {
-        modifier(NotchControlStyle(isSelected: isSelected))
+    func notchControlStyle() -> some View {
+        modifier(NotchControlStyle())
     }
 
     func notchCapsuleGroupStyle() -> some View {

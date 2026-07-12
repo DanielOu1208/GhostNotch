@@ -143,7 +143,8 @@ assets, layout measurements, or product-specific animation choreography.
   remain below the physical notch without crowding.
 - Use 40-by-32-point quick-launch targets with a two-point outer capsule inset;
   they exceed Apple's 20-point macOS minimum and read as compact pills rather
-  than rounded squares.
+  than rounded squares. Keep native hover and press glass centered at 36 by 28
+  points inside those targets so its material never spills beyond the group.
 - Normalize internal gaps around a small set of local values instead of adding
   a global token system. Use zero points between actions inside a capsule, 4
   points from each caption to its capsule, 8 points between the status and
@@ -164,12 +165,17 @@ assets, layout measurements, or product-specific animation choreography.
   mark or outline without relying on glow.
 - Give folders, agents, and expanded actions one persistent native
   `glassEffect(.regular.interactive(), in: Capsule())` surface per group. Keep
-  unselected inner actions plain at rest, materialize the native `.glass`
-  subcapsule on pointer hover, and use `.glassProminent` for the selected
-  directory preset. Do not apply glass to the black shell, terminal canvas,
-  status mark, or Settings form.
+  inner actions plain at rest and materialize a centered 36-by-28-point native
+  `glassEffect` subcapsule on pointer hover. Render the selected folder as one
+  40-by-32-point `NSColor.systemBlue` content layer beneath the outer folder
+  glass so native refraction can reach sibling folder segments without
+  reaching the separate Agents capsule. Move it with a 0.18-second `snappy`
+  spring and fade it in or out over 0.12 seconds. Reduce Motion removes the
+  translation and uses a 0.08-second fade; Reduce Transparency replaces the
+  hidden backing with an exact-size native tinted glass segment. Do not apply
+  glass to the black shell, terminal canvas, status mark, or Settings form.
 - Let macOS own glass focus, hover, press, Reduce Transparency, and Increase
-  Contrast rendering. Add no custom control fill, stroke, blur, or material.
+  Contrast rendering. Add no imitation glass fill, stroke, blur, or material.
   Activate the hover panel on pointer entry so macOS renders genuine focused
   glass, then restore the previously active app on pointer exit. Expansion keeps
   GhostNotch focused.

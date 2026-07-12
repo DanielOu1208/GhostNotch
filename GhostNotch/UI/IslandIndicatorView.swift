@@ -1,8 +1,12 @@
+import AppKit
 import SwiftUI
 
 struct IslandIndicatorView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @ObservedObject var sessionState: TerminalSessionState
     @ObservedObject var presetStore: AgentPresetStore
+    @Namespace private var directorySelectionNamespace
 
     let isHovering: Bool
     let selectedDirectoryPresetID: AgentLaunchDirectoryPreset.ID?
@@ -107,17 +111,7 @@ struct IslandIndicatorView: View {
                             .foregroundStyle(.secondary)
                             .frame(height: IslandMetrics.hoverControlLabelHeight)
 
-                        HStack(alignment: .center, spacing: 0) {
-                            ForEach(visibleDirectoryPresets) { preset in
-                                DirectoryPresetButton(
-                                    preset: preset,
-                                    isSelected: preset.id == selectedDirectoryPresetID
-                                ) {
-                                    onSelectDirectory(preset)
-                                }
-                            }
-                        }
-                        .notchCapsuleGroupStyle()
+                        directoryPresetControls
                     }
                 }
 
@@ -152,6 +146,75 @@ struct IslandIndicatorView: View {
                 .filter { $0.directoryExists() }
                 .prefix(AgentPresetStore.maximumDirectoryPresets)
         )
+    }
+
+    private var directoryPresetControls: some View {
+        ZStack {
+            if !reduceTransparency {
+                directorySelectionLayer(usesOpaqueGlass: false)
+                    .padding(IslandMetrics.notchCapsuleGroupInset)
+            }
+
+            HStack(alignment: .center, spacing: 0) {
+                ForEach(visibleDirectoryPresets) { preset in
+                    DirectoryPresetButton(preset: preset) {
+                        onSelectDirectory(preset)
+                    }
+                }
+            }
+            .background {
+                if reduceTransparency {
+                    directorySelectionLayer(usesOpaqueGlass: true)
+                }
+            }
+            .notchCapsuleGroupStyle()
+        }
+        .animation(directorySelectionAnimation, value: selectedDirectoryPresetID)
+    }
+
+    private func directorySelectionLayer(usesOpaqueGlass: Bool) -> some View {
+        HStack(spacing: 0) {
+            ForEach(visibleDirectoryPresets) { preset in
+                ZStack {
+                    if preset.id == selectedDirectoryPresetID {
+                        directorySelectionCapsule(usesOpaqueGlass: usesOpaqueGlass)
+                            .matchedGeometryEffect(
+                                id: usesOpaqueGlass ? "opaque-directory-selection" : "directory-selection",
+                                in: directorySelectionNamespace
+                            )
+                            .transition(directorySelectionTransition)
+                    }
+                }
+                .frame(
+                    width: IslandMetrics.notchControlWidth,
+                    height: IslandMetrics.notchControlHeight
+                )
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private func directorySelectionCapsule(usesOpaqueGlass: Bool) -> some View {
+        if usesOpaqueGlass {
+            Color.clear
+                .glassEffect(
+                    .regular.tint(Color(nsColor: .systemBlue)),
+                    in: Capsule()
+                )
+                .clipShape(Capsule())
+        } else {
+            Capsule()
+                .fill(Color(nsColor: .systemBlue))
+        }
+    }
+
+    private var directorySelectionAnimation: Animation? {
+        reduceMotion ? nil : .snappy(duration: 0.18, extraBounce: 0.02)
+    }
+
+    private var directorySelectionTransition: AnyTransition {
+        .opacity.animation(.easeOut(duration: reduceMotion ? 0.08 : 0.12))
     }
 
     private var hoverStatus: some View {
@@ -190,7 +253,6 @@ struct IslandIndicatorView: View {
 
 private struct DirectoryPresetButton: View {
     let preset: AgentLaunchDirectoryPreset
-    let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
@@ -204,7 +266,7 @@ private struct DirectoryPresetButton: View {
                 .contentShape(Capsule())
         }
         .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
-        .notchControlStyle(isSelected: isSelected)
+        .notchControlStyle()
         .accessibilityLabel("Use \(preset.displayLabel) folder")
         .help("\(preset.displayLabel) - \(preset.path)")
     }
