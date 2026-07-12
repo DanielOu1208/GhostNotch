@@ -278,7 +278,12 @@ final class IslandPanelController: ObservableObject {
     private func restoreApplicationAfterHover() {
         let application = applicationBeforeHover
         applicationBeforeHover = nil
-        application?.activate(options: [.activateIgnoringOtherApps])
+
+        guard NSApp.isActive, let application, !application.isTerminated else {
+            return
+        }
+
+        application.activate()
     }
 
     private func configurePanel() {

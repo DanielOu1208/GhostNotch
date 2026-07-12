@@ -66,8 +66,8 @@ private struct NotchControlStyle: ViewModifier {
                 if isHovering {
                     Color.clear
                         .frame(
-                            width: IslandMetrics.notchControlWidth - 4,
-                            height: IslandMetrics.notchControlHeight - 4
+                            width: IslandMetrics.notchControlWidth - IslandMetrics.notchCapsuleGroupInset * 2,
+                            height: IslandMetrics.notchControlHeight - IslandMetrics.notchCapsuleGroupInset * 2
                         )
                         .glassEffect(
                             .regular.tint(.white.opacity(0.14)).interactive(),

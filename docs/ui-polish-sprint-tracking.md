@@ -1,7 +1,7 @@
 # GhostNotch v0.1.0 UI Polish Sprint Tracking
 
 Status: Tracks 0–2 complete; ready for Track 3
-Created: 2026-07-10  
+Created: 2026-07-10
 Depends on: [UI Polish Research Brief](ui-polish-research.md)
 
 This tracker is the execution source of truth for the v0.1.0 styling and motion

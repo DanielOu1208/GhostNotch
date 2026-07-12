@@ -1,7 +1,7 @@
 # GhostNotch v0.1.0 UI Polish Research Brief
 
 Status: approved direction; Tracks 0–2 implemented
-Reviewed: 2026-07-10  
+Reviewed: 2026-07-10
 Primary audience: coding agents
 
 ## Purpose
