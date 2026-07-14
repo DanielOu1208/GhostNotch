@@ -29,18 +29,9 @@ final class AgentLauncherTests: XCTestCase {
         XCTAssertNil(AgentLauncherSelection.validated(.claude, enabledIDs: [.codex]))
     }
 
-    func testHoverPrimaryActionPrioritizesRunningTerminalAndRequiresValidSelectionToLaunch() {
+    func testHoverPrimaryActionRequiresValidSelectionToLaunch() {
         XCTAssertEqual(
             HoverPrimaryAction.resolve(
-                isTerminalRunning: true,
-                selectedAgentID: .codex,
-                enabledAgentIDs: [.codex]
-            ),
-            .expand
-        )
-        XCTAssertEqual(
-            HoverPrimaryAction.resolve(
-                isTerminalRunning: false,
                 selectedAgentID: nil,
                 enabledAgentIDs: [.codex]
             ),
@@ -48,7 +39,6 @@ final class AgentLauncherTests: XCTestCase {
         )
         XCTAssertEqual(
             HoverPrimaryAction.resolve(
-                isTerminalRunning: false,
                 selectedAgentID: .claude,
                 enabledAgentIDs: [.codex]
             ),
@@ -56,7 +46,6 @@ final class AgentLauncherTests: XCTestCase {
         )
         XCTAssertEqual(
             HoverPrimaryAction.resolve(
-                isTerminalRunning: false,
                 selectedAgentID: .claude,
                 enabledAgentIDs: [.codex, .claude]
             ),

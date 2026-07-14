@@ -62,12 +62,10 @@ enum HoverPrimaryAction: Equatable {
     case launch(AgentLauncher.ID)
 
     static func resolve(
-        isTerminalRunning: Bool,
         selectedAgentID: AgentLauncher.ID?,
         enabledAgentIDs: [AgentLauncher.ID]
     ) -> HoverPrimaryAction {
-        guard !isTerminalRunning,
-              let selectedAgentID,
+        guard let selectedAgentID,
               enabledAgentIDs.contains(selectedAgentID) else {
             return .expand
         }

@@ -165,6 +165,7 @@ final class IslandPanelController: ObservableObject {
         let launchSnapshot = terminalSurfaceCoordinator.currentSnapshot()
         let directoryPath = selectedLaunchDirectoryPath()
         selectedLaunchDirectoryPresetID = nil
+        selectedLaunchAgentID = nil
 
         pendingAgentLaunchTask = Task { @MainActor [weak self] in
             guard let self else {
@@ -203,7 +204,6 @@ final class IslandPanelController: ObservableObject {
 
     func performHoverPrimaryAction() {
         switch HoverPrimaryAction.resolve(
-            isTerminalRunning: terminalState.isRunning,
             selectedAgentID: selectedLaunchAgentID,
             enabledAgentIDs: agentPresetStore.enabledAgentIDs
         ) {
@@ -383,6 +383,7 @@ final class IslandPanelController: ObservableObject {
             guard state != .hover else {
                 return
             }
+            activateHoverPanel()
             transition(to: .hover)
         } else {
             guard state == .hover else {
@@ -681,9 +682,7 @@ final class IslandPanelController: ObservableObject {
         case .expanded:
             finishExpandPanelAnimation()
         case .hover:
-            if plan.from == .collapsed {
-                activateHoverPanel()
-            } else if plan.from == .expanded {
+            if plan.from == .expanded {
                 lastHoverContainment = nil
                 refreshHoverState()
             }

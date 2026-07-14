@@ -206,9 +206,8 @@ Depends on: Track 2
 - [x] Keep a root-level expand target active during compact transitions while
   child hover controls remain locked, so the slower hover opening never requires
   a second click.
-- [x] Defer app activation and key-panel work until collapsed→hover finishes;
-  the controls are locked during that transition, so pointer entry can start the
-  shell animation without waiting on focus work.
+- [x] Activate and focus the panel immediately on hover so macOS renders the
+  liquid-glass controls in their active-window appearance throughout opening.
 - [x] Make transitions interruptible: retarget from the visible state, ignore
   stale completion callbacks, and keep the last requested state.
 - [x] Preserve `finishExpandPanelAnimation()` as the single point that marks the
@@ -326,11 +325,10 @@ Depends on: Track 3
   in the remaining lower band. Add a downward chevron, dim the resting label,
   and bring it to full brightness over a subtle full-width bottom gradient on
   hover. Keep 12-point horizontal spacing and the 136-point shell height.
-- [x] Make the primary action session-aware. A running terminal always expands
-  the current session and reads `Expand`, `Expand Codex`, or `Expand Claude`.
-  With no running terminal, use `Launch <agent>` for a selected agent or
-  `Expand` without one, appending `in <preset label>` for a selected folder and
-  starting the new terminal or agent in that folder.
+- [x] Make the primary action selection-aware. A valid selected agent always
+  reads `Launch <agent>` and starts a fresh agent session, including after hover
+  restart has created a new shell. Without an agent selection, expand the
+  current session. Always append `in <preset label>` for a selected folder.
 - [x] Add a top-right hover restart control matching the expanded header. Show
   it only for a running terminal, align its outer right edge with the Status
   capsule, cancel any pending launch, restart without expanding, and clear both

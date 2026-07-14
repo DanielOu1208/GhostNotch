@@ -523,13 +523,12 @@ struct IslandIndicatorView: View {
     private var primaryActionTitle: String {
         primaryAction.title(
             agentName: primaryActionAgentName,
-            directoryName: sessionState.isRunning ? nil : selectedDirectoryName
+            directoryName: selectedDirectoryName
         )
     }
 
     private var primaryAction: HoverPrimaryAction {
         HoverPrimaryAction.resolve(
-            isTerminalRunning: sessionState.isRunning,
             selectedAgentID: selectedAgentID,
             enabledAgentIDs: presetStore.enabledAgentIDs
         )
