@@ -107,6 +107,47 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(environment["GHOSTNOTCH_AGENT_EVENT_LOG"], "/tmp/ghostnotch-agent-events.jsonl")
     }
 
+    func testPTYProcessFindsSymlinkedDescendantByInvokedAgentName() async throws {
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ghostnotch-process-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: temporaryDirectory,
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? FileManager.default.removeItem(at: temporaryDirectory)
+        }
+
+        let agentURL = temporaryDirectory.appendingPathComponent("codex")
+        try FileManager.default.createSymbolicLink(
+            at: agentURL,
+            withDestinationURL: URL(fileURLWithPath: "/bin/sleep")
+        )
+
+        let process = PTYProcess()
+        try process.start(
+            shell: "/bin/sh",
+            workingDirectory: temporaryDirectory.path,
+            cols: 80,
+            rows: 24,
+            environmentOverrides: [:]
+        )
+        defer {
+            _ = process.stop()
+        }
+
+        try process.write(Data("./codex 2\n".utf8))
+        let deadline = Date().addingTimeInterval(1)
+        while Date() < deadline {
+            if process.descendantProcessNames(matching: ["codex"]).contains("codex") {
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        XCTFail("Expected the symlinked Codex process in the PTY descendant tree")
+    }
+
     func testSessionRunsCommandAndCapturesOutput() async throws {
         let state = TerminalSessionState(outputLimit: 16 * 1024)
         let session = TerminalSession(
@@ -383,14 +424,59 @@ final class TerminalSessionTests: XCTestCase {
         try #"{"version":1,"agent":"codex","state":"attention","event":"PermissionRequest"}"#
             .write(toFile: stateFilePath, atomically: true, encoding: .utf8)
         try await waitForAgentActivityState(.attention, in: state)
+        try await waitForActiveAgent(.codex, in: state)
 
         try #"{"version":1,"agent":"claude","state":"working","event":"ElicitationResult"}"#
             .write(toFile: stateFilePath, atomically: true, encoding: .utf8)
         try await waitForAgentActivityState(.working, in: state)
+        try await waitForActiveAgent(.claude, in: state)
 
         try #"{"version":1,"agent":"claude","state":"idle","event":"Stop"}"#
             .write(toFile: stateFilePath, atomically: true, encoding: .utf8)
         try await waitForAgentActivityState(.idle, in: state)
+        try await waitForActiveAgent(.claude, in: state)
+    }
+
+    func testKnownAgentClearsWhenItsProcessExits() async throws {
+        let state = TerminalSessionState()
+        let process = FakeTerminalProcess()
+        process.descendantExecutableNames = ["codex"]
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: process
+        )
+
+        try session.start(cols: 80, rows: 24)
+        guard let stateFilePath = process.startEnvironmentOverrides.last?["GHOSTNOTCH_AGENT_STATE_FILE"] else {
+            return XCTFail("Expected GhostNotch agent state file override")
+        }
+
+        try #"{"version":1,"agent":"codex","state":"working","event":"UserPromptSubmit"}"#
+            .write(toFile: stateFilePath, atomically: true, encoding: .utf8)
+        try await waitForAgentActivityState(.working, in: state)
+        try await waitForActiveAgent(.codex, in: state)
+
+        process.descendantExecutableNames.remove("codex")
+
+        try await waitForAgentActivityState(.idle, in: state)
+        try await waitForActiveAgent(nil, in: state)
+    }
+
+    func testProcessIdentityAppearsBeforeTheFirstStructuredHook() async throws {
+        let state = TerminalSessionState()
+        let process = FakeTerminalProcess()
+        process.descendantExecutableNames = ["claude"]
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: process
+        )
+
+        try session.start(cols: 80, rows: 24)
+
+        try await waitForAgentActivityState(.idle, in: state)
+        try await waitForActiveAgent(.claude, in: state)
     }
 
     func testCodexWorkingStateDoesNotExpireDuringLongHookGap() async throws {
@@ -686,6 +772,22 @@ final class TerminalSessionTests: XCTestCase {
         XCTFail("Agent activity state did not become \(expectedValue). Current value: \(state.agentActivityState)")
     }
 
+    private func waitForActiveAgent(
+        _ expectedValue: TerminalAgentActivityAgent?,
+        in state: TerminalSessionState
+    ) async throws {
+        let deadline = Date().addingTimeInterval(1)
+        while Date() < deadline {
+            if state.activeAgent == expectedValue {
+                return
+            }
+
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        XCTFail("Active agent did not become \(String(describing: expectedValue)). Current value: \(String(describing: state.activeAgent))")
+    }
+
     private func agentActivityEnvelope(
         agent: String,
         state: String,
@@ -714,6 +816,11 @@ private final class FakeTerminalProcess: @MainActor TerminalProcess {
     private(set) var startRequests: [TerminalGridSize] = []
     private(set) var startEnvironmentOverrides: [[String: String]] = []
     var notifyOnStop = false
+    var descendantExecutableNames: Set<String> = ["codex", "claude"]
+
+    func descendantProcessNames(matching executableNames: Set<String>) -> Set<String> {
+        descendantExecutableNames.intersection(executableNames)
+    }
 
     func start(
         shell: String,

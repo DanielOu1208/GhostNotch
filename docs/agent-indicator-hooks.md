@@ -1,14 +1,29 @@
 # Agent Indicator Hooks
 
-GhostNotch drives the collapsed agent indicator from explicit Codex CLI and Claude Code hook state. It does not infer agent work from PTY output.
+GhostNotch derives the running Codex or Claude identity from the terminal's
+descendant process tree. Explicit Codex CLI and Claude Code hooks provide the
+working and waiting status. It does not infer agent work from PTY output.
 
 ## Indicator States
 
-- `idle`: steady green dot
-- `working`: breathing white dot
-- `attention`: breathing blue dot
+- `idle`: static system-green Rose Three
+- `working`: animated white/primary Rose Three particle trail
+- `attention`: animated system-blue Rose Three particle trail
+
+The collapsed left wing shows the existing Codex or Claude asset in monochrome
+primary while that CLI is running, including its `idle`/`Ready` state. It is
+blank when no supported agent is running. The right wing always shows status.
+With Reduce Motion, every rose is static and agent identity changes immediately.
 
 Other terminal programs and agents remain idle unless they call a GhostNotch helper explicitly.
+
+GhostNotch performs one recursive, read-only check of the terminal's descendant
+process tree on each status refresh. This makes launcher-started and manually
+typed supported CLIs appear before their first structured hook and clears their
+identity when the named process exits. Hooks then refine the state to `working`
+or `attention`. This is necessary for Codex, whose available hooks include
+`SessionStart` and turn-level `Stop` but no session-end event. The check does not
+inspect terminal output or change the hook or state-file format.
 
 ## Install
 

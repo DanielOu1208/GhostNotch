@@ -1,6 +1,7 @@
 # MacBook Notch Geometry Research
 
-This note captures the notch sizing reference for GhostNotch so the Stage 1 UI can be tuned against real MacBook notch geometry instead of guessing.
+This note captures the notch sizing reference and current UI geometry for
+GhostNotch so layout remains tied to real MacBook notch measurements.
 
 ## Sources and Measurement Method
 
@@ -58,31 +59,36 @@ MacBook Air 15.3-inch: 2880 x 1864 native pixels, normally 1440 x 932 pt at 2x
 
 Do not hard-code these as notch sizes. Use AppKit at runtime when possible because display scaling and model differences affect logical coordinates.
 
-## Recommended GhostNotch Geometry
+## Current GhostNotch Geometry
 
-For the current measured `220 x 38 pt` physical notch, the collapsed state needs to extend visibly beyond the hardware notch.
-
-Recommended Stage 1 constants:
+For the current measured `220 x 38 pt` physical notch, the approved constants
+are:
 
 ```text
 physical notch reference: 220 x 38 pt
-collapsed visual width: 320 pt
+collapsed visual width: 280 pt
 collapsed visual height: 38 pt
-collapsed extension beyond notch: 50 pt per side
+collapsed extension beyond notch: 30 pt per side
+compact mark: 14 pt
+compact visible outer and bottom spacing: 16 pt
 
 hover visual width: 420 pt
-hover visual height: 72 pt
+hover visual height: 104 pt
 hover extension beyond notch: 100 pt per side
+hover left, right, and bottom spacing: 12 pt
+hover clearance below physical notch: 0 pt
 
-expanded visual width: 680 pt
-expanded visual height: 320 pt
+expanded visual width: 822.8 pt
+expanded visual height: 562 pt
 ```
 
-If using runtime measurement later, derive collapsed width as:
+The runtime formulas are:
 
 ```text
-collapsedWidth = max(notchWidth + 96, 320)
-collapsedHeight = notchHeight
+collapsedWidth = notchWidth + 60
+collapsedHeight = max(notchHeight, 38)
+hoverWidth = max(notchWidth + 200, 420)
+hoverHeight = max(104, notchHeight + 14 + 4 + 32 + 4 + 12)
 ```
 
 ## Corner Curvature Guidance
@@ -91,12 +97,12 @@ AppKit exposes notch width and height, but not the physical notch corner radius.
 
 For the visual shape, use top-flush geometry with only the bottom corners rounded. Avoid full pill curvature for collapsed and hover states because the real MacBook notch is a top-attached camera housing, not a floating capsule.
 
-Recommended radii:
+Current radii:
 
 ```text
 collapsed bottom corner radius: 14 pt
-hover bottom corner radius: 18 pt
-expanded bottom corner radius: 28 pt
+hover bottom corner radius: 14 pt
+expanded bottom corner radius: 18 pt
 ```
 
 These radii are intentionally smaller than half the height. They keep the shape notch-like instead of pill-like while still feeling Apple-like and softened.
@@ -107,3 +113,6 @@ When tuning visually:
 - If it looks like a blocky rectangle, increase radius by 2-4 pt.
 - Keep the top edge perfectly flat and flush with the screen top.
 - Put active indicators in the side extensions, not in the hardware notch center.
+- Do not add content padding beside the physical notch: the black shell and black
+  camera housing are visually continuous. Apply equal spacing only at visible
+  screen edges and the bottom.

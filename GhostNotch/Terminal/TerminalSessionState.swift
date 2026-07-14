@@ -18,10 +18,57 @@ enum TerminalAgentActivityState: String, Equatable {
     }
 }
 
+struct AgentStatusIndicatorStyle: Equatable {
+    enum ColorRole: Equatable {
+        case ready
+        case working
+        case waiting
+    }
+
+    let colorRole: ColorRole
+    let animates: Bool
+    let label: String
+
+    static func style(
+        for state: TerminalAgentActivityState,
+        reducesMotion: Bool
+    ) -> AgentStatusIndicatorStyle {
+        switch state {
+        case .idle:
+            AgentStatusIndicatorStyle(colorRole: .ready, animates: false, label: "Ready")
+        case .working:
+            AgentStatusIndicatorStyle(
+                colorRole: .working,
+                animates: !reducesMotion,
+                label: "Working"
+            )
+        case .attention:
+            AgentStatusIndicatorStyle(
+                colorRole: .waiting,
+                animates: !reducesMotion,
+                label: "Waiting"
+            )
+        }
+    }
+}
+
 enum TerminalAgentActivityAgent: String, Equatable {
     case codex
     case claude
     case unknown
+
+    static let supportedCases: [TerminalAgentActivityAgent] = [.codex, .claude]
+
+    var executableName: String? {
+        switch self {
+        case .codex:
+            "codex"
+        case .claude:
+            "claude"
+        case .unknown:
+            nil
+        }
+    }
 }
 
 struct TerminalAgentActivityRecord: Equatable {
@@ -181,6 +228,7 @@ final class TerminalSessionState: ObservableObject {
     @Published private(set) var phase: TerminalSessionPhase = .stopped
     @Published private(set) var hasReceivedOutput = false
     @Published private(set) var agentActivityState: TerminalAgentActivityState = .idle
+    @Published private(set) var activeAgent: TerminalAgentActivityAgent?
     @Published private(set) var lastError: String?
     @Published private(set) var currentWorkingDirectory: String?
 
@@ -357,6 +405,11 @@ final class TerminalSessionState: ObservableObject {
     }
 
     private func resolveAgentActivityState() {
+        let resolvedAgent = hookActivityRecord.agent == .unknown ? nil : hookActivityRecord.agent
+        if activeAgent != resolvedAgent {
+            activeAgent = resolvedAgent
+        }
+
         let resolvedState: TerminalAgentActivityState
         if hookActivityRecord.agent == .codex,
            hookActivityRecord.state == .working,

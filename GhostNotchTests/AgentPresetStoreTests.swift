@@ -161,13 +161,83 @@ final class AgentPresetStoreTests: XCTestCase {
 }
 
 final class IslandMetricsTests: XCTestCase {
-    func testHoverHeightLeavesControlsBelowPhysicalNotch() {
-        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 38), 112)
+    func testHoverHeightPlacesControlsDirectlyBelowPhysicalNotch() {
+        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 38), 104)
     }
 
     func testHoverHeightUsesMinimumForShortOrMissingNotch() {
-        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 0), 112)
-        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 20), 112)
+        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 0), 104)
+        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 20), 104)
+    }
+
+    func testCompactMarksTouchPhysicalNotchWithEqualOuterAndBottomSpacing() {
+        let wingWidth = (IslandMetrics.collapsedFallbackSize.width - IslandMetrics.physicalNotchReferenceWidth) / 2
+
+        XCTAssertEqual(wingWidth, 30)
+        XCTAssertEqual(wingWidth - IslandMetrics.compactMarkSize, 16)
+        XCTAssertEqual(IslandMetrics.hoverControlOuterPadding, 12)
+    }
+}
+
+final class AgentStatusIndicatorStyleTests: XCTestCase {
+    func testStateMappingUsesStaticReadyAndAnimatedActiveStates() {
+        XCTAssertEqual(
+            AgentStatusIndicatorStyle.style(for: .idle, reducesMotion: false),
+            AgentStatusIndicatorStyle(colorRole: .ready, animates: false, label: "Ready")
+        )
+        XCTAssertEqual(
+            AgentStatusIndicatorStyle.style(for: .working, reducesMotion: false),
+            AgentStatusIndicatorStyle(colorRole: .working, animates: true, label: "Working")
+        )
+        XCTAssertEqual(
+            AgentStatusIndicatorStyle.style(for: .attention, reducesMotion: false),
+            AgentStatusIndicatorStyle(colorRole: .waiting, animates: true, label: "Waiting")
+        )
+    }
+
+    func testReduceMotionMakesEveryStatusStatic() {
+        for state in [TerminalAgentActivityState.idle, .working, .attention] {
+            XCTAssertFalse(
+                AgentStatusIndicatorStyle.style(for: state, reducesMotion: true).animates
+            )
+        }
+    }
+
+    func testRoseThreeGeometryStaysInsideFourteenPointFootprint() {
+        let size = CGSize(width: 14, height: 14)
+        let start = RoseThreeGeometry.point(at: 0, in: size)
+        let end = RoseThreeGeometry.point(at: 1, in: size)
+
+        XCTAssertEqual(start.x, end.x, accuracy: 0.0001)
+        XCTAssertEqual(start.y, end.y, accuracy: 0.0001)
+
+        for index in 0...RoseThreeGeometry.sampleCount {
+            let point = RoseThreeGeometry.point(
+                at: Double(index) / Double(RoseThreeGeometry.sampleCount),
+                in: size
+            )
+            XCTAssertGreaterThanOrEqual(point.x, 0)
+            XCTAssertLessThanOrEqual(point.x, size.width)
+            XCTAssertGreaterThanOrEqual(point.y, 0)
+            XCTAssertLessThanOrEqual(point.y, size.height)
+        }
+    }
+
+    func testRoseThreeTrailUsesEighteenTaperedParticlesAcrossConfiguredSpan() {
+        let headPhase = 0.2
+        let tailPhase = RoseThreeGeometry.particlePhase(
+            headPhase: headPhase,
+            index: RoseThreeGeometry.particleCount - 1
+        )
+        let wrappedDistance = RoseThreeGeometry.wrappedPhase(headPhase - tailPhase)
+
+        XCTAssertEqual(RoseThreeGeometry.particleCount, 18)
+        XCTAssertEqual(wrappedDistance, RoseThreeGeometry.trailSpan, accuracy: 0.0001)
+        XCTAssertEqual(RoseThreeGeometry.particleScale(index: 0), 1, accuracy: 0.0001)
+        XCTAssertLessThan(
+            RoseThreeGeometry.particleScale(index: RoseThreeGeometry.particleCount - 1),
+            0.1
+        )
     }
 }
 

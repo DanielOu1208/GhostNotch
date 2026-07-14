@@ -1,6 +1,6 @@
 # GhostNotch v0.1.0 UI Polish Research Brief
 
-Status: Track 3 revision implemented; performance evidence and live approval pending
+Status: Track 4 implementation complete; Track 3/4 performance evidence and live approval pending
 Reviewed: 2026-07-10
 Primary audience: coding agents
 
@@ -28,8 +28,9 @@ In scope, in priority order:
 
 Out of scope:
 
-- Terminal font, cell metrics, glyph rendering, PTY behavior, and terminal
-  feature work.
+- Terminal font, cell metrics, glyph rendering, PTY input/output behavior, and
+  terminal feature work. Track 4's read-only descendant-process check is limited
+  to identifying a supported CLI and clearing its identity after it exits.
 - New activities, widgets, launchers, settings, gestures, or status meanings.
 - Changes to the labels `Ready`, `Working`, and `Waiting`.
 - A general-purpose design system or animation framework.
@@ -138,9 +139,14 @@ assets, layout measurements, or product-specific animation choreography.
 
 ### Spacing and dimensions
 
-- Preserve collapsed and expanded shell dimensions. Track 2 raises the hover
-  shell from 90 to 112 points so the group captions and native outer capsule
-  remain below the physical notch without crowding.
+- Preserve the 280-by-38-point collapsed and 822.8-by-562-point expanded shell
+  dimensions. The approved final hover shell is 420 by 104 points on the
+  measured 220-by-38-point notch.
+- Treat the physical notch as hidden black space, not as a padded content box.
+  In collapsed state, each 14-point mark touches the inner hardware-notch
+  boundary; the 30-point side wings then leave 16 points at the visible outer
+  edge and bottom. In hover, the outer glass capsule starts at the hardware
+  boundary with no extra vertical clearance.
 - Use 40-by-32-point quick-launch targets with a two-point outer capsule inset;
   they exceed Apple's 20-point macOS minimum and read as compact pills rather
   than rounded squares. Keep native hover and press glass centered at 36 by 28
@@ -149,9 +155,10 @@ assets, layout measurements, or product-specific animation choreography.
   a global token system. Use zero points between actions inside a capsule, 4
   points from each caption to its capsule, 8 points between the status and
   first control group, and 12 points between the folder and agent capsules.
-  Preserve the existing 24-point horizontal and 12-point bottom hover padding.
-- Keep notch clearance calculations shared between rendered controls and
-  `WindowPositioner`.
+  Use 12-point left, right, and bottom hover padding. This supersedes Track 2's
+  historical 24-point horizontal inset and makes the visible edge spacing even.
+- Keep hardware-boundary and outer-spacing calculations shared between rendered
+  controls and `WindowPositioner`.
 - Change an outer dimension only when a captured state proves clipping,
   overlap, or poor target separation. Document the evidence in the tracker.
 
@@ -327,6 +334,16 @@ Implementation constraints:
   programmatic signal.
 - Make the hover labels static `Ready`, `Working`, and `Waiting`; the Rose Three
   mark replaces the current animated trailing periods.
+- Put the active supported agent in the collapsed left wing: Codex or Claude's
+  existing asset, rendered monochrome primary at 14 points. Keep that mark for
+  the CLI's full lifetime, including `Ready`, and leave the wing blank when no
+  supported agent is running.
+- Cross-fade agent identity over 0.12 seconds. With Reduce Motion, update it
+  immediately.
+- Derive identity for launcher-started and manually typed sessions from the
+  terminal's descendant process tree so it appears before the first structured
+  hook. Use the unchanged hook/state-file contract for working and waiting
+  status, and clear identity after the named CLI exits.
 
 ## Acceptance evidence required before implementation sign-off
 

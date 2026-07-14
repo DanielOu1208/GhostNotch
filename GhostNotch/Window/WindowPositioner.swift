@@ -5,16 +5,16 @@ import SwiftUI
 struct IslandMetrics {
     static let physicalNotchReferenceWidth: CGFloat = 220
     static let collapsedFallbackSize = NSSize(width: 280, height: 38)
-    static let hoverFallbackSize = NSSize(width: 420, height: 112)
+    static let hoverFallbackSize = NSSize(width: 420, height: 104)
     static let expandedSize = NSSize(width: 822.8, height: 562)
-    static let minimumHoverHeight: CGFloat = 112
-    static let hoverNotchClearance: CGFloat = 8
+    static let minimumHoverHeight: CGFloat = 104
+    static let compactMarkSize: CGFloat = 14
     static let notchControlWidth: CGFloat = 40
     static let notchControlHeight: CGFloat = 32
     static let notchCapsuleGroupInset: CGFloat = 2
     static let hoverControlLabelHeight: CGFloat = 14
     static let hoverControlLabelSpacing: CGFloat = 4
-    static let hoverControlBottomPadding: CGFloat = 12
+    static let hoverControlOuterPadding: CGFloat = 12
 
     static var currentNotchReferenceWidth: CGFloat {
         notchReferenceWidth(on: WindowPositioner.notchScreen)
@@ -43,12 +43,11 @@ struct IslandMetrics {
         max(
             minimumHoverHeight,
             notchHeight
-                + hoverNotchClearance
                 + hoverControlLabelHeight
                 + hoverControlLabelSpacing
                 + notchControlHeight
                 + notchCapsuleGroupInset * 2
-                + hoverControlBottomPadding
+                + hoverControlOuterPadding
         )
     }
 
@@ -74,6 +73,57 @@ struct IslandMetrics {
         }
 
         return collapsedFallbackSize.height
+    }
+}
+
+enum RoseThreeGeometry {
+    static let particleCount = 18
+    static let maximumParticleDiameter: CGFloat = 1.5
+    static let trailSpan = 0.34
+    static let loopDuration: TimeInterval = 1.8
+    static let sampleCount = 96
+
+    static func point(at phase: Double, in size: CGSize) -> CGPoint {
+        let normalizedPhase = wrappedPhase(phase)
+        let theta = Double.pi * normalizedPhase
+        let maximumRadius = max(
+            min(size.width, size.height) / 2 - maximumParticleDiameter / 2,
+            0
+        )
+        let radius = maximumRadius * CGFloat(cos(3 * theta))
+
+        return CGPoint(
+            x: size.width / 2 + radius * CGFloat(cos(theta)),
+            y: size.height / 2 + radius * CGFloat(sin(theta))
+        )
+    }
+
+    static func path(in size: CGSize) -> Path {
+        var path = Path()
+        for index in 0...sampleCount {
+            let point = point(at: Double(index) / Double(sampleCount), in: size)
+            if index == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+        path.closeSubpath()
+        return path
+    }
+
+    static func particlePhase(headPhase: Double, index: Int) -> Double {
+        let offset = trailSpan * Double(index) / Double(max(particleCount - 1, 1))
+        return wrappedPhase(headPhase - offset)
+    }
+
+    static func particleScale(index: Int) -> Double {
+        max(1 - Double(index) / Double(particleCount), 0)
+    }
+
+    static func wrappedPhase(_ phase: Double) -> Double {
+        let remainder = phase.truncatingRemainder(dividingBy: 1)
+        return remainder >= 0 ? remainder : remainder + 1
     }
 }
 

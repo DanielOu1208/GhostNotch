@@ -1,12 +1,13 @@
 # GhostNotch v0.1.0 UI Polish Sprint Tracking
 
-Status: Track 3 revision implemented; performance evidence and live approval pending
+Status: Track 4 implementation complete; Track 3/4 performance evidence and live approval pending
 Created: 2026-07-10
 Depends on: [UI Polish Research Brief](ui-polish-research.md)
 
 This tracker is the execution source of truth for the v0.1.0 styling and motion
-sprint. Work in order. Do not begin a track until its dependencies and exit gate
-are complete.
+sprint. Work in order unless the user explicitly approves the next implementation
+slice while an evidence-only exit gate remains open. Open evidence gates must stay
+visible and cannot be treated as complete.
 
 ## Status legend
 
@@ -20,9 +21,17 @@ are complete.
 - Target macOS 26 and raise the deployment target from 14.0 during this sprint.
 - Use an Alcove-like balance: Dynamic Island fluidity, restrained macOS utility
   styling, opaque black notch shell.
-- Cover all visible chrome, notch first. Do not modify the terminal canvas,
-  font metrics, parser, PTY, or hook contracts.
-- Preserve current shell dimensions unless captured evidence proves a problem.
+- Cover all visible chrome, notch first. Do not modify the terminal canvas, font
+  metrics, parser, PTY input/output behavior, or hook contracts. A read-only PTY
+  descendant-process query is allowed only to identify a manually typed or
+  launcher-started supported CLI and clear its identity after it exits.
+- Keep the 220-by-38-point physical notch as hidden black space: place compact
+  side marks directly against its left/right boundary instead of padding away
+  from it. Keep visible screen-edge and bottom spacing equal.
+- Use the approved 280-by-38-point collapsed shell and 420-by-104-point hover
+  shell on the measured notch. In hover, keep 12 points at both screen edges and
+  the bottom; the top of the glass control group begins at the hardware-notch
+  boundary with no extra clearance.
 - Use system-semantic typography, color, materials, and accessibility settings.
 - Use clean-room Rose Three math; add no package and copy no external source.
 - Keep static `Ready`, `Working`, and `Waiting` wording. Rose Three replaces the
@@ -93,8 +102,9 @@ Depends on: Track 0
   treatment. Do not create a general token framework.
 - [x] Add coverage for any extracted pure sizing or state-style logic.
   Evidence: all six deployment settings and the Zig default target 26.0;
-  existing `IslandMetricsTests` cover the shared 40-by-32-point capsule geometry
-  and 112-point hover height;
+  existing `IslandMetricsTests` covered the shared 40-by-32-point capsule
+  geometry and then-current 112-point hover height (superseded by Track 4's
+  approved 104-point geometry);
   `xcodebuild test` passed on 2026-07-11. Xcode's project-format
   `compatibilityVersion = "Xcode 14.0"` remains intentionally unchanged.
 
@@ -112,7 +122,8 @@ Depends on: Track 1
   semantic secondary foreground. Keep it on one line.
 - [x] Use 40-by-32-point quick-launch segments with a two-point outer capsule
   inset. Keep 8 points from status to controls, 12 points between folder and
-  agent groups, and the existing 24-point horizontal/12-point bottom padding.
+  agent groups, and the then-current 24-point horizontal/12-point bottom
+  padding. Track 4 supersedes the horizontal inset with 12 points on each side.
   Keep every native hover/press subcapsule centered at 36 by 28 points with a
   14% white tint so it remains visible inside the outer capsule while
   preserving the full click target.
@@ -153,7 +164,9 @@ Exit gate:
   two launchers.
 - [x] Physical-notch clearance remains intact. The hover height changed from 90
   to 112 points to fit the caption row and native outer-capsule inset; collapsed
-  and expanded dimensions remain unchanged.
+  and expanded dimensions remain unchanged. This is historical Track 2
+  evidence; Track 4 intentionally removes the eight-point hidden-notch
+  clearance and sets the final hover height to 104 points.
 - [x] Pointer and VoiceOver labels/help work. Hover temporarily activates
   GhostNotch for focused native glass and restores the previous app on exit;
   expansion retains focus. Expanded terminal Tab input and native Settings
@@ -240,32 +253,58 @@ Exit gate:
 - [ ] The user approves Standard and Reduce Motion in the live build. Retain one
   sanitized technical recording of each mode after approval.
 
-## Track 4: Rose Three status indicator
+## Track 4: Rose Three status and compact identity
 
 Depends on: Track 3
 
-- [ ] Implement one clean-room Rose Three SwiftUI view from
+- [x] Implement one clean-room Rose Three SwiftUI view from
   `r(θ) = a cos(3θ)` using native drawing and timeline APIs.
-- [ ] Use a 14-point footprint, 1.25-point ready stroke, and for active states a
+- [x] Use a 14-point footprint, 1.25-point ready stroke, and for active states a
   0.6-point guide at 12% opacity plus 18 particles, 1.5-point maximum particle
   diameter, 0.34-cycle trail span, and 1.8-second loop.
-- [ ] Render ready as a static system-green curve.
-- [ ] Render working as an animated white/primary curve and waiting as the same
+- [x] Render ready as a static system-green curve.
+- [x] Render working as an animated white/primary curve and waiting as the same
   animation in system blue.
-- [ ] Render all states statically when Reduce Motion is enabled.
-- [ ] Ensure ready and reduced-motion states do not create a continuous
+- [x] Render all states statically when Reduce Motion is enabled.
+- [x] Ensure ready and reduced-motion states do not create a continuous
   timeline or measurable idle rendering loop.
-- [ ] Replace both collapsed and hover dots with the same component while
+- [x] Replace both collapsed and hover dots with the same component while
   preserving hover text and activity-state contracts.
-- [ ] Add pure tests for state-to-color/motion mapping and accessibility labels.
-- [ ] Use static hover labels `Ready`, `Working`, and `Waiting`; remove the
+- [x] Add pure tests for state-to-color/motion mapping, labels, rose bounds, and
+  trail constants.
+- [x] Use static hover labels `Ready`, `Working`, and `Waiting`; remove the
   animated trailing-period timeline.
+- [x] Replace the collapsed Ghost mark with the active Codex or Claude asset in
+  monochrome primary color for the CLI's full lifetime, including its ready
+  state. Clear it when that CLI process exits; keep the left wing blank when no
+  supported agent is running. Preserve the structured hook/state-file format.
+- [x] Support launcher-started and manually typed Codex/Claude sessions by
+  deriving identity from a recursive read-only descendant-process check before
+  the first hook event. Keep hooks as the working/waiting status source.
+  Cross-fade agent identity over 0.12 seconds, or update immediately with Reduce
+  Motion.
+- [x] Place both 14-point compact marks against the inner physical-notch
+  boundary. The 30-point wings therefore derive 16-point outer and bottom
+  spacing without adding padding next to hidden hardware.
+- [x] Remove the eight-point hover hardware-notch clearance, set hover to
+  420-by-104 points on the measured notch, and use 12-point left, right, and
+  bottom outer spacing.
+  Evidence: `AgentStatusIndicatorStyleTests`, `IslandMetricsTests`, and
+  `TerminalSessionTests` passed in the full suite on 2026-07-14; the tests cover
+  geometry, motion/color/label mapping, Reduce Motion, and process-exit cleanup.
+  A live Release harness on Mac16,7 verified blank Ready, Codex Ready/Working/
+  Waiting, Claude Ready, real Codex process-exit cleanup, and the unchanged
+  expanded terminal. The temporary startup seam and shell wrappers were removed,
+  `AppDelegate.swift` returned to a clean diff, and the exact final source was
+  rebuilt successfully. Pure pointer-hover motion, accessibility variants,
+  formal CPU sampling, and user approval remain in the gates below.
 
 Exit gate:
 
-- [ ] Ready, working, and waiting remain recognizable in collapsed and hover
-  states without changing shell dimensions.
-- [ ] No external loader source, package, or copied implementation is present.
+- [ ] Ready, working, and waiting plus Codex/Claude identity remain recognizable
+  in collapsed and hover states at the approved 280-by-38 and 420-by-104 shell
+  dimensions.
+- [x] No external loader source, package, or copied implementation is present.
 - [ ] Idle CPU returns to baseline after agent activity stops.
 - [ ] Three 60-second samples meet the research thresholds against the matching
   Track 0 state median: final ready versus Track 0 ready adds at most 0.2 CPU
@@ -301,6 +340,11 @@ Exit gate:
 Depends on: Tracks 1–5
 
 Automated checks:
+
+Track 4's interim 2026-07-14 verification passed `git diff --check`, both hook
+self-tests, the full macOS test suite, static analysis, and the Release build.
+The final boxes remain open because Track 6 depends on Track 5 and must rerun
+against the eventual release source.
 
 - [ ] `git diff --check`
 - [ ] `python3 scripts/install-agent-hooks.py self-test`

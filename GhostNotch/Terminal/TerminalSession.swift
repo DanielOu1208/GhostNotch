@@ -8,6 +8,8 @@ protocol TerminalProcess: AnyObject {
     var onTermination: TerminalTerminationHandler? { get set }
     var isRunning: Bool { get }
 
+    func descendantProcessNames(matching executableNames: Set<String>) -> Set<String>
+
     func start(
         shell: String,
         workingDirectory: String,
@@ -273,6 +275,39 @@ final class TerminalSession {
         }
 
         let record = TerminalAgentActivityRecord(rawFileValue: stateText)
-        state.updateAgentActivityRecord(record)
+        let detectedProcessNames = process.descendantProcessNames(
+            matching: Set(TerminalAgentActivityAgent.supportedCases.compactMap(\.executableName))
+        )
+
+        if let recordedProcessName = record.agent.executableName,
+           detectedProcessNames.contains(recordedProcessName) {
+            state.updateAgentActivityRecord(record)
+            return
+        }
+
+        guard let detectedAgent = TerminalAgentActivityAgent.supportedCases.first(where: {
+            guard let executableName = $0.executableName else {
+                return false
+            }
+            return detectedProcessNames.contains(executableName)
+        }) else {
+            if record.agent == .unknown {
+                state.updateAgentActivityRecord(record)
+            } else {
+                state.updateAgentActivityState(.idle)
+            }
+            return
+        }
+
+        let detectedState = record.agent == .unknown ? record.state : .idle
+        state.updateAgentActivityRecord(
+            TerminalAgentActivityRecord(
+                agent: detectedAgent,
+                state: detectedState,
+                event: record.agent == .unknown ? record.event : nil,
+                timestamp: record.agent == .unknown ? record.timestamp : nil,
+                isLegacy: record.isLegacy
+            )
+        )
     }
 }

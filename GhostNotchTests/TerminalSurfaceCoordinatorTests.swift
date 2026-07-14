@@ -184,6 +184,10 @@ private final class CoordinatorTestTerminalProcess: @MainActor TerminalProcess {
     private(set) var stopCallCount = 0
     private(set) var startWorkingDirectories: [String] = []
 
+    func descendantProcessNames(matching executableNames: Set<String>) -> Set<String> {
+        executableNames
+    }
+
     func start(
         shell: String,
         workingDirectory: String,

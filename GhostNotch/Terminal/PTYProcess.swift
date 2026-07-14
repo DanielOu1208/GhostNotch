@@ -63,6 +63,34 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         }
     }
 
+    func descendantProcessNames(matching executableNames: Set<String>) -> Set<String> {
+        guard let rootProcessID = lock.withLock({ process?.processIdentifier }) else {
+            return []
+        }
+
+        let normalizedExecutableNames = Set(executableNames.map { $0.lowercased() })
+        var pendingProcessIDs = Self.childProcessIDs(of: rootProcessID)
+        var visitedProcessIDs = Set<pid_t>()
+        var matchingProcessNames = Set<String>()
+
+        while let processID = pendingProcessIDs.popLast() {
+            guard visitedProcessIDs.insert(processID).inserted else {
+                continue
+            }
+
+            matchingProcessNames.formUnion(
+                Self.processCommandNames(processID).intersection(normalizedExecutableNames)
+            )
+            if matchingProcessNames == normalizedExecutableNames {
+                return matchingProcessNames
+            }
+
+            pendingProcessIDs.append(contentsOf: Self.childProcessIDs(of: processID))
+        }
+
+        return matchingProcessNames
+    }
+
     func start(
         shell: String,
         workingDirectory: String,
@@ -206,6 +234,95 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         }
 
         return descriptor
+    }
+
+    private static func childProcessIDs(of processID: pid_t) -> [pid_t] {
+        var capacity = 16
+
+        while capacity <= 4096 {
+            var childProcessIDs = [pid_t](repeating: 0, count: capacity)
+            let count = proc_listchildpids(
+                processID,
+                &childProcessIDs,
+                Int32(childProcessIDs.count * MemoryLayout<pid_t>.stride)
+            )
+            guard count > 0 else {
+                return []
+            }
+            if count < capacity {
+                return Array(childProcessIDs.prefix(Int(count)))
+            }
+            capacity *= 2
+        }
+
+        return []
+    }
+
+    private static func processCommandNames(_ processID: pid_t) -> Set<String> {
+        var names = Set<String>()
+        var nameBuffer = [CChar](repeating: 0, count: 256)
+        if proc_name(processID, &nameBuffer, UInt32(nameBuffer.count)) > 0 {
+            names.insert(string(from: nameBuffer).lowercased())
+        }
+
+        var pathBuffer = [CChar](repeating: 0, count: 4096)
+        if proc_pidpath(processID, &pathBuffer, UInt32(pathBuffer.count)) > 0 {
+            names.insert(
+                URL(fileURLWithPath: string(from: pathBuffer)).lastPathComponent.lowercased()
+            )
+        }
+
+        if let firstArgument = processFirstArgument(processID) {
+            names.insert(URL(fileURLWithPath: firstArgument).lastPathComponent.lowercased())
+        }
+
+        return names
+    }
+
+    private static func string(from buffer: [CChar]) -> String {
+        String(
+            decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) },
+            as: UTF8.self
+        )
+    }
+
+    private static func processFirstArgument(_ processID: pid_t) -> String? {
+        var managementInformationBase = [CTL_KERN, KERN_PROCARGS2, processID]
+        var bufferSize = 0
+        guard sysctl(&managementInformationBase, 3, nil, &bufferSize, nil, 0) == 0,
+              bufferSize > MemoryLayout<Int32>.size
+        else {
+            return nil
+        }
+
+        var buffer = [UInt8](repeating: 0, count: bufferSize)
+        guard sysctl(&managementInformationBase, 3, &buffer, &bufferSize, nil, 0) == 0 else {
+            return nil
+        }
+
+        let argumentCount = Int(buffer.withUnsafeBytes { $0.load(as: Int32.self) })
+        guard argumentCount > 0 else {
+            return nil
+        }
+
+        var index = MemoryLayout<Int32>.size
+
+        while index < bufferSize, buffer[index] != 0 {
+            index += 1
+        }
+        while index < bufferSize, buffer[index] == 0 {
+            index += 1
+        }
+
+        let argumentStart = index
+        while index < bufferSize, buffer[index] != 0 {
+            index += 1
+        }
+
+        guard argumentStart < index else {
+            return nil
+        }
+        return String(decoding: buffer[argumentStart..<index], as: UTF8.self)
     }
 
     private func startReading(from descriptor: Int32, generation: Int) {

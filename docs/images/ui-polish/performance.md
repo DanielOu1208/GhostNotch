@@ -55,3 +55,17 @@ outside Git under `/tmp/ghostnotch-ui-polish-traces/`:
 These traces contained local process diagnostics and were intentionally not
 part of the repository. The table above is the durable sanitized summary; the
 235 MB temporary trace directory was removed on 2026-07-13 after verification.
+
+## Track 4 Final Measurement
+
+Status: pending
+
+On 2026-07-14, live Release validation confirmed blank Ready, Codex
+Ready/Working/Waiting, Claude Ready, and agent-process exit cleanup. That pass
+used temporary, environment-gated startup wiring solely to make the real agent
+states controllable by UI automation. The wiring and wrappers were removed and
+the exact final source was rebuilt afterward.
+
+Those checks are not substitutes for the required three 60-second Time Profiler
+runs per state on the exact final binary. No final CPU median is recorded yet;
+the Track 4 CPU gate remains open.
