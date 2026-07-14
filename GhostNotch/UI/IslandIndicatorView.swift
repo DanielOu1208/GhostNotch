@@ -20,28 +20,49 @@ struct IslandIndicatorView: View {
                     .transition(hoverTransition)
             } else {
                 collapsedIndicator
-                    .transition(.opacity)
+                    .transition(collapsedTransition)
             }
         }
-        .animation(compactStateAnimation, value: isHovering)
     }
 
-    private var compactStateAnimation: Animation {
+    private var hoverEntryAnimation: Animation {
         if reduceMotion {
-            return .easeOut(duration: 0.08)
+            return .easeOut(duration: IslandTransitionPlan.reduceMotionDuration)
         }
 
-        return .easeOut(duration: isHovering ? 0.22 : 0.18)
+        let delay = IslandTransitionPlan.hoverOpenDuration
+            * IslandTransitionPlan.primaryContentEntryDelayFraction
+        return .easeOut(duration: IslandTransitionPlan.hoverOpenDuration - delay)
+            .delay(delay)
+    }
+
+    private var collapsedExitAnimation: Animation {
+        let duration = reduceMotion
+            ? IslandTransitionPlan.reduceMotionDuration
+            : IslandTransitionPlan.hoverOpenDuration
+                * IslandTransitionPlan.outgoingContentDurationFraction
+        return .easeOut(duration: duration)
+    }
+
+    private var compactCloseAnimation: Animation {
+        .easeOut(
+            duration: reduceMotion
+                ? IslandTransitionPlan.reduceMotionDuration
+                : IslandTransitionPlan.hoverCloseDuration
+        )
     }
 
     private var hoverTransition: AnyTransition {
-        guard !reduceMotion else {
-            return .opacity
-        }
-
         return .asymmetric(
-            insertion: .opacity.combined(with: .offset(y: -4)),
-            removal: .opacity
+            insertion: .opacity.animation(hoverEntryAnimation),
+            removal: .opacity.animation(compactCloseAnimation)
+        )
+    }
+
+    private var collapsedTransition: AnyTransition {
+        .asymmetric(
+            insertion: .opacity.animation(compactCloseAnimation),
+            removal: .opacity.animation(collapsedExitAnimation)
         )
     }
 

@@ -174,7 +174,7 @@ final class IslandMetricsTests: XCTestCase {
 final class IslandTransitionPlanTests: XCTestCase {
     func testStandardTransitionTimingsAndCurves() {
         let cases: [(IslandState, IslandState, TimeInterval, IslandTransitionCurve)] = [
-            (.collapsed, .hover, 0.22, .easeOut),
+            (.collapsed, .hover, 0.22, .spring),
             (.hover, .collapsed, 0.18, .easeOut),
             (.collapsed, .expanded, 0.34, .spring),
             (.hover, .expanded, 0.34, .spring),
@@ -188,7 +188,7 @@ final class IslandTransitionPlanTests: XCTestCase {
             XCTAssertEqual(plan.duration, duration, accuracy: 0.001)
             XCTAssertEqual(plan.curve, curve)
         }
-        XCTAssertEqual(IslandTransitionPlan.hoverExitGrace, 0.12, accuracy: 0.001)
+        XCTAssertEqual(IslandTransitionPlan.hoverExitGrace, 0.04, accuracy: 0.001)
     }
 
     func testReduceMotionUsesShortCrossFadeForEveryTransition() {
@@ -205,6 +205,16 @@ final class IslandTransitionPlanTests: XCTestCase {
 
         XCTAssertEqual(plan.progress(at: 0), 0, accuracy: 0.0001)
         XCTAssertGreaterThan(plan.progress(at: 0.06), 0.5)
+        XCTAssertEqual(samples.max() ?? 0, 1.02, accuracy: 0.001)
+        XCTAssertEqual(plan.progress(at: plan.duration), 1, accuracy: 0.0001)
+    }
+
+    func testHoverSpringStartsFastAndSettlesAfterOneSmallOvershoot() {
+        let plan = IslandTransitionPlan(from: .collapsed, to: .hover, reducesMotion: false)
+        let samples = stride(from: 0.0, through: plan.duration, by: 0.001).map(plan.progress(at:))
+
+        XCTAssertEqual(plan.progress(at: 0), 0, accuracy: 0.0001)
+        XCTAssertGreaterThan(plan.progress(at: 0.04), 0.5)
         XCTAssertEqual(samples.max() ?? 0, 1.02, accuracy: 0.001)
         XCTAssertEqual(plan.progress(at: plan.duration), 1, accuracy: 0.0001)
     }
@@ -247,12 +257,48 @@ final class IslandTransitionPlanTests: XCTestCase {
         )
     }
 
+    func testHoverHitTestingIncludesExactScreenTopEdge() {
+        let frame = NSRect(x: 888, y: 1_291, width: 280, height: 38)
+
+        XCTAssertTrue(
+            WindowPositioner.containsHoverPoint(
+                NSPoint(x: frame.midX, y: frame.maxY),
+                in: frame
+            )
+        )
+        XCTAssertTrue(
+            WindowPositioner.containsHoverPoint(
+                NSPoint(x: frame.midX, y: frame.maxY - 0.5),
+                in: frame
+            )
+        )
+        XCTAssertFalse(
+            WindowPositioner.containsHoverPoint(
+                NSPoint(x: frame.midX, y: frame.maxY + 0.5),
+                in: frame
+            )
+        )
+        XCTAssertFalse(
+            WindowPositioner.containsHoverPoint(
+                NSPoint(x: frame.maxX, y: frame.maxY),
+                in: frame
+            )
+        )
+    }
+
     func testCloseDestinationUsesFinalHoverBounds() {
         let hoverFrame = NSRect(x: 100, y: 100, width: 420, height: 112)
 
         XCTAssertEqual(
             IslandTransitionPlan.closeDestination(
                 pointer: NSPoint(x: hoverFrame.midX, y: hoverFrame.midY),
+                hoverFrame: hoverFrame
+            ),
+            .hover
+        )
+        XCTAssertEqual(
+            IslandTransitionPlan.closeDestination(
+                pointer: NSPoint(x: hoverFrame.midX, y: hoverFrame.maxY),
                 hoverFrame: hoverFrame
             ),
             .hover

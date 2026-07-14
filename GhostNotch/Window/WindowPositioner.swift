@@ -100,7 +100,13 @@ enum IslandTransitionCurve: Equatable {
 }
 
 struct IslandTransitionPlan: Equatable {
-    static let hoverExitGrace: TimeInterval = 0.12
+    static let hoverExitGrace: TimeInterval = 0.04
+    static let hoverOpenDuration: TimeInterval = 0.22
+    static let hoverCloseDuration: TimeInterval = 0.18
+    static let reduceMotionDuration: TimeInterval = 0.08
+    static let outgoingContentDurationFraction = 0.35
+    static let primaryContentEntryDelayFraction = 0.25
+    static let hoverSpring = Spring(settlingDuration: hoverOpenDuration, dampingRatio: 0.78)
     static let expandedSpring = Spring(settlingDuration: 0.34, dampingRatio: 0.78)
 
     let from: IslandState
@@ -115,18 +121,27 @@ struct IslandTransitionPlan: Equatable {
         self.reducesMotion = reducesMotion
 
         if reducesMotion {
-            duration = 0.08
+            duration = Self.reduceMotionDuration
         } else {
             duration = switch (from, to) {
-            case (.collapsed, .hover): 0.22
-            case (.hover, .collapsed): 0.18
+            case (.collapsed, .hover): Self.hoverOpenDuration
+            case (.hover, .collapsed): Self.hoverCloseDuration
             case (.collapsed, .expanded), (.hover, .expanded): 0.34
             case (.expanded, .collapsed), (.expanded, .hover): 0.22
             default: 0
             }
         }
 
-        curve = !reducesMotion && to == .expanded ? .spring : .easeOut
+        if reducesMotion {
+            curve = .easeOut
+        } else {
+            curve = switch (from, to) {
+            case (.collapsed, .hover), (.collapsed, .expanded), (.hover, .expanded):
+                .spring
+            default:
+                .easeOut
+            }
+        }
     }
 
     func progress(at elapsedTime: TimeInterval) -> CGFloat {
@@ -140,7 +155,11 @@ struct IslandTransitionPlan: Equatable {
         let elapsedTime = max(elapsedTime, 0)
         switch curve {
         case .spring:
-            return Self.expandedSpring.value(
+            let spring = switch (from, to) {
+            case (.collapsed, .hover): Self.hoverSpring
+            default: Self.expandedSpring
+            }
+            return spring.value(
                 fromValue: 0,
                 toValue: 1,
                 initialVelocity: 0,
@@ -156,7 +175,7 @@ struct IslandTransitionPlan: Equatable {
     }
 
     static func closeDestination(pointer: NSPoint, hoverFrame: NSRect) -> IslandState {
-        hoverFrame.contains(pointer) ? .hover : .collapsed
+        WindowPositioner.containsHoverPoint(pointer, in: hoverFrame) ? .hover : .collapsed
     }
 }
 
@@ -189,6 +208,11 @@ enum WindowPositioner {
             width: width,
             height: height
         )
+    }
+
+    static func containsHoverPoint(_ point: NSPoint, in frame: NSRect) -> Bool {
+        frame.contains(point)
+            || point.y == frame.maxY && point.x >= frame.minX && point.x < frame.maxX
     }
 }
 

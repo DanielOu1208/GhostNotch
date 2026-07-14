@@ -169,15 +169,18 @@ Depends on: Track 2
   system springs. Measure it before adding custom frame-driving code.
   Evidence: the 2026-07-12 pass compiled and passed tests, but live review on
   2026-07-13 rejected its linear-feeling window resize and transient top gap.
-- [x] Use 0.22 seconds collapsed→hover, 0.18 seconds hover→collapsed, a
-  0.34-second system spring to expanded, and a 0.22-second ease-out close. The
-  spring uses a 0.78 damping ratio and approximately 2% overshoot; content
-  glides without bouncing.
-- [x] Fade outgoing content in the first 35%; start expanded header content at
-  25% and terminal content at 35%. On close, return compact content during the
+- [x] Use a 0.22-second system spring for collapsed→hover, 0.18 seconds
+  hover→collapsed, a 0.34-second system spring to expanded, and a 0.22-second
+  ease-out close. Both opening springs use a 0.78 damping ratio and
+  approximately 2% overshoot; content glides without bouncing.
+- [x] Fade outgoing content in the first 35%; start hover controls and expanded
+  header content at 25%, and terminal content at 35%. Hover controls use pure
+  opacity with no vertical travel. On close, return compact content during the
   final 25% and finish it at shell settlement.
-- [x] Implement immediate hover entry and a cancelable 0.12-second exit grace.
+- [x] Implement immediate hover entry and a cancelable 0.04-second exit grace.
   Re-entry must cancel collapse without a visible jump.
+- [x] Include the exact top screen edge in the shared hover entry/exit hit test;
+  AppKit's default rectangle containment excludes that edge.
 - [x] Make transitions interruptible: retarget from the visible state, ignore
   stale completion callbacks, and keep the last requested state.
 - [x] Preserve `finishExpandPanelAnimation()` as the single point that marks the
@@ -198,9 +201,9 @@ Depends on: Track 2
   and cross-fade layouts over 0.08 seconds with ease-out only when both old and
   new layouts exist. Use no spring, scale, or overshoot.
   Evidence: `IslandTransitionPlanTests` cover every state-pair duration and
-  curve, the 2% spring peak, monotonic close, top attachment through overshoot,
-  Reduce Motion, close-to-hover bounds, and stale-generation rejection; full
-  `xcodebuild test` passed on 2026-07-13.
+  curve, both 2% spring peaks, monotonic close, top attachment through
+  overshoot, Reduce Motion, close-to-hover bounds, and stale-generation
+  rejection; full `xcodebuild test` passed on 2026-07-13.
 
 Exit gate:
 

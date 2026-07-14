@@ -216,15 +216,20 @@ Initial tuning bounds used for the first implementation:
 The first AppKit pass stayed inside those bounds but still read as linear in live
 review. The approved revision uses these exact values:
 
-- Collapsed → hover: 0.22 seconds.
-- Hover → collapsed: 0.18 seconds after a 0.12-second exit grace.
+- Collapsed → hover: 0.22-second system `Spring` with a `0.78` damping ratio,
+  approximately 2% overshoot, and one settle.
+- Hover → collapsed: 0.18 seconds after a 0.04-second exit grace, shortened
+  after live review found the previous 0.12-second grace sluggish.
+- Hover hit testing includes the exact top screen edge instead of inheriting
+  AppKit's default maximum-edge exclusion.
 - Collapsed/hover → expanded: 0.34-second system `Spring` with a `0.78`
   damping ratio, approximately 2% overshoot, and one settle.
 - Expanded → collapsed/hover: 0.22-second ease-out with no bounce.
-- Only the shell, corner shape, and rim spring. Content uses ease-out travel and
-  opacity so text and controls do not bounce.
+- Only the shell, corner shape, and rim spring. Content uses ease-out opacity so
+  text and controls do not bounce; hover controls have no vertical travel.
 - Outgoing content fades during the first 35% of a transition. Incoming content
-  begins at 25% and reaches full opacity at settlement.
+  begins at 25% and reaches full opacity at settlement, including collapsed →
+  hover.
 
 Further timing changes require a new live review; do not tune against recordings
 alone.

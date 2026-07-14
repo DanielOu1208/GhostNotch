@@ -288,7 +288,10 @@ final class IslandPanelController: ObservableObject {
             return
         }
 
-        let isHovering = panel.frame.contains(NSEvent.mouseLocation)
+        let isHovering = WindowPositioner.containsHoverPoint(
+            NSEvent.mouseLocation,
+            in: panel.frame
+        )
         guard lastHoverContainment != isHovering else {
             GhostNotchRuntimeMetrics.recordHoverEvent(stateChanged: false)
             return
@@ -332,7 +335,10 @@ final class IslandPanelController: ObservableObject {
 
             guard let self,
                   self.state == .hover,
-                  !WindowPositioner.frame(for: .hover).contains(NSEvent.mouseLocation)
+                  !WindowPositioner.containsHoverPoint(
+                      NSEvent.mouseLocation,
+                      in: WindowPositioner.frame(for: .hover)
+                  )
             else {
                 return
             }
@@ -477,12 +483,18 @@ final class IslandPanelController: ObservableObject {
         }
 
         if plan.to == .expanded {
-            withAnimation(.easeOut(duration: plan.duration * 0.35)) {
+            withAnimation(
+                .easeOut(
+                    duration: plan.duration * IslandTransitionPlan.outgoingContentDurationFraction
+                )
+            ) {
                 compactContentVisible = false
             }
+            let primaryContentDelay = plan.duration
+                * IslandTransitionPlan.primaryContentEntryDelayFraction
             withAnimation(
-                .easeOut(duration: plan.duration * 0.75)
-                    .delay(plan.duration * 0.25)
+                .easeOut(duration: plan.duration - primaryContentDelay)
+                    .delay(primaryContentDelay)
             ) {
                 expandedHeaderVisible = true
             }
