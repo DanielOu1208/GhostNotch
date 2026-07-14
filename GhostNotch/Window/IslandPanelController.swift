@@ -1,5 +1,15 @@
 import AppKit
+import QuartzCore
 import SwiftUI
+
+private struct PanelFrameAnimation {
+    let plan: IslandTransitionPlan
+    let generation: Int
+    let startFrame: NSRect
+    let targetFrame: NSRect
+    let screenFrame: NSRect
+    let startTime: TimeInterval
+}
 
 @MainActor
 final class IslandPanelController: ObservableObject {
@@ -10,9 +20,33 @@ final class IslandPanelController: ObservableObject {
     @Published private(set) var terminalSnapshot = TerminalRenderSnapshot.empty()
     @Published private(set) var terminalSurfacePhase: IslandTerminalSurfacePhase = .idle
     @Published private(set) var selectedLaunchDirectoryPresetID: AgentLaunchDirectoryPreset.ID?
+    @Published private(set) var transitionPlan: IslandTransitionPlan?
+    @Published private(set) var compactContentVisible = true
+    @Published private(set) var expandedHeaderVisible = false
+    @Published private(set) var expandedTerminalVisible = false
 
     var allowsGridResizeReporting: Bool {
         terminalSurfacePhase == .ready
+    }
+
+    var showsCompactContent: Bool {
+        state != .expanded || transitionPlan.map { $0.from != .expanded } == true
+    }
+
+    var showsExpandedContent: Bool {
+        state == .expanded || transitionPlan?.from == .expanded
+    }
+
+    var compactPresentationState: IslandState {
+        if state == .expanded, let transitionPlan, transitionPlan.from != .expanded {
+            return transitionPlan.from
+        }
+
+        return state
+    }
+
+    var expandedContentIsInteractive: Bool {
+        terminalSurfacePhase == .ready && transitionPlan == nil
     }
 
     let agentPresetStore: AgentPresetStore
@@ -22,8 +56,14 @@ final class IslandPanelController: ObservableObject {
     private var localMouseMonitor: Any?
     private var globalMouseMonitor: Any?
     private var pendingAgentLaunchTask: Task<Void, Never>?
+    private var pendingHoverExitTask: Task<Void, Never>?
+    private var pendingReducedMotionCompletionTask: Task<Void, Never>?
+    private var pendingTransitionStartTask: Task<Void, Never>?
+    private var panelDisplayLink: CADisplayLink?
+    private var panelFrameAnimation: PanelFrameAnimation?
     private var lastHoverContainment: Bool?
-    private var applicationBeforeHover: NSRunningApplication?
+    private var applicationBeforeGhostNotch: NSRunningApplication?
+    private var transitionGeneration = 0
     private lazy var outsideClickMonitor = OutsideClickMonitor(
         shouldCollapse: { [weak self] in self?.state == .expanded },
         isPointInsidePanel: { [weak self] point in self?.panel.frame.contains(point) ?? false },
@@ -66,7 +106,10 @@ final class IslandPanelController: ObservableObject {
             onClick: { [weak self] in self?.expand() }
         )
 
-        panel.contentView = IslandHostingView(rootView: rootView.environmentObject(self))
+        let hostingView = NSHostingView(rootView: rootView.environmentObject(self))
+        hostingView.sizingOptions = []
+        hostingView.safeAreaRegions = []
+        panel.contentView = hostingView
         panel.onEscape = { [weak self] in self?.collapse() }
     }
 
@@ -78,7 +121,11 @@ final class IslandPanelController: ObservableObject {
 
     func tearDown() {
         pendingAgentLaunchTask?.cancel()
-        restoreApplicationAfterHover()
+        pendingHoverExitTask?.cancel()
+        pendingReducedMotionCompletionTask?.cancel()
+        pendingTransitionStartTask?.cancel()
+        stopPanelFrameAnimation()
+        restorePreviousApplication()
         outsideClickMonitor.stop()
         stopHoverMonitoring()
         terminalSurfaceCoordinator.stop()
@@ -123,12 +170,14 @@ final class IslandPanelController: ObservableObject {
 
     private func expand(startTerminal: Bool) {
         if state == .expanded {
-            activateTerminalSurface()
+            if transitionPlan == nil {
+                activateTerminalSurface()
+            }
             return
         }
 
         terminalSurfacePhase = .expanding
-        applicationBeforeHover = nil
+        captureApplicationBeforeActivation()
         panel.shouldAcceptKeyFocus = true
         panel.styleMask.remove(.nonactivatingPanel)
         NSApp.activate()
@@ -144,14 +193,26 @@ final class IslandPanelController: ObservableObject {
             return
         }
 
+        pendingHoverExitTask?.cancel()
+        let destination: IslandState = if state == .expanded {
+            IslandTransitionPlan.closeDestination(
+                pointer: NSEvent.mouseLocation,
+                hoverFrame: WindowPositioner.frame(for: .hover)
+            )
+        } else {
+            .collapsed
+        }
+
         terminalSurfacePhase = .idle
-        panel.shouldAcceptKeyFocus = false
-        panel.resignKey()
-        panel.styleMask.insert(.nonactivatingPanel)
+        panel.shouldAcceptKeyFocus = destination == .hover
+        if destination == .collapsed {
+            panel.resignKey()
+            panel.styleMask.insert(.nonactivatingPanel)
+        }
         if shouldSendBlurOnCollapse() {
             terminalSurfaceCoordinator.blur()
         }
-        transition(to: .collapsed)
+        transition(to: destination)
     }
 
     func toggleNotchFillMode() {
@@ -223,7 +284,7 @@ final class IslandPanelController: ObservableObject {
     }
 
     private func refreshHoverState() {
-        guard state != .expanded else {
+        guard state != .expanded, transitionPlan?.from != .expanded else {
             return
         }
 
@@ -243,24 +304,45 @@ final class IslandPanelController: ObservableObject {
             return
         }
 
-        guard state != (isHovering ? .hover : .collapsed) else {
-            return
-        }
-
         if isHovering {
+            pendingHoverExitTask?.cancel()
+            guard state != .hover else {
+                return
+            }
             activateHoverPanel()
             transition(to: .hover)
         } else {
-            transition(to: .collapsed)
-            deactivateHoverPanel()
+            guard state == .hover else {
+                return
+            }
+            scheduleHoverExit()
+        }
+    }
+
+    private func scheduleHoverExit() {
+        pendingHoverExitTask?.cancel()
+        pendingHoverExitTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(
+                    nanoseconds: UInt64(IslandTransitionPlan.hoverExitGrace * 1_000_000_000)
+                )
+            } catch {
+                return
+            }
+
+            guard let self,
+                  self.state == .hover,
+                  !WindowPositioner.frame(for: .hover).contains(NSEvent.mouseLocation)
+            else {
+                return
+            }
+
+            self.transition(to: .collapsed)
         }
     }
 
     private func activateHoverPanel() {
-        if let frontmostApplication = NSWorkspace.shared.frontmostApplication,
-           frontmostApplication.processIdentifier != ProcessInfo.processInfo.processIdentifier {
-            applicationBeforeHover = frontmostApplication
-        }
+        captureApplicationBeforeActivation()
 
         panel.shouldAcceptKeyFocus = true
         panel.styleMask.remove(.nonactivatingPanel)
@@ -272,18 +354,29 @@ final class IslandPanelController: ObservableObject {
         panel.shouldAcceptKeyFocus = false
         panel.resignKey()
         panel.styleMask.insert(.nonactivatingPanel)
-        restoreApplicationAfterHover()
+        restorePreviousApplication()
     }
 
-    private func restoreApplicationAfterHover() {
-        let application = applicationBeforeHover
-        applicationBeforeHover = nil
+    private func restorePreviousApplication() {
+        let application = applicationBeforeGhostNotch
+        applicationBeforeGhostNotch = nil
 
         guard NSApp.isActive, let application, !application.isTerminated else {
             return
         }
 
         application.activate()
+    }
+
+    private func captureApplicationBeforeActivation() {
+        guard applicationBeforeGhostNotch == nil,
+              let frontmostApplication = NSWorkspace.shared.frontmostApplication,
+              frontmostApplication.processIdentifier != ProcessInfo.processInfo.processIdentifier
+        else {
+            return
+        }
+
+        applicationBeforeGhostNotch = frontmostApplication
     }
 
     private func configurePanel() {
@@ -329,29 +422,183 @@ final class IslandPanelController: ObservableObject {
     }
 
     private func transition(to newState: IslandState) {
+        guard state != newState else {
+            return
+        }
+
+        pendingReducedMotionCompletionTask?.cancel()
+        pendingTransitionStartTask?.cancel()
+        stopPanelFrameAnimation()
+        transitionGeneration += 1
+        let generation = transitionGeneration
+        let plan = IslandTransitionPlan(
+            from: state,
+            to: newState,
+            reducesMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        )
+        transitionPlan = plan
+
         state = newState
+
         if newState == .expanded {
             lastHoverContainment = nil
+        } else if newState == .hover {
+            lastHoverContainment = true
+        } else {
+            lastHoverContainment = false
         }
-        animatePanel(to: newState)
-    }
 
-    private func animatePanel(to newState: IslandState) {
-        let frame = WindowPositioner.frame(for: newState)
-        let shouldFinishExpandAfterAnimation = newState == .expanded
-
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = newState == .expanded ? 0.18 : 0.16
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            panel.animator().setFrame(frame, display: true)
-        }, completionHandler: {
-            guard shouldFinishExpandAfterAnimation else {
+        pendingTransitionStartTask = Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self,
+                  !Task.isCancelled,
+                  plan.canComplete(
+                    generation: generation,
+                    currentGeneration: self.transitionGeneration,
+                    state: self.state
+                  )
+            else {
                 return
             }
-            Task { @MainActor in
-                self.finishExpandPanelAnimation()
+
+            self.animateContent(for: plan)
+            self.animatePanel(for: plan, generation: generation)
+        }
+    }
+
+    private func animateContent(for plan: IslandTransitionPlan) {
+        if plan.reducesMotion {
+            withAnimation(.easeOut(duration: plan.duration)) {
+                compactContentVisible = plan.to != .expanded
+                expandedHeaderVisible = plan.to == .expanded
+                expandedTerminalVisible = plan.to == .expanded
             }
-        })
+            return
+        }
+
+        if plan.to == .expanded {
+            withAnimation(.easeOut(duration: plan.duration * 0.35)) {
+                compactContentVisible = false
+            }
+            withAnimation(
+                .easeOut(duration: plan.duration * 0.75)
+                    .delay(plan.duration * 0.25)
+            ) {
+                expandedHeaderVisible = true
+            }
+            withAnimation(
+                .easeOut(duration: plan.duration * 0.65)
+                    .delay(plan.duration * 0.35)
+            ) {
+                expandedTerminalVisible = true
+            }
+            return
+        }
+
+        if plan.from == .expanded {
+            withAnimation(.easeOut(duration: plan.duration * 0.35)) {
+                expandedTerminalVisible = false
+            }
+            withAnimation(.easeOut(duration: plan.duration * 0.45)) {
+                expandedHeaderVisible = false
+            }
+            withAnimation(
+                .easeOut(duration: plan.duration * 0.25)
+                    .delay(plan.duration * 0.75)
+            ) {
+                compactContentVisible = true
+            }
+        }
+    }
+
+    private func animatePanel(for plan: IslandTransitionPlan, generation: Int) {
+        let screen = WindowPositioner.notchScreen
+        let targetFrame = WindowPositioner.frame(for: plan.to, on: screen)
+
+        if plan.reducesMotion {
+            panel.setFrame(targetFrame, display: true)
+            pendingReducedMotionCompletionTask = Task { @MainActor [weak self] in
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(plan.duration * 1_000_000_000))
+                } catch {
+                    return
+                }
+                self?.completeTransition(plan, generation: generation)
+            }
+            return
+        }
+
+        let startFrame = WindowPositioner.transitionFrame(
+            from: panel.frame,
+            to: targetFrame,
+            progress: 0,
+            screenFrame: screen.frame
+        )
+        panel.setFrame(startFrame, display: true)
+        panelFrameAnimation = PanelFrameAnimation(
+            plan: plan,
+            generation: generation,
+            startFrame: startFrame,
+            targetFrame: targetFrame,
+            screenFrame: screen.frame,
+            startTime: CACurrentMediaTime()
+        )
+
+        let displayLink = panel.displayLink(target: self, selector: #selector(advancePanelAnimation(_:)))
+        panelDisplayLink = displayLink
+        displayLink.add(to: .main, forMode: .common)
+    }
+
+    @objc private func advancePanelAnimation(_ displayLink: CADisplayLink) {
+        guard displayLink === panelDisplayLink, let animation = panelFrameAnimation else {
+            return
+        }
+
+        let elapsedTime = max(displayLink.targetTimestamp - animation.startTime, 0)
+        let frame = WindowPositioner.transitionFrame(
+            from: animation.startFrame,
+            to: animation.targetFrame,
+            progress: animation.plan.progress(at: elapsedTime),
+            screenFrame: animation.screenFrame
+        )
+        panel.setFrame(frame, display: true)
+
+        guard elapsedTime >= animation.plan.duration else {
+            return
+        }
+
+        panel.setFrame(animation.targetFrame, display: true)
+        stopPanelFrameAnimation()
+        completeTransition(animation.plan, generation: animation.generation)
+    }
+
+    private func stopPanelFrameAnimation() {
+        panelDisplayLink?.invalidate()
+        panelDisplayLink = nil
+        panelFrameAnimation = nil
+    }
+
+    private func completeTransition(_ plan: IslandTransitionPlan, generation: Int) {
+        guard plan.canComplete(
+            generation: generation,
+            currentGeneration: transitionGeneration,
+            state: state
+        ) else {
+            return
+        }
+
+        transitionPlan = nil
+        switch plan.to {
+        case .expanded:
+            finishExpandPanelAnimation()
+        case .hover:
+            if plan.from == .expanded {
+                lastHoverContainment = nil
+                refreshHoverState()
+            }
+        case .collapsed:
+            deactivateHoverPanel()
+        }
     }
 
     private func finishExpandPanelAnimation() {

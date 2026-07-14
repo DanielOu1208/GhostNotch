@@ -14,11 +14,35 @@ struct IslandIndicatorView: View {
     let onLaunchAgent: (AgentLauncher) -> Void
 
     var body: some View {
-        if isHovering {
-            hoverIndicator
-        } else {
-            collapsedIndicator
+        ZStack {
+            if isHovering {
+                hoverIndicator
+                    .transition(hoverTransition)
+            } else {
+                collapsedIndicator
+                    .transition(.opacity)
+            }
         }
+        .animation(compactStateAnimation, value: isHovering)
+    }
+
+    private var compactStateAnimation: Animation {
+        if reduceMotion {
+            return .easeOut(duration: 0.08)
+        }
+
+        return .easeOut(duration: isHovering ? 0.22 : 0.18)
+    }
+
+    private var hoverTransition: AnyTransition {
+        guard !reduceMotion else {
+            return .opacity
+        }
+
+        return .asymmetric(
+            insertion: .opacity.combined(with: .offset(y: -4)),
+            removal: .opacity
+        )
     }
 
     private var collapsedIndicator: some View {
@@ -33,7 +57,6 @@ struct IslandIndicatorView: View {
                 .frame(width: collapsedSideExtensionWidth, height: collapsedIndicatorHeight)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .animation(.easeInOut(duration: 0.2), value: isHovering)
     }
 
     @ViewBuilder
@@ -137,7 +160,6 @@ struct IslandIndicatorView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .padding(.horizontal, 24)
         .padding(.bottom, IslandMetrics.hoverControlBottomPadding)
-        .animation(.easeInOut(duration: 0.2), value: isHovering)
     }
 
     private var visibleDirectoryPresets: [AgentLaunchDirectoryPreset] {

@@ -44,13 +44,14 @@ The active breathing dot accounts for the large working/waiting difference.
 Ready is static. This sprint records that behavior without changing it; the
 Rose Three track owns the later comparison and idle-cost gate.
 
-## Local Trace Locations
+## Baseline Trace Retention
 
-The nine Time Profiler traces and their one-second CSV samples are stored
+The nine Time Profiler traces and their one-second CSV samples were created
 outside Git under `/tmp/ghostnotch-ui-polish-traces/`:
 
 - `baseline-{ready,working,waiting}-{1,2,3}.trace`
 - `baseline-{ready,working,waiting}-{1,2,3}.csv`
 
-These traces contain local process diagnostics and are intentionally not part
-of the repository. The table above is the durable sanitized summary.
+These traces contained local process diagnostics and were intentionally not
+part of the repository. The table above is the durable sanitized summary; the
+235 MB temporary trace directory was removed on 2026-07-13 after verification.

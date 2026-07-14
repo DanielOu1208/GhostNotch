@@ -1,5 +1,4 @@
 import AppKit
-import SwiftUI
 
 @MainActor
 final class IslandPanel: NSPanel {
@@ -21,12 +20,5 @@ final class IslandPanel: NSPanel {
         }
 
         super.keyDown(with: event)
-    }
-}
-
-@MainActor
-final class IslandHostingView<Content: View>: NSHostingView<Content> {
-    override var safeAreaInsets: NSEdgeInsets {
-        NSEdgeInsetsZero
     }
 }

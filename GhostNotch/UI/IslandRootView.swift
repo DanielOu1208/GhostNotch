@@ -10,7 +10,19 @@ struct IslandRootView: View {
         ZStack {
             NotchBackground(state: controller.state, fillMode: controller.notchFillMode)
 
-            islandContent
+            ZStack {
+                if controller.showsCompactContent {
+                    compactContent
+                        .opacity(controller.compactContentVisible ? 1 : 0)
+                        .allowsHitTesting(
+                            controller.compactContentVisible && controller.transitionPlan == nil
+                        )
+                }
+
+                if controller.showsExpandedContent {
+                    expandedContent
+                }
+            }
                 .clipShape(notchShape)
 
             NotchRimOverlay(state: controller.state)
@@ -24,34 +36,35 @@ struct IslandRootView: View {
         NotchExtensionShape(cornerRadius: controller.state.notchCornerRadius)
     }
 
-    @ViewBuilder
-    private var islandContent: some View {
-        switch controller.state {
-        case .collapsed, .hover:
-            IslandIndicatorView(
-                sessionState: controller.terminalState,
-                presetStore: controller.agentPresetStore,
-                isHovering: controller.state == .hover,
-                selectedDirectoryPresetID: controller.selectedLaunchDirectoryPresetID,
-                onSelectDirectory: controller.selectLaunchDirectory,
-                onLaunchAgent: controller.launchAgent
-            )
-        case .expanded:
-            IslandExpandedView(
-                sessionState: controller.terminalState,
-                snapshot: controller.terminalSnapshot,
-                initialLastReportedResize: controller.lastAppliedGridResize,
-                focusRequestID: controller.terminalFocusRequestID,
-                repaintRequestID: controller.terminalSurfaceRepaintRequestID,
-                onInput: controller.writeToTerminal,
-                onKeyEvent: controller.sendTerminalKeyEvent,
-                onScroll: controller.handleTerminalScrollWheel,
-                onMouseEvent: controller.handleTerminalMouseEvent,
-                onResize: controller.resizeTerminal,
-                onRestart: controller.restartTerminal,
-                onCollapse: controller.collapse
-            )
-        }
+    private var compactContent: some View {
+        IslandIndicatorView(
+            sessionState: controller.terminalState,
+            presetStore: controller.agentPresetStore,
+            isHovering: controller.compactPresentationState == .hover,
+            selectedDirectoryPresetID: controller.selectedLaunchDirectoryPresetID,
+            onSelectDirectory: controller.selectLaunchDirectory,
+            onLaunchAgent: controller.launchAgent
+        )
+    }
+
+    private var expandedContent: some View {
+        IslandExpandedView(
+            sessionState: controller.terminalState,
+            snapshot: controller.terminalSnapshot,
+            initialLastReportedResize: controller.lastAppliedGridResize,
+            focusRequestID: controller.terminalFocusRequestID,
+            repaintRequestID: controller.terminalSurfaceRepaintRequestID,
+            headerVisible: controller.expandedHeaderVisible,
+            terminalVisible: controller.expandedTerminalVisible,
+            isInteractive: controller.expandedContentIsInteractive,
+            onInput: controller.writeToTerminal,
+            onKeyEvent: controller.sendTerminalKeyEvent,
+            onScroll: controller.handleTerminalScrollWheel,
+            onMouseEvent: controller.handleTerminalMouseEvent,
+            onResize: controller.resizeTerminal,
+            onRestart: controller.restartTerminal,
+            onCollapse: controller.collapse
+        )
     }
 }
 
@@ -116,12 +129,20 @@ private struct CollapsedIslandTapToExpand: ViewModifier {
 }
 
 private struct NotchBackground: View {
+    @Environment(\.displayScale) private var displayScale
+
     let state: IslandState
     let fillMode: NotchFillMode
 
     var body: some View {
-        NotchExtensionShape(cornerRadius: cornerRadius)
-            .fill(fillMode.color)
+        ZStack(alignment: .top) {
+            NotchExtensionShape(cornerRadius: cornerRadius)
+                .fill(fillMode.color)
+
+            Rectangle()
+                .fill(fillMode.color)
+                .frame(height: 1 / max(displayScale, 1))
+        }
     }
 
     private var cornerRadius: CGFloat {
@@ -143,6 +164,7 @@ private struct NotchRimOverlay: View {
             NotchRimShape(cornerRadius: state.notchCornerRadius, lineWidth: rimLineWidth)
                 .stroke(Color(nsColor: .separatorColor), lineWidth: rimLineWidth)
                 .allowsHitTesting(false)
+                .transition(.opacity)
         }
     }
 }
@@ -189,7 +211,12 @@ private extension IslandState {
 }
 
 private struct NotchExtensionShape: Shape {
-    let cornerRadius: CGFloat
+    var cornerRadius: CGFloat
+
+    var animatableData: CGFloat {
+        get { cornerRadius }
+        set { cornerRadius = newValue }
+    }
 
     func path(in rect: CGRect) -> Path {
         let radius = min(cornerRadius, rect.width / 2, rect.height)
@@ -218,8 +245,13 @@ private struct NotchExtensionShape: Shape {
 }
 
 private struct NotchRimShape: Shape {
-    let cornerRadius: CGFloat
+    var cornerRadius: CGFloat
     let lineWidth: CGFloat
+
+    var animatableData: CGFloat {
+        get { cornerRadius }
+        set { cornerRadius = newValue }
+    }
 
     func path(in rect: CGRect) -> Path {
         let inset = lineWidth / 2

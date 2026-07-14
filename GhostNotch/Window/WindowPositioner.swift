@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import SwiftUI
 
 struct IslandMetrics {
     static let physicalNotchReferenceWidth: CGFloat = 220
@@ -93,6 +94,72 @@ enum IslandState: Equatable {
     }
 }
 
+enum IslandTransitionCurve: Equatable {
+    case spring
+    case easeOut
+}
+
+struct IslandTransitionPlan: Equatable {
+    static let hoverExitGrace: TimeInterval = 0.12
+    static let expandedSpring = Spring(settlingDuration: 0.34, dampingRatio: 0.78)
+
+    let from: IslandState
+    let to: IslandState
+    let duration: TimeInterval
+    let curve: IslandTransitionCurve
+    let reducesMotion: Bool
+
+    init(from: IslandState, to: IslandState, reducesMotion: Bool) {
+        self.from = from
+        self.to = to
+        self.reducesMotion = reducesMotion
+
+        if reducesMotion {
+            duration = 0.08
+        } else {
+            duration = switch (from, to) {
+            case (.collapsed, .hover): 0.22
+            case (.hover, .collapsed): 0.18
+            case (.collapsed, .expanded), (.hover, .expanded): 0.34
+            case (.expanded, .collapsed), (.expanded, .hover): 0.22
+            default: 0
+            }
+        }
+
+        curve = !reducesMotion && to == .expanded ? .spring : .easeOut
+    }
+
+    func progress(at elapsedTime: TimeInterval) -> CGFloat {
+        guard duration > 0 else {
+            return 1
+        }
+        if elapsedTime >= duration {
+            return 1
+        }
+
+        let elapsedTime = max(elapsedTime, 0)
+        switch curve {
+        case .spring:
+            return Self.expandedSpring.value(
+                fromValue: 0,
+                toValue: 1,
+                initialVelocity: 0,
+                time: elapsedTime
+            )
+        case .easeOut:
+            return UnitCurve.easeOut.value(at: elapsedTime / duration)
+        }
+    }
+
+    func canComplete(generation: Int, currentGeneration: Int, state: IslandState) -> Bool {
+        generation == currentGeneration && state == to
+    }
+
+    static func closeDestination(pointer: NSPoint, hoverFrame: NSRect) -> IslandState {
+        hoverFrame.contains(pointer) ? .hover : .collapsed
+    }
+}
+
 enum WindowPositioner {
     static var notchScreen: NSScreen {
         NSScreen.screens.first(where: \.isBuiltInDisplay) ?? NSScreen.main ?? NSScreen.screens[0]
@@ -105,6 +172,23 @@ enum WindowPositioner {
         let y = screenFrame.maxY - size.height
 
         return NSRect(origin: NSPoint(x: x, y: y), size: size)
+    }
+
+    static func transitionFrame(
+        from startFrame: NSRect,
+        to targetFrame: NSRect,
+        progress: CGFloat,
+        screenFrame: NSRect
+    ) -> NSRect {
+        let width = startFrame.width + (targetFrame.width - startFrame.width) * progress
+        let height = startFrame.height + (targetFrame.height - startFrame.height) * progress
+
+        return NSRect(
+            x: screenFrame.midX - width / 2,
+            y: screenFrame.maxY - height,
+            width: width,
+            height: height
+        )
     }
 }
 

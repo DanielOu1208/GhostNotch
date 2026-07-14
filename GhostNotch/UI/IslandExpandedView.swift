@@ -9,6 +9,9 @@ struct IslandExpandedView: View {
     let initialLastReportedResize: TerminalGridResize?
     let focusRequestID: Int
     let repaintRequestID: Int
+    let headerVisible: Bool
+    let terminalVisible: Bool
+    let isInteractive: Bool
     let onInput: (Data) -> Void
     let onKeyEvent: (TerminalKeyEvent) -> Void
     let onScroll: (TerminalScrollEvent) -> Void
@@ -28,6 +31,9 @@ struct IslandExpandedView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+                .opacity(headerVisible ? 1 : 0)
+                .offset(y: headerVisible ? 0 : -4)
+                .allowsHitTesting(isInteractive)
 
             TerminalGridSurfaceView(
                 snapshot: chrome.gridSnapshot,
@@ -44,6 +50,9 @@ struct IslandExpandedView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 5)
             .padding(.bottom, 5)
+            .opacity(terminalVisible ? 1 : 0)
+            .offset(y: terminalVisible ? 0 : -10)
+            .allowsHitTesting(isInteractive)
         }
         .foregroundStyle(.white)
     }

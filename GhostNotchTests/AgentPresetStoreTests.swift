@@ -170,3 +170,104 @@ final class IslandMetricsTests: XCTestCase {
         XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 20), 112)
     }
 }
+
+final class IslandTransitionPlanTests: XCTestCase {
+    func testStandardTransitionTimingsAndCurves() {
+        let cases: [(IslandState, IslandState, TimeInterval, IslandTransitionCurve)] = [
+            (.collapsed, .hover, 0.22, .easeOut),
+            (.hover, .collapsed, 0.18, .easeOut),
+            (.collapsed, .expanded, 0.34, .spring),
+            (.hover, .expanded, 0.34, .spring),
+            (.expanded, .collapsed, 0.22, .easeOut),
+            (.expanded, .hover, 0.22, .easeOut),
+        ]
+
+        for (from, to, duration, curve) in cases {
+            let plan = IslandTransitionPlan(from: from, to: to, reducesMotion: false)
+
+            XCTAssertEqual(plan.duration, duration, accuracy: 0.001)
+            XCTAssertEqual(plan.curve, curve)
+        }
+        XCTAssertEqual(IslandTransitionPlan.hoverExitGrace, 0.12, accuracy: 0.001)
+    }
+
+    func testReduceMotionUsesShortCrossFadeForEveryTransition() {
+        let plan = IslandTransitionPlan(from: .collapsed, to: .expanded, reducesMotion: true)
+
+        XCTAssertEqual(plan.duration, 0.08, accuracy: 0.001)
+        XCTAssertTrue(plan.reducesMotion)
+        XCTAssertEqual(plan.curve, .easeOut)
+    }
+
+    func testExpandedSpringStartsFastAndSettlesAfterOneSmallOvershoot() {
+        let plan = IslandTransitionPlan(from: .collapsed, to: .expanded, reducesMotion: false)
+        let samples = stride(from: 0.0, through: plan.duration, by: 0.001).map(plan.progress(at:))
+
+        XCTAssertEqual(plan.progress(at: 0), 0, accuracy: 0.0001)
+        XCTAssertGreaterThan(plan.progress(at: 0.06), 0.5)
+        XCTAssertEqual(samples.max() ?? 0, 1.02, accuracy: 0.001)
+        XCTAssertEqual(plan.progress(at: plan.duration), 1, accuracy: 0.0001)
+    }
+
+    func testEaseOutTransitionsNeverOvershoot() {
+        let plan = IslandTransitionPlan(from: .expanded, to: .collapsed, reducesMotion: false)
+        let samples = stride(from: 0.0, through: plan.duration, by: 0.001).map(plan.progress(at:))
+
+        XCTAssertEqual(samples.first ?? -1, 0, accuracy: 0.0001)
+        XCTAssertEqual(samples.last ?? -1, 1, accuracy: 0.0001)
+        XCTAssertEqual(samples, samples.sorted())
+        XCTAssertLessThanOrEqual(samples.max() ?? 0, 1)
+    }
+
+    func testTransitionFramesStayAttachedToScreenTopIncludingOvershoot() {
+        let screenFrame = NSRect(x: 0, y: 0, width: 2_000, height: 1_000)
+        let startFrame = NSRect(x: 860, y: 962, width: 280, height: 38)
+        let targetFrame = NSRect(x: 588.6, y: 438, width: 822.8, height: 562)
+
+        for progress: CGFloat in [0, 0.5, 1, 1.02] {
+            let frame = WindowPositioner.transitionFrame(
+                from: startFrame,
+                to: targetFrame,
+                progress: progress,
+                screenFrame: screenFrame
+            )
+
+            XCTAssertEqual(frame.midX, screenFrame.midX, accuracy: 0.0001)
+            XCTAssertEqual(frame.maxY, screenFrame.maxY, accuracy: 0.0001)
+        }
+
+        XCTAssertEqual(
+            WindowPositioner.transitionFrame(
+                from: startFrame,
+                to: targetFrame,
+                progress: 1,
+                screenFrame: screenFrame
+            ),
+            targetFrame
+        )
+    }
+
+    func testCloseDestinationUsesFinalHoverBounds() {
+        let hoverFrame = NSRect(x: 100, y: 100, width: 420, height: 112)
+
+        XCTAssertEqual(
+            IslandTransitionPlan.closeDestination(
+                pointer: NSPoint(x: hoverFrame.midX, y: hoverFrame.midY),
+                hoverFrame: hoverFrame
+            ),
+            .hover
+        )
+        XCTAssertEqual(
+            IslandTransitionPlan.closeDestination(pointer: .zero, hoverFrame: hoverFrame),
+            .collapsed
+        )
+    }
+
+    func testOnlyCurrentGenerationCanComplete() {
+        let plan = IslandTransitionPlan(from: .collapsed, to: .expanded, reducesMotion: false)
+
+        XCTAssertTrue(plan.canComplete(generation: 3, currentGeneration: 3, state: .expanded))
+        XCTAssertFalse(plan.canComplete(generation: 2, currentGeneration: 3, state: .expanded))
+        XCTAssertFalse(plan.canComplete(generation: 3, currentGeneration: 3, state: .collapsed))
+    }
+}

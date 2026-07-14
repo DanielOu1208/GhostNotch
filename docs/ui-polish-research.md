@@ -1,6 +1,6 @@
 # GhostNotch v0.1.0 UI Polish Research Brief
 
-Status: approved direction; Tracks 0–2 implemented
+Status: Track 3 revision implemented; performance evidence and live approval pending
 Reviewed: 2026-07-10
 Primary audience: coding agents
 
@@ -200,7 +200,12 @@ decorative motion.
 | Expanded → collapsed | Terminal content fades/clips before contraction | Collapsed side marks appear near settlement | Preserve blur and session behavior |
 | Interrupted transition | Retarget from the visible frame and content state | Never flash both complete layouts | Last requested state wins; stale completions do nothing |
 
-Initial tuning bounds for the implementation sprint:
+When expanded content closes, resolve the destination once at the close request:
+land directly in hover when the pointer is inside the final hover frame,
+otherwise land collapsed. A hover landing keeps GhostNotch active until pointer
+exit, then restores the application that was active before expansion.
+
+Initial tuning bounds used for the first implementation:
 
 - Collapsed → hover: 0.18–0.24 seconds.
 - Hover → collapsed: 0.16–0.22 seconds after a 0.10–0.16 second exit grace.
@@ -208,37 +213,45 @@ Initial tuning bounds for the implementation sprint:
 - Expanded → collapsed: 0.20–0.28 seconds.
 - Minimal overshoot; no repeated oscillation.
 
-These are tuning bounds, not constants. Record the chosen values with a 60 fps
-and 120 Hz screen recording.
-
-Start with these exact timings:
+The first AppKit pass stayed inside those bounds but still read as linear in live
+review. The approved revision uses these exact values:
 
 - Collapsed → hover: 0.22 seconds.
 - Hover → collapsed: 0.18 seconds after a 0.12-second exit grace.
-- Collapsed/hover → expanded: 0.28 seconds.
-- Expanded → collapsed: 0.24 seconds.
-- SwiftUI content: `snappy` spring with the matching duration and
-  `extraBounce = 0.02`.
+- Collapsed/hover → expanded: 0.34-second system `Spring` with a `0.78`
+  damping ratio, approximately 2% overshoot, and one settle.
+- Expanded → collapsed/hover: 0.22-second ease-out with no bounce.
+- Only the shell, corner shape, and rim spring. Content uses ease-out travel and
+  opacity so text and controls do not bounce.
 - Outgoing content fades during the first 35% of a transition. Incoming content
   begins at 25% and reaches full opacity at settlement.
 
-Agents may move a duration only inside the bounds above. Every deviation must
-be recorded beside the before/after recording and keep `extraBounce` between
-0 and 0.05.
+Further timing changes require a new live review; do not tune against recordings
+alone.
 
 ### Motion implementation decision rule
 
-Start at the highest existing platform rung:
+The state-specific `NSAnimationContext` path was implemented first and rejected
+on 2026-07-13: SwiftUI subviews settled, but the window frame still read as
+linear and transient expansion exposed wallpaper above the transparent panel.
+The resting frame remained correctly attached, isolating the defect to the
+intermediate frames.
 
-1. Keep `NSAnimationContext` for the panel frame, but give each transition its
-   own timing and coordinate SwiftUI content with system springs.
-2. Test rapid retargeting, focus settlement, and native-refresh pacing using
-   the measurement protocol below.
-3. Add one display-linked frame animator only if Instruments or recordings show
-   that `NSAnimationContext` cannot meet the interruption or frame-pacing gates.
+The production path is one panel-linked `CADisplayLink`. It samples SwiftUI's
+native `Spring.value` for expanded opening and `UnitCurve.easeOut` otherwise,
+then rebuilds the complete panel frame on every refresh. Width and height may
+overshoot, but `y = screen.maxY - height` keeps the top edge attached. A
+one-physical-pixel shell-colored strip protects the transparent content edge
+from raster seams. Do not restore the rejected window animator or add another
+animation engine.
 
-Do not maintain two production animation engines. Once the gate selects one,
-remove the rejected path.
+The panel must remain the only owner of animated window size. The first
+display-link build also wrapped the root state change in `withAnimation` while
+the hosting view reported its own safe-area geometry; on hover, those competing
+updates entered AppKit's Update Constraints loop and terminated the app. The
+production hosting view uses empty sizing options and safe-area regions, while
+the state change itself is immediate. The panel spring and staged content fades
+remain the only animation paths.
 
 The existing engine passes only if three repeated runs meet all of these rules:
 
@@ -250,10 +263,10 @@ The existing engine passes only if three repeated runs meet all of these rules:
 - No captured frame shows two complete state layouts at once.
 
 If the first three-run set fails, inspect that evidence and allow one correction
-cycle: one source revision limited to stale-completion/state invalidation and
-timings within the bounds above, followed by one complete three-run retest. If
-that retest fails any rule, use the display-linked driver. Do not keep tuning
-the platform animator indefinitely.
+cycle limited to stale-completion/state invalidation and the approved timings,
+followed by one complete three-run retest. If that retest fails, remove optional
+content translation but retain the top-anchored display link. A further failure
+blocks Track 3; do not fall back to the rejected linear path.
 
 ### Accessibility variants
 
@@ -353,7 +366,12 @@ Store sanitized evidence under `docs/images/ui-polish/`:
 - `{baseline|final}-accessibility-{reduce-transparency|increase-contrast}.jpg`,
   a sanitized hover-state capture with the named setting enabled
 - `performance.md` containing hardware, display rate, build commit, three raw
-  runs, medians, and Instruments trace locations
+  runs, and medians. Keep raw traces only until their results are transcribed.
+
+For the Track 3 revision, retain only `track3-final-standard.mp4` and
+`track3-final-reduce-motion.mp4` after approval. Delete tuning captures and
+temporary frame dumps; the two retained clips are technical evidence and may
+later be reused on GitHub, while live behavior remains the approval source.
 
 Tracker evidence entries use the form `Evidence: artifact link — date,
 hardware, state/accessibility mode`.

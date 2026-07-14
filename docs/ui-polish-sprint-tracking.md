@@ -1,6 +1,6 @@
 # GhostNotch v0.1.0 UI Polish Sprint Tracking
 
-Status: Tracks 0–2 complete; ready for Track 3
+Status: Track 3 revision implemented; performance evidence and live approval pending
 Created: 2026-07-10
 Depends on: [UI Polish Research Brief](ui-polish-research.md)
 
@@ -161,29 +161,46 @@ Exit gate:
 
 Depends on: Track 2
 
-- [ ] Make transition intent explicit for each state pair instead of selecting
+- [x] Make transition intent explicit for each state pair instead of selecting
   duration only from the destination state.
-- [ ] Coordinate panel frame, notch shape/rim, old-content exit, and new-content
+- [x] Coordinate panel frame, notch shape/rim, old-content exit, and new-content
   entrance using the storyboard in the research brief.
-- [ ] Start with `NSAnimationContext` plus state-specific timing and SwiftUI
+- [x] Start with `NSAnimationContext` plus state-specific timing and SwiftUI
   system springs. Measure it before adding custom frame-driving code.
-- [ ] Start with 0.22 seconds collapsed→hover, 0.18 seconds hover→collapsed,
-  0.28 seconds to expanded, and 0.24 seconds expanded→collapsed. Use matching
-  `snappy` content springs with `extraBounce = 0.02`.
-- [ ] Fade outgoing content in the first 35%; start incoming content at 25% and
-  finish it at shell settlement.
-- [ ] Implement immediate hover entry and a cancelable 0.12-second exit grace.
+  Evidence: the 2026-07-12 pass compiled and passed tests, but live review on
+  2026-07-13 rejected its linear-feeling window resize and transient top gap.
+- [x] Use 0.22 seconds collapsed→hover, 0.18 seconds hover→collapsed, a
+  0.34-second system spring to expanded, and a 0.22-second ease-out close. The
+  spring uses a 0.78 damping ratio and approximately 2% overshoot; content
+  glides without bouncing.
+- [x] Fade outgoing content in the first 35%; start expanded header content at
+  25% and terminal content at 35%. On close, return compact content during the
+  final 25% and finish it at shell settlement.
+- [x] Implement immediate hover entry and a cancelable 0.12-second exit grace.
   Re-entry must cancel collapse without a visible jump.
-- [ ] Make transitions interruptible: retarget from the visible state, ignore
+- [x] Make transitions interruptible: retarget from the visible state, ignore
   stale completion callbacks, and keep the last requested state.
-- [ ] Preserve `finishExpandPanelAnimation()` as the single point that marks the
+- [x] Preserve `finishExpandPanelAnimation()` as the single point that marks the
   terminal ready and requests repaint/focus.
-- [ ] If the platform animator fails frame-pacing or interruption gates, replace
-  it with one screen-linked spring driver and remove the rejected production
-  path.
-- [ ] Add the exact Reduce Motion behavior: resize directly to the target frame
+- [x] Replace the rejected window animator with one panel-linked
+  `CADisplayLink`, sampling native `Spring.value`/`UnitCurve` progress. Remove
+  the old production path and invalidate the link on retarget, completion, and
+  teardown.
+- [x] Keep the panel as the only owner of animated window size. Configure the
+  `NSHostingView` with no content-derived sizing constraints or safe-area
+  regions, and do not wrap the root state change in a second SwiftUI animation.
+  Evidence: after the original path triggered AppKit's Update Constraints loop,
+  live hover, expand, close, and reopen completed on one process with no new
+  crash report on 2026-07-13.
+- [x] Keep every intermediate frame top-centered and attached, including the
+  spring overshoot, and add a one-physical-pixel shell-colored top seam guard.
+- [x] Add the exact Reduce Motion behavior: resize directly to the target frame
   and cross-fade layouts over 0.08 seconds with ease-out only when both old and
   new layouts exist. Use no spring, scale, or overshoot.
+  Evidence: `IslandTransitionPlanTests` cover every state-pair duration and
+  curve, the 2% spring peak, monotonic close, top attachment through overshoot,
+  Reduce Motion, close-to-hover bounds, and stale-generation rejection; full
+  `xcodebuild test` passed on 2026-07-13.
 
 Exit gate:
 
@@ -196,7 +213,10 @@ Exit gate:
   the requested state with correct focus. Do not average FPS across runs. After
   a failed first set, permit one evidence-led source revision limited to state
   invalidation and in-bounds timing, then one complete three-run retest. If it
-  fails, use the display-linked driver.
+  fails, remove optional content translation but retain the top-anchored display
+  link, then rerun the complete gate. A second failure blocks Track 3.
+- [ ] The user approves Standard and Reduce Motion in the live build. Retain one
+  sanitized technical recording of each mode after approval.
 
 ## Track 4: Rose Three status indicator
 
@@ -287,10 +307,10 @@ Performance evidence:
   highest available rate and mark 120 Hz unavailable rather than failing.
 - [ ] No sustained loader work in ready or Reduce Motion states.
 - [ ] Working/waiting loader CPU use is recorded and accepted in the tracker.
-- [ ] Store screenshots, the standard and Reduce Motion H.264 recordings under
-  20 MB each for every tested refresh mode, the two accessibility captures,
-  and `performance.md` using the research brief's names. Add dated `Evidence:`
-  links with hardware and accessibility mode to completed tasks.
+- [ ] Store screenshots, the accepted standard and Reduce Motion H.264
+  recordings, the two accessibility captures, and `performance.md`. Delete
+  rejected recordings and raw traces after their measurements are transcribed.
+  Add dated `Evidence:` links with hardware and accessibility mode.
 
 Release closeout:
 
