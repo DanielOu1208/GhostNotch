@@ -215,8 +215,11 @@ Depends on: Track 2
 - [x] Resolve valid directory presets and enabled launchers once per hover
   render pass, without persistent caching or changes to the Track 4 status
   indicator and trailing-period behavior.
+- [x] Remove the collapsed Ghost mark immediately on hover entry instead of
+  fading its fill, outline, and shadow while the panel spring is resizing.
+  Keep the status-dot exit fade and the Ghost mark's close-state fade-in.
   Evidence: focused transition/publication tests, full `xcodebuild test`,
-  `xcodebuild analyze`, and a clean Release build passed on 2026-07-13. A live
+  `xcodebuild analyze`, and a clean Release build passed on 2026-07-14. A live
   Release smoke check covered launch, expand, collapse, terminal focus, and
   hidden terminal output without a crash. Direct pointer-hover pacing remains
   part of the performance and user-approval gates below.

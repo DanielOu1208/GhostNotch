@@ -22,6 +22,11 @@ struct IslandIndicatorView: View {
                 collapsedIndicator
                     .transition(collapsedTransition)
             }
+
+            if !isHovering {
+                collapsedGhosttyLogoLayer
+                    .transition(collapsedGhostTransition)
+            }
         }
     }
 
@@ -66,9 +71,16 @@ struct IslandIndicatorView: View {
         )
     }
 
+    private var collapsedGhostTransition: AnyTransition {
+        .asymmetric(
+            insertion: .opacity.animation(compactCloseAnimation),
+            removal: .identity
+        )
+    }
+
     private var collapsedIndicator: some View {
         HStack(spacing: 0) {
-            collapsedGhosttyLogo
+            Color.clear
                 .frame(width: collapsedSideExtensionWidth, height: collapsedIndicatorHeight)
 
             Color.clear
@@ -78,6 +90,21 @@ struct IslandIndicatorView: View {
                 .frame(width: collapsedSideExtensionWidth, height: collapsedIndicatorHeight)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    private var collapsedGhosttyLogoLayer: some View {
+        HStack(spacing: 0) {
+            collapsedGhosttyLogo
+                .frame(width: collapsedSideExtensionWidth, height: collapsedIndicatorHeight)
+
+            Color.clear
+                .frame(width: collapsedCenterGapWidth, height: collapsedIndicatorHeight)
+
+            Color.clear
+                .frame(width: collapsedSideExtensionWidth, height: collapsedIndicatorHeight)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .allowsHitTesting(false)
     }
 
     @ViewBuilder
