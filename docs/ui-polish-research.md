@@ -72,8 +72,9 @@ Numbered observations:
 
 1. The physical camera housing correctly remains an uninterrupted black center;
    polish must extend it rather than place glass over it.
-2. The side extensions have about 30 points each, so a 14-point status mark is
-   the initial maximum to test without changing the collapsed width.
+2. The side extensions have about 30 points each. The initial 14-point mark left
+   uneven visible margins; final tuning uses 22 points for equal 8-point top,
+   outer, and bottom spacing without changing the collapsed width.
 3. The current glow is visible at this scale, but the dot has no recognizable
    shape beyond color.
 4. Settings evidence uses an isolated `UserDefaults` suite so no private local
@@ -143,10 +144,10 @@ assets, layout measurements, or product-specific animation choreography.
   dimensions. The approved final hover shell is 420 by 104 points on the
   measured 220-by-38-point notch.
 - Treat the physical notch as hidden black space, not as a padded content box.
-  In collapsed state, each 14-point mark touches the inner hardware-notch
-  boundary; the 30-point side wings then leave 16 points at the visible outer
-  edge and bottom. In hover, the outer glass capsule starts at the hardware
-  boundary with no extra vertical clearance.
+  In collapsed state, each 22-point mark touches the inner hardware-notch
+  boundary; the 30-point side wings then leave 8 points at the visible top,
+  outer edge, and bottom. In hover, the outer glass capsule starts at the
+  hardware boundary with no extra vertical clearance.
 - Use 40-by-32-point quick-launch targets with a two-point outer capsule inset;
   they exceed Apple's 20-point macOS minimum and read as compact pills rather
   than rounded squares. Keep native hover and press glass centered at 36 by 28
@@ -320,7 +321,7 @@ Required state mapping:
 
 Implementation constraints:
 
-- Use a 14-point square in collapsed and hover states.
+- Use a 22-point square in collapsed and hover states.
 - Use one native SwiftUI `Canvas`/timeline view and no dependency.
 - Start with a 1.25-point static ready stroke. For active states, draw a
   0.6-point guide at 12% opacity plus 18 trail particles with a 1.5-point
@@ -335,7 +336,7 @@ Implementation constraints:
 - Make the hover labels static `Ready`, `Working`, and `Waiting`; the Rose Three
   mark replaces the current animated trailing periods.
 - Put the active supported agent in the collapsed left wing: Codex or Claude's
-  existing asset, rendered monochrome primary at 14 points. Keep that mark for
+  existing asset, rendered monochrome primary at 22 points. Keep that mark for
   the CLI's full lifetime, including `Ready`, and leave the wing blank when no
   supported agent is running.
 - Cross-fade agent identity over 0.12 seconds. With Reduce Motion, update it

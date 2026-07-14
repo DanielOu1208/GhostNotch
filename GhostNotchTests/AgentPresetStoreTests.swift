@@ -170,11 +170,14 @@ final class IslandMetricsTests: XCTestCase {
         XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 20), 104)
     }
 
-    func testCompactMarksTouchPhysicalNotchWithEqualOuterAndBottomSpacing() {
+    func testCompactMarksTouchPhysicalNotchWithEqualVisibleSpacing() {
         let wingWidth = (IslandMetrics.collapsedFallbackSize.width - IslandMetrics.physicalNotchReferenceWidth) / 2
+        let visibleSpacing = wingWidth - IslandMetrics.compactMarkSize
+        let verticalSpacing = (IslandMetrics.collapsedFallbackSize.height - IslandMetrics.compactMarkSize) / 2
 
         XCTAssertEqual(wingWidth, 30)
-        XCTAssertEqual(wingWidth - IslandMetrics.compactMarkSize, 16)
+        XCTAssertEqual(visibleSpacing, 8)
+        XCTAssertEqual(verticalSpacing, visibleSpacing)
         XCTAssertEqual(IslandMetrics.hoverControlOuterPadding, 12)
     }
 }
@@ -203,8 +206,11 @@ final class AgentStatusIndicatorStyleTests: XCTestCase {
         }
     }
 
-    func testRoseThreeGeometryStaysInsideFourteenPointFootprint() {
-        let size = CGSize(width: 14, height: 14)
+    func testRoseThreeGeometryStaysInsideCompactFootprint() {
+        let size = CGSize(
+            width: IslandMetrics.compactMarkSize,
+            height: IslandMetrics.compactMarkSize
+        )
         let start = RoseThreeGeometry.point(at: 0, in: size)
         let end = RoseThreeGeometry.point(at: 1, in: size)
 

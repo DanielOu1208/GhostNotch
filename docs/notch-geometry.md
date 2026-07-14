@@ -69,8 +69,8 @@ physical notch reference: 220 x 38 pt
 collapsed visual width: 280 pt
 collapsed visual height: 38 pt
 collapsed extension beyond notch: 30 pt per side
-compact mark: 14 pt
-compact visible outer and bottom spacing: 16 pt
+compact mark: 22 pt
+compact visible top, outer, and bottom spacing: 8 pt
 
 hover visual width: 420 pt
 hover visual height: 104 pt

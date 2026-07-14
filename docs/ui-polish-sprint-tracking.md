@@ -259,7 +259,7 @@ Depends on: Track 3
 
 - [x] Implement one clean-room Rose Three SwiftUI view from
   `r(θ) = a cos(3θ)` using native drawing and timeline APIs.
-- [x] Use a 14-point footprint, 1.25-point ready stroke, and for active states a
+- [x] Use a 22-point footprint, 1.25-point ready stroke, and for active states a
   0.6-point guide at 12% opacity plus 18 particles, 1.5-point maximum particle
   diameter, 0.34-cycle trail span, and 1.8-second loop.
 - [x] Render ready as a static system-green curve.
@@ -283,9 +283,9 @@ Depends on: Track 3
   the first hook event. Keep hooks as the working/waiting status source.
   Cross-fade agent identity over 0.12 seconds, or update immediately with Reduce
   Motion.
-- [x] Place both 14-point compact marks against the inner physical-notch
-  boundary. The 30-point wings therefore derive 16-point outer and bottom
-  spacing without adding padding next to hidden hardware.
+- [x] Place both 22-point compact marks against the inner physical-notch
+  boundary. The 30-point wings therefore derive equal 8-point top, outer, and
+  bottom spacing without adding padding next to hidden hardware.
 - [x] Remove the eight-point hover hardware-notch clearance, set hover to
   420-by-104 points on the measured notch, and use 12-point left, right, and
   bottom outer spacing.

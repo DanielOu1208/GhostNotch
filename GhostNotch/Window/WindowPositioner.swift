@@ -8,7 +8,7 @@ struct IslandMetrics {
     static let hoverFallbackSize = NSSize(width: 420, height: 104)
     static let expandedSize = NSSize(width: 822.8, height: 562)
     static let minimumHoverHeight: CGFloat = 104
-    static let compactMarkSize: CGFloat = 14
+    static let compactMarkSize: CGFloat = 22
     static let notchControlWidth: CGFloat = 40
     static let notchControlHeight: CGFloat = 32
     static let notchCapsuleGroupInset: CGFloat = 2
