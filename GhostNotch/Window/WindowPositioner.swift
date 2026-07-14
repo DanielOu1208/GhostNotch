@@ -151,7 +151,7 @@ enum IslandTransitionCurve: Equatable {
 
 struct IslandTransitionPlan: Equatable {
     static let hoverExitGrace: TimeInterval = 0.04
-    static let hoverOpenDuration: TimeInterval = 0.22
+    static let hoverOpenDuration: TimeInterval = 0.34
     static let hoverCloseDuration: TimeInterval = 0.18
     static let reduceMotionDuration: TimeInterval = 0.08
     static let outgoingContentDurationFraction = 0.35

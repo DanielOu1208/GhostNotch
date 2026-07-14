@@ -226,8 +226,9 @@ Initial tuning bounds used for the first implementation:
 The first AppKit pass stayed inside those bounds but still read as linear in live
 review. The approved revision uses these exact values:
 
-- Collapsed → hover: 0.22-second system `Spring` with a `0.78` damping ratio,
-  approximately 2% overshoot, and one settle.
+- Collapsed → hover: 0.34-second system `Spring` with a `0.78` damping ratio,
+  matching the fully expanded opening after live review found 0.22 seconds too
+  fast.
 - Hover → collapsed: 0.18 seconds after a 0.04-second exit grace, shortened
   after live review found the previous 0.12-second grace sluggish.
 - Hover hit testing includes the exact top screen edge instead of inheriting

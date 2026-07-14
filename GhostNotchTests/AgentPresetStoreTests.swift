@@ -250,7 +250,7 @@ final class AgentStatusIndicatorStyleTests: XCTestCase {
 final class IslandTransitionPlanTests: XCTestCase {
     func testStandardTransitionTimingsAndCurves() {
         let cases: [(IslandState, IslandState, TimeInterval, IslandTransitionCurve)] = [
-            (.collapsed, .hover, 0.22, .spring),
+            (.collapsed, .hover, 0.34, .spring),
             (.hover, .collapsed, 0.18, .easeOut),
             (.collapsed, .expanded, 0.34, .spring),
             (.hover, .expanded, 0.34, .spring),
@@ -315,7 +315,7 @@ final class IslandTransitionPlanTests: XCTestCase {
         let samples = stride(from: 0.0, through: plan.duration, by: 0.001).map(plan.progress(at:))
 
         XCTAssertEqual(plan.progress(at: 0), 0, accuracy: 0.0001)
-        XCTAssertGreaterThan(plan.progress(at: 0.04), 0.5)
+        XCTAssertGreaterThan(plan.progress(at: 0.06), 0.5)
         XCTAssertEqual(samples.max() ?? 0, 1.02, accuracy: 0.001)
         XCTAssertEqual(plan.progress(at: plan.duration), 1, accuracy: 0.0001)
     }

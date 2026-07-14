@@ -29,7 +29,20 @@ struct IslandRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.all)
-        .modifier(CollapsedIslandTapToExpand(onClick: onClick, isEnabled: controller.state != .expanded))
+        .modifier(
+            CollapsedIslandTapToExpand(
+                onClick: onClick,
+                isEnabled: controller.state != .expanded && controller.transitionPlan == nil
+            )
+        )
+        .overlay {
+            if controller.state != .expanded, controller.transitionPlan != nil {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onClick)
+                    .accessibilityHidden(true)
+            }
+        }
     }
 
     private var notchShape: NotchExtensionShape {
