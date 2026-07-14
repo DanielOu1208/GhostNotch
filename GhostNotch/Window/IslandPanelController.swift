@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import QuartzCore
 import SwiftUI
 
@@ -20,6 +21,7 @@ final class IslandPanelController: ObservableObject {
     @Published private(set) var terminalSnapshot = TerminalRenderSnapshot.empty()
     @Published private(set) var terminalSurfacePhase: IslandTerminalSurfacePhase = .idle
     @Published private(set) var selectedLaunchDirectoryPresetID: AgentLaunchDirectoryPreset.ID?
+    @Published private(set) var selectedLaunchAgentID: AgentLauncher.ID?
     @Published private(set) var transitionPlan: IslandTransitionPlan?
     @Published private(set) var compactContentVisible = true
     @Published private(set) var expandedHeaderVisible = false
@@ -59,6 +61,7 @@ final class IslandPanelController: ObservableObject {
     private var pendingHoverExitTask: Task<Void, Never>?
     private var pendingReducedMotionCompletionTask: Task<Void, Never>?
     private var pendingTransitionStartTask: Task<Void, Never>?
+    private var agentPresetSubscription: AnyCancellable?
     private var panelDisplayLink: CADisplayLink?
     private var panelFrameAnimation: PanelFrameAnimation?
     private var lastHoverContainment: Bool?
@@ -102,6 +105,16 @@ final class IslandPanelController: ObservableObject {
             }
 
             self.terminalSnapshot = snapshot
+        }
+
+        agentPresetSubscription = agentPresetStore.$configuration.sink { [weak self] configuration in
+            guard let self else {
+                return
+            }
+            self.selectedLaunchAgentID = AgentLauncherSelection.validated(
+                self.selectedLaunchAgentID,
+                enabledIDs: configuration.enabledAgentIDs
+            )
         }
 
         configurePanel()
@@ -173,7 +186,56 @@ final class IslandPanelController: ObservableObject {
         )
     }
 
-    private func expand(startTerminal: Bool) {
+    func selectLaunchAgent(_ launcher: AgentLauncher) {
+        guard agentPresetStore.enabledAgentIDs.contains(launcher.id) else {
+            return
+        }
+
+        selectedLaunchAgentID = AgentLauncherSelection.toggled(
+            currentSelection: selectedLaunchAgentID,
+            selectedID: launcher.id
+        )
+    }
+
+    func performHoverPrimaryAction() {
+        switch HoverPrimaryAction.resolve(
+            isTerminalRunning: terminalState.isRunning,
+            selectedAgentID: selectedLaunchAgentID,
+            enabledAgentIDs: agentPresetStore.enabledAgentIDs
+        ) {
+        case .expand:
+            if terminalState.isRunning {
+                expand()
+            } else {
+                let directoryPath = selectedLaunchDirectoryPath()
+                selectedLaunchDirectoryPresetID = nil
+                expand(startTerminal: true, workingDirectory: directoryPath)
+            }
+        case let .launch(agentID):
+            guard let launcher = agentPresetStore.enabledLaunchers.first(where: {
+                $0.id == agentID
+            }) else {
+                return
+            }
+            launchAgent(launcher)
+        }
+    }
+
+    func resetTerminalFromHover() {
+        guard terminalState.isRunning else {
+            return
+        }
+
+        pendingAgentLaunchTask?.cancel()
+        pendingAgentLaunchTask = nil
+        selectedLaunchDirectoryPresetID = nil
+        selectedLaunchAgentID = nil
+        terminalSurfaceCoordinator.restartPreservingGrid(
+            currentSnapshot: terminalSurfaceCoordinator.currentSnapshot()
+        )
+    }
+
+    private func expand(startTerminal: Bool, workingDirectory: String? = nil) {
         if state == .expanded {
             if transitionPlan == nil {
                 activateTerminalSurface()
@@ -187,7 +249,7 @@ final class IslandPanelController: ObservableObject {
         panel.styleMask.remove(.nonactivatingPanel)
         NSApp.activate()
         if startTerminal {
-            startTerminalIfNeeded()
+            startTerminalIfNeeded(workingDirectory: workingDirectory)
         }
         transition(to: .expanded)
         panel.makeKeyAndOrderFront(nil)
@@ -403,8 +465,8 @@ final class IslandPanelController: ObservableObject {
         panel.animationBehavior = .none
     }
 
-    private func startTerminalIfNeeded() {
-        terminalSurfaceCoordinator.startIfNeeded()
+    private func startTerminalIfNeeded(workingDirectory: String? = nil) {
+        terminalSurfaceCoordinator.startIfNeeded(workingDirectory: workingDirectory)
     }
 
     private func selectedLaunchDirectoryPath() -> String? {

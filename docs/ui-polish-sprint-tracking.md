@@ -28,7 +28,7 @@ visible and cannot be treated as complete.
 - Keep the 220-by-38-point physical notch as hidden black space: place compact
   side marks directly against its left/right boundary instead of padding away
   from it. Keep visible screen-edge and bottom spacing equal.
-- Use the approved 280-by-38-point collapsed shell and 420-by-104-point hover
+- Use the approved 280-by-38-point collapsed shell and 420-by-136-point hover
   shell on the measured notch. In hover, keep 12 points at both screen edges and
   the bottom; the top of the glass control group begins at the hardware-notch
   boundary with no extra clearance.
@@ -104,7 +104,7 @@ Depends on: Track 0
   Evidence: all six deployment settings and the Zig default target 26.0;
   existing `IslandMetricsTests` covered the shared 40-by-32-point capsule
   geometry and then-current 112-point hover height (superseded by Track 4's
-  approved 104-point geometry);
+  current 136-point geometry);
   `xcodebuild test` passed on 2026-07-11. Xcode's project-format
   `compatibilityVersion = "Xcode 14.0"` remains intentionally unchanged.
 
@@ -121,15 +121,16 @@ Depends on: Track 1
 - [x] Change hover status text to system-default `.caption`, Medium weight, and
   semantic secondary foreground. Keep it on one line.
 - [x] Use 40-by-32-point quick-launch segments with a two-point outer capsule
-  inset. Keep 8 points from status to controls, 12 points between folder and
-  agent groups, and the then-current 24-point horizontal/12-point bottom
-  padding. Track 4 supersedes the horizontal inset with 12 points on each side.
+  inset. The original layout kept 8 points from status to controls and 12 points
+  between folder and agent groups. Track 4 supersedes it with three equal groups
+  and 12-point gaps and outer insets.
   Keep every native hover/press subcapsule centered at 36 by 28 points with a
   14% white tint so it remains visible inside the outer capsule while
   preserving the full click target.
 - [x] Add `Folders` and `Agents` secondary `caption2` labels four points above
   two separate native outer glass capsules. Hide the folder label and capsule
-  when there are no valid presets.
+  when there are no valid presets. Track 4 supersedes this with always-present
+  `Folders`, `Agents`, and `Status` groups.
 - [x] Put expanded restart/collapse actions in one native outer capsule and
   inset it from the screen top. Keep Settings on native grouped-Form controls.
 - [x] Add clear hover, pressed, selected, disabled, and keyboard-focus states
@@ -140,15 +141,17 @@ Depends on: Track 1
   36-by-28-point capsule in the same blue above the outer glass and below the
   folder icon. When Reduce Transparency is enabled, replace only the backing
   with a 43-by-35-point native tinted glass segment. Add no imitation glass
-  surface or outline.
+  surface or outline. Track 4 supersedes the backing dimensions while preserving
+  the same layering and accessibility behavior.
 - [x] Keep the opaque black shell and apply semantic label/symbol colors.
 - [x] Let native Liquid Glass respond to Reduce Transparency and Increase
   Contrast. Use semantic foregrounds and native focus/hover/press treatments;
   use `NSColor.separatorColor` only for the outer black shell rim.
 - [x] Preserve the existing directory preset accessibility label and help
-  formats (`Use <name> folder` and `<name> - <path>`), preserve each launcher's
-  existing label/help text, and preserve `Restart terminal` and `Collapse
-  terminal` for expanded actions. Verify each string with VoiceOver.
+  formats (`Use <name> folder` and `<name> - <path>`), and preserve `Restart
+  terminal` and `Collapse terminal` for expanded actions. Track 4 changes agent
+  controls to `Select`/`Deselect` and moves launching to the labeled primary
+  action. Verify each string with VoiceOver.
   Evidence: [standard hover](images/ui-polish/track2-hover-standard.jpg),
   [expanded actions](images/ui-polish/track2-expanded-standard.jpg),
   [Reduce Transparency](images/ui-polish/track2-hover-reduce-transparency.jpg),
@@ -166,7 +169,8 @@ Exit gate:
   to 112 points to fit the caption row and native outer-capsule inset; collapsed
   and expanded dimensions remain unchanged. This is historical Track 2
   evidence; Track 4 intentionally removes the eight-point hidden-notch
-  clearance and sets the final hover height to 104 points.
+  clearance; Track 4's separate primary-action row sets the final hover height
+  to 136 points.
 - [x] Pointer and VoiceOver labels/help work. Hover temporarily activates
   GhostNotch for focused native glass and restores the previous app on exit;
   expansion retains focus. Expanded terminal Tab input and native Settings
@@ -264,7 +268,7 @@ Depends on: Track 3
 - [x] Implement one clean-room Rose Three SwiftUI view from
   `r(θ) = a cos(3θ)` using native drawing and timeline APIs.
 - [x] Use a 22-point footprint, 1.25-point ready stroke, and for active states a
-  0.6-point guide at 12% opacity plus 18 particles, 1.5-point maximum particle
+  0.6-point guide at 24% opacity plus 18 particles, 1.5-point maximum particle
   diameter, 0.34-cycle trail span, and 1.8-second loop.
 - [x] Render ready as a static system-green curve.
 - [x] Render working as an animated white/primary curve and waiting as the same
@@ -291,11 +295,45 @@ Depends on: Track 3
   boundary. The 30-point wings therefore derive equal 8-point top, outer, and
   bottom spacing without adding padding next to hidden hardware.
 - [x] Remove the eight-point hover hardware-notch clearance, set hover to
-  420-by-104 points on the measured notch, and use 12-point left, right, and
+  420-by-136 points on the measured notch, and use 12-point left, right, and
   bottom outer spacing.
+- [x] Keep the collapsed agent icon at 22 points so its top, outer, and bottom
+  spacing remains exactly eight points with no physical-notch-side padding.
+- [x] Replace the hover row with always-present, labeled `Folders`, `Agents`, and
+  `Status` glass capsules. Give each capsule a 124-point width, keep 12-point
+  gaps, and resize one through three folder or agent segments to 120, 60, or 40
+  points so their hit, hover, and selection areas fill the reserved width. Three
+  groups plus gaps and outer insets fit the 420-point shell exactly.
+- [x] Change agent controls from immediate launch actions to single-selection
+  toggles using the folder selection treatment. Keep the selected agent for the
+  app session across hover and expanded transitions until toggled off, and clear
+  it if that agent is disabled.
+- [x] Center the 22-point Rose Three mark and static status word inside the
+  Status capsule with no extra ring. Put a plain 396-by-36-point primary action
+  four points below the full three-group row so its label is vertically centered
+  in the remaining lower band. Add a downward chevron, dim the resting label,
+  and bring it to full brightness over a subtle full-width bottom gradient on
+  hover. Keep 12-point horizontal spacing and the 136-point shell height.
+- [x] Make the primary action session-aware. A running terminal always expands
+  the current session and reads `Expand`, `Expand Codex`, or `Expand Claude`.
+  With no running terminal, use `Launch <agent>` for a selected agent or
+  `Expand` without one, appending `in <preset label>` for a selected folder and
+  starting the new terminal or agent in that folder.
+- [x] Add a top-right hover restart control matching the expanded header. Show
+  it only for a running terminal, align its outer right edge with the Status
+  capsule, cancel any pending launch, restart without expanding, and clear both
+  hover selections when invoked.
+- [x] Extend each selected segment's colored underlay five points beyond its
+  segment width—two points more than the previous backing—and use the full
+  36-point capsule height so more color refracts into neighboring glass.
   Evidence: `AgentStatusIndicatorStyleTests`, `IslandMetricsTests`, and
   `TerminalSessionTests` passed in the full suite on 2026-07-14; the tests cover
   geometry, motion/color/label mapping, Reduce Motion, and process-exit cleanup.
+  `AgentLauncherTests` also cover selection, disabled-agent cleanup, and
+  session-aware Expand/Launch resolution and dynamic labels, while
+  `IslandMetricsTests` lock the three-group 420-point equation and 136-point
+  hover height. The refreshed layout still awaits the user's live visual and
+  interaction approval.
   A live Release harness on Mac16,7 verified blank Ready, Codex Ready/Working/
   Waiting, Claude Ready, real Codex process-exit cleanup, and the unchanged
   expanded terminal. The temporary startup seam and shell wrappers were removed,
@@ -306,7 +344,7 @@ Depends on: Track 3
 Exit gate:
 
 - [ ] Ready, working, and waiting plus Codex/Claude identity remain recognizable
-  in collapsed and hover states at the approved 280-by-38 and 420-by-104 shell
+  in collapsed and hover states at the approved 280-by-38 and 420-by-136 shell
   dimensions.
 - [x] No external loader source, package, or copied implementation is present.
 - [ ] Idle CPU returns to baseline after agent activity stops.

@@ -162,12 +162,12 @@ final class AgentPresetStoreTests: XCTestCase {
 
 final class IslandMetricsTests: XCTestCase {
     func testHoverHeightPlacesControlsDirectlyBelowPhysicalNotch() {
-        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 38), 104)
+        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 38), 136)
     }
 
     func testHoverHeightUsesMinimumForShortOrMissingNotch() {
-        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 0), 104)
-        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 20), 104)
+        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 0), 136)
+        XCTAssertEqual(IslandMetrics.hoverHeight(forNotchHeight: 20), 136)
     }
 
     func testCompactMarksTouchPhysicalNotchWithEqualVisibleSpacing() {
@@ -179,6 +179,42 @@ final class IslandMetricsTests: XCTestCase {
         XCTAssertEqual(visibleSpacing, 8)
         XCTAssertEqual(verticalSpacing, visibleSpacing)
         XCTAssertEqual(IslandMetrics.hoverControlOuterPadding, 12)
+    }
+
+    func testThreeEqualHoverGroupsFitTheApprovedWidth() {
+        let expectedGroupWidth = IslandMetrics.notchControlWidth * 3
+            + IslandMetrics.notchCapsuleGroupInset * 2
+        let totalWidth = IslandMetrics.notchCapsuleGroupWidth * 3
+            + IslandMetrics.hoverControlGroupSpacing * 2
+            + IslandMetrics.hoverControlOuterPadding * 2
+
+        XCTAssertEqual(IslandMetrics.notchCapsuleGroupWidth, expectedGroupWidth)
+        XCTAssertEqual(totalWidth, IslandMetrics.hoverFallbackSize.width)
+        XCTAssertEqual(
+            IslandMetrics.hoverPrimaryActionWidth,
+            IslandMetrics.notchCapsuleGroupWidth * 3
+                + IslandMetrics.hoverControlGroupSpacing * 2
+        )
+        XCTAssertEqual(IslandMetrics.hoverPrimaryActionHeight, 36)
+        XCTAssertEqual(IslandMetrics.hoverPrimaryActionSpacing, 4)
+        XCTAssertEqual(IslandMetrics.hoverPrimaryActionBottomPadding, 4)
+    }
+
+    func testSelectorSegmentsFillTheCapsuleContentWidth() {
+        XCTAssertEqual(IslandMetrics.notchSegmentWidth(itemCount: 0), 120)
+        XCTAssertEqual(IslandMetrics.notchSegmentWidth(itemCount: 1), 120)
+        XCTAssertEqual(IslandMetrics.notchSegmentWidth(itemCount: 2), 60)
+        XCTAssertEqual(IslandMetrics.notchSegmentWidth(itemCount: 3), 40)
+        XCTAssertEqual(
+            IslandMetrics.notchSegmentWidth(itemCount: 2)
+                + IslandMetrics.notchSelectionBackingExtraWidth,
+            65
+        )
+        XCTAssertEqual(
+            IslandMetrics.notchControlHeight
+                + IslandMetrics.notchSelectionBackingExtraHeight,
+            36
+        )
     }
 }
 
@@ -216,7 +252,6 @@ final class AgentStatusIndicatorStyleTests: XCTestCase {
 
         XCTAssertEqual(start.x, end.x, accuracy: 0.0001)
         XCTAssertEqual(start.y, end.y, accuracy: 0.0001)
-
         for index in 0...RoseThreeGeometry.sampleCount {
             let point = RoseThreeGeometry.point(
                 at: Double(index) / Double(RoseThreeGeometry.sampleCount),
@@ -244,6 +279,7 @@ final class AgentStatusIndicatorStyleTests: XCTestCase {
             RoseThreeGeometry.particleScale(index: RoseThreeGeometry.particleCount - 1),
             0.1
         )
+        XCTAssertEqual(RoseThreeGeometry.activeGuideOpacity, 0.24)
     }
 }
 

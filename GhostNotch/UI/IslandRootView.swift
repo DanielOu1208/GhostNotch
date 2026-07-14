@@ -55,8 +55,11 @@ struct IslandRootView: View {
             presetStore: controller.agentPresetStore,
             isHovering: controller.compactPresentationState == .hover,
             selectedDirectoryPresetID: controller.selectedLaunchDirectoryPresetID,
+            selectedAgentID: controller.selectedLaunchAgentID,
             onSelectDirectory: controller.selectLaunchDirectory,
-            onLaunchAgent: controller.launchAgent
+            onSelectAgent: controller.selectLaunchAgent,
+            onPrimaryAction: controller.performHoverPrimaryAction,
+            onReset: controller.resetTerminalFromHover
         )
     }
 
@@ -85,6 +88,8 @@ private struct NotchControlStyle: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
 
+    let width: CGFloat
+
     func body(content: Content) -> some View {
         content
             .buttonStyle(.plain)
@@ -92,7 +97,7 @@ private struct NotchControlStyle: ViewModifier {
                 if isHovering {
                     Color.clear
                         .frame(
-                            width: IslandMetrics.notchControlWidth - IslandMetrics.notchCapsuleGroupInset * 2,
+                            width: width - IslandMetrics.notchCapsuleGroupInset * 2,
                             height: IslandMetrics.notchControlHeight - IslandMetrics.notchCapsuleGroupInset * 2
                         )
                         .glassEffect(
@@ -109,8 +114,8 @@ private struct NotchControlStyle: ViewModifier {
 }
 
 extension View {
-    func notchControlStyle() -> some View {
-        modifier(NotchControlStyle())
+    func notchControlStyle(width: CGFloat = IslandMetrics.notchControlWidth) -> some View {
+        modifier(NotchControlStyle(width: width))
     }
 
     func notchCapsuleGroupStyle() -> some View {

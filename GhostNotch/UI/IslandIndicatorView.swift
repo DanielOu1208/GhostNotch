@@ -7,11 +7,16 @@ struct IslandIndicatorView: View {
     @ObservedObject var sessionState: TerminalSessionState
     @ObservedObject var presetStore: AgentPresetStore
     @Namespace private var directorySelectionNamespace
+    @Namespace private var agentSelectionNamespace
+    @State private var isPrimaryActionHovering = false
 
     let isHovering: Bool
     let selectedDirectoryPresetID: AgentLaunchDirectoryPreset.ID?
+    let selectedAgentID: AgentLauncher.ID?
     let onSelectDirectory: (AgentLaunchDirectoryPreset) -> Void
-    let onLaunchAgent: (AgentLauncher) -> Void
+    let onSelectAgent: (AgentLauncher) -> Void
+    let onPrimaryAction: () -> Void
+    let onReset: () -> Void
 
     var body: some View {
         ZStack {
@@ -26,6 +31,11 @@ struct IslandIndicatorView: View {
             if !isHovering {
                 collapsedAgentLogoLayer
                     .transition(collapsedAgentTransition)
+            }
+        }
+        .onChange(of: isHovering) { _, isHovering in
+            if !isHovering {
+                isPrimaryActionHovering = false
             }
         }
     }
@@ -195,46 +205,67 @@ struct IslandIndicatorView: View {
         let directoryPresets = visibleDirectoryPresets
         let enabledLaunchers = presetStore.enabledLaunchers
 
-        return HStack(alignment: .bottom, spacing: 0) {
-            hoverStatus
-                .layoutPriority(1)
+        return ZStack(alignment: .topTrailing) {
+            if isPrimaryActionHovering {
+                LinearGradient(
+                    colors: [.clear, .primary.opacity(0.12)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .transition(.opacity)
+                .allowsHitTesting(false)
+            }
 
-            Spacer(minLength: 8)
-
-            HStack(alignment: .bottom, spacing: 12) {
-                if !directoryPresets.isEmpty {
-                    VStack(spacing: IslandMetrics.hoverControlLabelSpacing) {
-                        Text("Folders")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .frame(height: IslandMetrics.hoverControlLabelHeight)
-
+            VStack(spacing: IslandMetrics.hoverPrimaryActionSpacing) {
+                HStack(alignment: .bottom, spacing: IslandMetrics.hoverControlGroupSpacing) {
+                    hoverControlGroup("Folders") {
                         directoryPresetControls(directoryPresets)
                     }
-                }
 
-                if !enabledLaunchers.isEmpty {
-                    VStack(spacing: IslandMetrics.hoverControlLabelSpacing) {
-                        Text("Agents")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .frame(height: IslandMetrics.hoverControlLabelHeight)
+                    hoverControlGroup("Agents") {
+                        agentControls(enabledLaunchers)
+                    }
 
-                        HStack(alignment: .center, spacing: 0) {
-                            ForEach(enabledLaunchers) { launcher in
-                                AgentLauncherButton(launcher: launcher) {
-                                    onLaunchAgent(launcher)
-                                }
-                            }
-                        }
-                        .notchCapsuleGroupStyle()
+                    hoverControlGroup("Status") {
+                        hoverStatus
                     }
                 }
+
+                hoverPrimaryAction
+            }
+            .padding(.horizontal, IslandMetrics.hoverControlOuterPadding)
+            .padding(.bottom, IslandMetrics.hoverPrimaryActionBottomPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+
+            if sessionState.isRunning {
+                hoverResetButton
+                    .padding(.top, 2)
+                    .padding(.trailing, IslandMetrics.hoverControlOuterPadding)
+                    .transition(.opacity)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .padding(.horizontal, IslandMetrics.hoverControlOuterPadding)
-        .padding(.bottom, IslandMetrics.hoverControlOuterPadding)
+        .animation(
+            reduceMotion ? nil : .easeOut(duration: 0.18),
+            value: isPrimaryActionHovering
+        )
+    }
+
+    private func hoverControlGroup<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(spacing: IslandMetrics.hoverControlLabelSpacing) {
+            Text(title)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(height: IslandMetrics.hoverControlLabelHeight)
+
+            content()
+        }
+        .frame(width: IslandMetrics.notchCapsuleGroupWidth)
     }
 
     private var visibleDirectoryPresets: [AgentLaunchDirectoryPreset] {
@@ -248,9 +279,18 @@ struct IslandIndicatorView: View {
     private func directoryPresetControls(
         _ directoryPresets: [AgentLaunchDirectoryPreset]
     ) -> some View {
-        ZStack {
+        let segmentWidth = IslandMetrics.notchSegmentWidth(itemCount: directoryPresets.count)
+
+        return ZStack {
             if !reduceTransparency {
-                directorySelectionLayer(directoryPresets, usesOpaqueGlass: false)
+                selectionLayer(
+                    ids: directoryPresets.map(\.id),
+                    selectedID: selectedDirectoryPresetID,
+                    namespace: directorySelectionNamespace,
+                    effectID: "directory-selection",
+                    segmentWidth: segmentWidth,
+                    usesOpaqueGlass: false
+                )
                     .padding(IslandMetrics.notchCapsuleGroupInset)
             }
 
@@ -261,15 +301,24 @@ struct IslandIndicatorView: View {
                         isSelected: preset.id == selectedDirectoryPresetID,
                         selectionColor: directorySelectionColor,
                         selectionNamespace: directorySelectionNamespace,
-                        selectionTransition: directorySelectionTransition
+                        selectionTransition: directorySelectionTransition,
+                        width: segmentWidth
                     ) {
                         onSelectDirectory(preset)
                     }
                 }
             }
+            .frame(width: IslandMetrics.notchCapsuleContentWidth)
             .background {
                 if reduceTransparency {
-                    directorySelectionLayer(directoryPresets, usesOpaqueGlass: true)
+                    selectionLayer(
+                        ids: directoryPresets.map(\.id),
+                        selectedID: selectedDirectoryPresetID,
+                        namespace: directorySelectionNamespace,
+                        effectID: "directory-selection",
+                        segmentWidth: segmentWidth,
+                        usesOpaqueGlass: true
+                    )
                 }
             }
             .notchCapsuleGroupStyle()
@@ -277,33 +326,38 @@ struct IslandIndicatorView: View {
         .animation(directorySelectionAnimation, value: selectedDirectoryPresetID)
     }
 
-    private func directorySelectionLayer(
-        _ directoryPresets: [AgentLaunchDirectoryPreset],
+    private func selectionLayer<ID: Hashable>(
+        ids: [ID],
+        selectedID: ID?,
+        namespace: Namespace.ID,
+        effectID: String,
+        segmentWidth: CGFloat,
         usesOpaqueGlass: Bool
     ) -> some View {
         HStack(spacing: 0) {
-            ForEach(directoryPresets) { preset in
+            ForEach(ids, id: \.self) { id in
                 ZStack {
-                    if preset.id == selectedDirectoryPresetID {
-                        directorySelectionCapsule(usesOpaqueGlass: usesOpaqueGlass)
+                    if id == selectedID {
+                        selectionCapsule(
+                            width: segmentWidth,
+                            usesOpaqueGlass: usesOpaqueGlass
+                        )
                             .matchedGeometryEffect(
-                                id: usesOpaqueGlass ? "opaque-directory-selection" : "directory-selection",
-                                in: directorySelectionNamespace
+                                id: usesOpaqueGlass ? "opaque-\(effectID)" : effectID,
+                                in: namespace
                             )
                             .transition(directorySelectionTransition)
                     }
                 }
-                .frame(
-                    width: IslandMetrics.notchControlWidth,
-                    height: IslandMetrics.notchControlHeight
-                )
+                .frame(width: segmentWidth, height: IslandMetrics.notchControlHeight)
             }
         }
+        .frame(width: IslandMetrics.notchCapsuleContentWidth)
         .allowsHitTesting(false)
     }
 
     @ViewBuilder
-    private func directorySelectionCapsule(usesOpaqueGlass: Bool) -> some View {
+    private func selectionCapsule(width: CGFloat, usesOpaqueGlass: Bool) -> some View {
         Group {
             if usesOpaqueGlass {
                 Color.clear
@@ -318,8 +372,9 @@ struct IslandIndicatorView: View {
             }
         }
         .frame(
-            width: IslandMetrics.notchControlWidth + IslandMetrics.notchCapsuleGroupInset + 1,
-            height: IslandMetrics.notchControlHeight + IslandMetrics.notchCapsuleGroupInset + 1
+            width: width + IslandMetrics.notchSelectionBackingExtraWidth,
+            height: IslandMetrics.notchControlHeight
+                + IslandMetrics.notchSelectionBackingExtraHeight
         )
     }
 
@@ -335,6 +390,54 @@ struct IslandIndicatorView: View {
         .opacity.animation(.easeOut(duration: reduceMotion ? 0.08 : 0.12))
     }
 
+    private func agentControls(_ launchers: [AgentLauncher]) -> some View {
+        let segmentWidth = IslandMetrics.notchSegmentWidth(itemCount: launchers.count)
+
+        return ZStack {
+            if !reduceTransparency {
+                selectionLayer(
+                    ids: launchers.map(\.id),
+                    selectedID: selectedAgentID,
+                    namespace: agentSelectionNamespace,
+                    effectID: "agent-selection",
+                    segmentWidth: segmentWidth,
+                    usesOpaqueGlass: false
+                )
+                .padding(IslandMetrics.notchCapsuleGroupInset)
+            }
+
+            HStack(alignment: .center, spacing: 0) {
+                ForEach(launchers) { launcher in
+                    AgentLauncherButton(
+                        launcher: launcher,
+                        isSelected: launcher.id == selectedAgentID,
+                        selectionColor: directorySelectionColor,
+                        selectionNamespace: agentSelectionNamespace,
+                        selectionTransition: directorySelectionTransition,
+                        width: segmentWidth
+                    ) {
+                        onSelectAgent(launcher)
+                    }
+                }
+            }
+            .frame(width: IslandMetrics.notchCapsuleContentWidth)
+            .background {
+                if reduceTransparency {
+                    selectionLayer(
+                        ids: launchers.map(\.id),
+                        selectedID: selectedAgentID,
+                        namespace: agentSelectionNamespace,
+                        effectID: "agent-selection",
+                        segmentWidth: segmentWidth,
+                        usesOpaqueGlass: true
+                    )
+                }
+            }
+            .notchCapsuleGroupStyle()
+        }
+        .animation(directorySelectionAnimation, value: selectedAgentID)
+    }
+
     private var hoverStatus: some View {
         HStack(alignment: .center, spacing: 4) {
             RoseThreeStatusIndicator(
@@ -342,25 +445,127 @@ struct IslandIndicatorView: View {
                 reducesMotion: reduceMotion
             )
 
-            Text(
-                AgentStatusIndicatorStyle.style(
-                    for: renderedAgentActivityState,
-                    reducesMotion: reduceMotion
-                ).label
-            )
+            Text(statusLabel)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
         }
-        .frame(height: IslandMetrics.notchControlHeight, alignment: .center)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            AgentStatusIndicatorStyle.style(
-                for: renderedAgentActivityState,
-                reducesMotion: reduceMotion
-            ).label
+        .frame(
+            width: IslandMetrics.notchCapsuleContentWidth,
+            height: IslandMetrics.notchControlHeight
         )
+        .notchCapsuleGroupStyle()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(statusLabel)
+    }
+
+    private var hoverPrimaryAction: some View {
+        Button(action: onPrimaryAction) {
+            HStack(spacing: 4) {
+                Text(primaryActionTitle)
+                    .lineLimit(1)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.primary.opacity(isPrimaryActionHovering ? 1 : 0.72))
+            .frame(
+                width: IslandMetrics.hoverPrimaryActionWidth,
+                height: IslandMetrics.hoverPrimaryActionHeight
+            )
+            .contentShape(Rectangle())
+        }
+        .frame(
+            width: IslandMetrics.hoverPrimaryActionWidth,
+            height: IslandMetrics.hoverPrimaryActionHeight
+        )
+        .buttonStyle(.plain)
+        .onHover { isPrimaryActionHovering = $0 }
+        .accessibilityLabel(primaryActionTitle)
+        .help(primaryActionHelp)
+    }
+
+    private var hoverResetButton: some View {
+        Button(action: onReset) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.primary)
+                .frame(
+                    width: IslandMetrics.notchControlWidth,
+                    height: IslandMetrics.notchControlHeight
+                )
+                .contentShape(Capsule())
+        }
+        .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
+        .notchControlStyle()
+        .notchCapsuleGroupStyle()
+        .accessibilityLabel("Restart terminal and clear launch selections")
+        .help("Restart terminal and clear launch selections")
+    }
+
+    private var statusLabel: String {
+        statusStyle.label
+    }
+
+    private var statusStyle: AgentStatusIndicatorStyle {
+        AgentStatusIndicatorStyle.style(
+            for: renderedAgentActivityState,
+            reducesMotion: reduceMotion
+        )
+    }
+
+    private var selectedLauncher: AgentLauncher? {
+        presetStore.enabledLaunchers.first { $0.id == selectedAgentID }
+    }
+
+    private var primaryActionTitle: String {
+        primaryAction.title(
+            agentName: primaryActionAgentName,
+            directoryName: sessionState.isRunning ? nil : selectedDirectoryName
+        )
+    }
+
+    private var primaryAction: HoverPrimaryAction {
+        HoverPrimaryAction.resolve(
+            isTerminalRunning: sessionState.isRunning,
+            selectedAgentID: selectedAgentID,
+            enabledAgentIDs: presetStore.enabledAgentIDs
+        )
+    }
+
+    private var primaryActionAgentName: String? {
+        switch primaryAction {
+        case .expand:
+            guard sessionState.isRunning else {
+                return nil
+            }
+            return activeAgentDisplayName
+        case .launch:
+            return selectedLauncher?.displayName
+        }
+    }
+
+    private var activeAgentDisplayName: String? {
+        switch sessionState.activeAgent {
+        case .codex:
+            AgentLauncher.codex.displayName
+        case .claude:
+            AgentLauncher.claude.displayName
+        case .unknown, nil:
+            nil
+        }
+    }
+
+    private var selectedDirectoryName: String? {
+        visibleDirectoryPresets
+            .first { $0.id == selectedDirectoryPresetID }?
+            .displayLabel
+    }
+
+    private var primaryActionHelp: String {
+        primaryActionTitle
     }
 }
 
@@ -370,6 +575,7 @@ private struct DirectoryPresetButton: View {
     let selectionColor: Color
     let selectionNamespace: Namespace.ID
     let selectionTransition: AnyTransition
+    let width: CGFloat
     let action: () -> Void
 
     var body: some View {
@@ -379,7 +585,7 @@ private struct DirectoryPresetButton: View {
                     Capsule()
                         .fill(selectionColor)
                         .frame(
-                            width: IslandMetrics.notchControlWidth
+                            width: width
                                 - IslandMetrics.notchCapsuleGroupInset * 2,
                             height: IslandMetrics.notchControlHeight
                                 - IslandMetrics.notchCapsuleGroupInset * 2
@@ -397,11 +603,11 @@ private struct DirectoryPresetButton: View {
                     .minimumScaleFactor(0.85)
                     .foregroundStyle(.primary)
             }
-            .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
+            .frame(width: width, height: IslandMetrics.notchControlHeight)
             .contentShape(Capsule())
         }
-        .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
-        .notchControlStyle()
+        .frame(width: width, height: IslandMetrics.notchControlHeight)
+        .notchControlStyle(width: width)
         .accessibilityLabel("Use \(preset.displayLabel) folder")
         .help("\(preset.displayLabel) - \(preset.path)")
     }
@@ -417,23 +623,46 @@ private struct DirectoryPresetButton: View {
 
 private struct AgentLauncherButton: View {
     let launcher: AgentLauncher
+    let isSelected: Bool
+    let selectionColor: Color
+    let selectionNamespace: Namespace.ID
+    let selectionTransition: AnyTransition
+    let width: CGFloat
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(launcher.assetName)
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(.primary)
-                .frame(width: 17, height: 17)
-                .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
-                .contentShape(Capsule())
+            ZStack {
+                if isSelected {
+                    Capsule()
+                        .fill(selectionColor)
+                        .frame(
+                            width: width
+                                - IslandMetrics.notchCapsuleGroupInset * 2,
+                            height: IslandMetrics.notchControlHeight
+                                - IslandMetrics.notchCapsuleGroupInset * 2
+                        )
+                        .matchedGeometryEffect(
+                            id: "foreground-agent-selection",
+                            in: selectionNamespace
+                        )
+                        .transition(selectionTransition)
+                }
+
+                Image(launcher.assetName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(.primary)
+                    .frame(width: 17, height: 17)
+            }
+            .frame(width: width, height: IslandMetrics.notchControlHeight)
+            .contentShape(Capsule())
         }
-        .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
-        .notchControlStyle()
-        .accessibilityLabel(launcher.accessibilityLabel)
-        .help(launcher.helpText)
+        .frame(width: width, height: IslandMetrics.notchControlHeight)
+        .notchControlStyle(width: width)
+        .accessibilityLabel("\(isSelected ? "Deselect" : "Select") \(launcher.displayName)")
+        .help("\(isSelected ? "Deselect" : "Select") \(launcher.displayName)")
     }
 }
 
@@ -446,14 +675,7 @@ private struct RoseThreeStatusIndicator: View {
     }
 
     private var color: Color {
-        switch style.colorRole {
-        case .ready:
-            Color(nsColor: .systemGreen)
-        case .working:
-            .primary
-        case .waiting:
-            Color(nsColor: .systemBlue)
-        }
+        style.colorRole.color
     }
 
     var body: some View {
@@ -485,7 +707,7 @@ private struct RoseThreeStatusIndicator: View {
     ) {
         context.stroke(
             RoseThreeGeometry.path(in: size),
-            with: .color(color.opacity(0.12)),
+            with: .color(color.opacity(RoseThreeGeometry.activeGuideOpacity)),
             style: StrokeStyle(lineWidth: 0.6, lineCap: .round, lineJoin: .round)
         )
 
@@ -506,6 +728,19 @@ private struct RoseThreeStatusIndicator: View {
                 )
             )
             context.fill(particle, with: .color(color.opacity(scale)))
+        }
+    }
+}
+
+private extension AgentStatusIndicatorStyle.ColorRole {
+    var color: Color {
+        switch self {
+        case .ready:
+            Color(nsColor: .systemGreen)
+        case .working:
+            .primary
+        case .waiting:
+            Color(nsColor: .systemBlue)
         }
     }
 }

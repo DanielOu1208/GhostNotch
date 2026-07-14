@@ -12,9 +12,74 @@ final class AgentLauncherTests: XCTestCase {
         XCTAssertEqual(AgentLauncher.claude.commandLine, "claude\n")
         XCTAssertEqual(AgentLauncher.codex.assetName, "OpenAILogo")
         XCTAssertEqual(AgentLauncher.claude.assetName, "ClaudeLogo")
-        XCTAssertFalse(AgentLauncher.codex.accessibilityLabel.isEmpty)
-        XCTAssertFalse(AgentLauncher.claude.accessibilityLabel.isEmpty)
-        XCTAssertFalse(AgentLauncher.codex.helpText.isEmpty)
-        XCTAssertFalse(AgentLauncher.claude.helpText.isEmpty)
+    }
+
+    func testAgentSelectionTogglesReplacesAndValidates() {
+        XCTAssertEqual(
+            AgentLauncherSelection.toggled(currentSelection: nil, selectedID: .codex),
+            .codex
+        )
+        XCTAssertNil(
+            AgentLauncherSelection.toggled(currentSelection: .codex, selectedID: .codex)
+        )
+        XCTAssertEqual(
+            AgentLauncherSelection.toggled(currentSelection: .codex, selectedID: .claude),
+            .claude
+        )
+        XCTAssertNil(AgentLauncherSelection.validated(.claude, enabledIDs: [.codex]))
+    }
+
+    func testHoverPrimaryActionPrioritizesRunningTerminalAndRequiresValidSelectionToLaunch() {
+        XCTAssertEqual(
+            HoverPrimaryAction.resolve(
+                isTerminalRunning: true,
+                selectedAgentID: .codex,
+                enabledAgentIDs: [.codex]
+            ),
+            .expand
+        )
+        XCTAssertEqual(
+            HoverPrimaryAction.resolve(
+                isTerminalRunning: false,
+                selectedAgentID: nil,
+                enabledAgentIDs: [.codex]
+            ),
+            .expand
+        )
+        XCTAssertEqual(
+            HoverPrimaryAction.resolve(
+                isTerminalRunning: false,
+                selectedAgentID: .claude,
+                enabledAgentIDs: [.codex]
+            ),
+            .expand
+        )
+        XCTAssertEqual(
+            HoverPrimaryAction.resolve(
+                isTerminalRunning: false,
+                selectedAgentID: .claude,
+                enabledAgentIDs: [.codex, .claude]
+            ),
+            .launch(.claude)
+        )
+    }
+
+    func testHoverPrimaryActionTitlesIncludeAgentAndSelectedDirectory() {
+        XCTAssertEqual(HoverPrimaryAction.expand.title(), "Expand")
+        XCTAssertEqual(
+            HoverPrimaryAction.expand.title(agentName: "Codex"),
+            "Expand Codex"
+        )
+        XCTAssertEqual(
+            HoverPrimaryAction.expand.title(directoryName: "GhostNotch"),
+            "Expand in GhostNotch"
+        )
+        XCTAssertEqual(
+            HoverPrimaryAction.launch(.claude).title(
+                agentName: "Claude",
+                directoryName: "Website"
+            ),
+            "Launch Claude in Website"
+        )
     }
 }

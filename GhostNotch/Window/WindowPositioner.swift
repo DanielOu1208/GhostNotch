@@ -5,13 +5,22 @@ import SwiftUI
 struct IslandMetrics {
     static let physicalNotchReferenceWidth: CGFloat = 220
     static let collapsedFallbackSize = NSSize(width: 280, height: 38)
-    static let hoverFallbackSize = NSSize(width: 420, height: 104)
+    static let hoverFallbackSize = NSSize(width: 420, height: 136)
     static let expandedSize = NSSize(width: 822.8, height: 562)
-    static let minimumHoverHeight: CGFloat = 104
+    static let minimumHoverHeight: CGFloat = 136
     static let compactMarkSize: CGFloat = 22
     static let notchControlWidth: CGFloat = 40
     static let notchControlHeight: CGFloat = 32
     static let notchCapsuleGroupInset: CGFloat = 2
+    static let notchCapsuleContentWidth: CGFloat = 120
+    static let notchCapsuleGroupWidth = notchCapsuleContentWidth + notchCapsuleGroupInset * 2
+    static let notchSelectionBackingExtraWidth: CGFloat = 5
+    static let notchSelectionBackingExtraHeight: CGFloat = 4
+    static let hoverControlGroupSpacing: CGFloat = 12
+    static let hoverPrimaryActionWidth = notchCapsuleGroupWidth * 3 + hoverControlGroupSpacing * 2
+    static let hoverPrimaryActionHeight: CGFloat = 36
+    static let hoverPrimaryActionSpacing: CGFloat = 4
+    static let hoverPrimaryActionBottomPadding: CGFloat = 4
     static let hoverControlLabelHeight: CGFloat = 14
     static let hoverControlLabelSpacing: CGFloat = 4
     static let hoverControlOuterPadding: CGFloat = 12
@@ -26,6 +35,10 @@ struct IslandMetrics {
 
     static var hoverSize: NSSize {
         hoverSize(on: WindowPositioner.notchScreen)
+    }
+
+    static func notchSegmentWidth(itemCount: Int) -> CGFloat {
+        notchCapsuleContentWidth / CGFloat(max(itemCount, 1))
     }
 
     static func collapsedSize(on screen: NSScreen) -> NSSize {
@@ -47,7 +60,9 @@ struct IslandMetrics {
                 + hoverControlLabelSpacing
                 + notchControlHeight
                 + notchCapsuleGroupInset * 2
-                + hoverControlOuterPadding
+                + hoverPrimaryActionSpacing
+                + hoverPrimaryActionHeight
+                + hoverPrimaryActionBottomPadding
         )
     }
 
@@ -79,6 +94,7 @@ struct IslandMetrics {
 enum RoseThreeGeometry {
     static let particleCount = 18
     static let maximumParticleDiameter: CGFloat = 1.5
+    static let activeGuideOpacity = 0.24
     static let trailSpan = 0.34
     static let loopDuration: TimeInterval = 1.8
     static let sampleCount = 96

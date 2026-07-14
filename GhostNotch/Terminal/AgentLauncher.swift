@@ -10,8 +10,6 @@ struct AgentLauncher: Identifiable, Equatable, Sendable {
     let command: String
     let displayName: String
     let assetName: String
-    let accessibilityLabel: String
-    let helpText: String
 
     var commandLine: String {
         "\(command)\n"
@@ -21,18 +19,14 @@ struct AgentLauncher: Identifiable, Equatable, Sendable {
         id: .codex,
         command: "codex",
         displayName: "Codex",
-        assetName: "OpenAILogo",
-        accessibilityLabel: "Launch Codex",
-        helpText: "Launch Codex"
+        assetName: "OpenAILogo"
     )
 
     static let claude = AgentLauncher(
         id: .claude,
         command: "claude",
         displayName: "Claude",
-        assetName: "ClaudeLogo",
-        accessibilityLabel: "Launch Claude",
-        helpText: "Launch Claude"
+        assetName: "ClaudeLogo"
     )
 
     static let all: [AgentLauncher] = [
@@ -44,5 +38,50 @@ struct AgentLauncher: Identifiable, Equatable, Sendable {
         enabledIDs.compactMap { enabledID in
             all.first { $0.id == enabledID }
         }
+    }
+}
+
+enum AgentLauncherSelection {
+    static func toggled(
+        currentSelection: AgentLauncher.ID?,
+        selectedID: AgentLauncher.ID
+    ) -> AgentLauncher.ID? {
+        currentSelection == selectedID ? nil : selectedID
+    }
+
+    static func validated(
+        _ selection: AgentLauncher.ID?,
+        enabledIDs: [AgentLauncher.ID]
+    ) -> AgentLauncher.ID? {
+        selection.flatMap { enabledIDs.contains($0) ? $0 : nil }
+    }
+}
+
+enum HoverPrimaryAction: Equatable {
+    case expand
+    case launch(AgentLauncher.ID)
+
+    static func resolve(
+        isTerminalRunning: Bool,
+        selectedAgentID: AgentLauncher.ID?,
+        enabledAgentIDs: [AgentLauncher.ID]
+    ) -> HoverPrimaryAction {
+        guard !isTerminalRunning,
+              let selectedAgentID,
+              enabledAgentIDs.contains(selectedAgentID) else {
+            return .expand
+        }
+        return .launch(selectedAgentID)
+    }
+
+    func title(agentName: String? = nil, directoryName: String? = nil) -> String {
+        let action = switch self {
+        case .expand:
+            agentName.map { "Expand \($0)" } ?? "Expand"
+        case .launch:
+            agentName.map { "Launch \($0)" } ?? "Launch"
+        }
+
+        return directoryName.map { "\(action) in \($0)" } ?? action
     }
 }
