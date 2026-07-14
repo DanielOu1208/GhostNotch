@@ -190,13 +190,15 @@ Depends on: Track 2
   2026-07-13 rejected its linear-feeling window resize and transient top gap.
 - [x] Use a 0.34-second system spring for collapsed→hover, matching the spring
   to expanded after live review found 0.22 seconds too fast. Keep 0.18 seconds
-  for hover→collapsed and a 0.22-second ease-out close. Both opening springs use
-  a 0.78 damping ratio and approximately 2% overshoot; content glides without
-  bouncing.
+  for hover→collapsed and a 0.22-second ease-out close. Opening height and the
+  full expansion use a 0.78 damping ratio and approximately 2% overshoot. Drive
+  collapsed→hover width and height with that same spring so the shell grows as
+  one centered shape.
 - [x] Fade outgoing content in the first 35%; start hover controls and expanded
   header content at 25%, and terminal content at 35%. Hover controls use pure
-  opacity with no vertical travel. On close, return compact content during the
-  final 25% and finish it at shell settlement.
+  opacity with no positional jump. Fade both compact marks out together. On
+  close, return compact content during the final 25% and finish it at shell
+  settlement.
 - [x] Implement immediate hover entry and a cancelable 0.04-second exit grace.
   Re-entry must cancel collapse without a visible jump.
 - [x] Include the exact top screen edge in the shared hover entry/exit hit test;
@@ -204,6 +206,9 @@ Depends on: Track 2
 - [x] Keep a root-level expand target active during compact transitions while
   child hover controls remain locked, so the slower hover opening never requires
   a second click.
+- [x] Defer app activation and key-panel work until collapsed→hover finishes;
+  the controls are locked during that transition, so pointer entry can start the
+  shell animation without waiting on focus work.
 - [x] Make transitions interruptible: retarget from the visible state, ignore
   stale completion callbacks, and keep the last requested state.
 - [x] Preserve `finishExpandPanelAnimation()` as the single point that marks the
@@ -211,10 +216,13 @@ Depends on: Track 2
 - [x] Replace the rejected window animator with one panel-linked
   `CADisplayLink`, sampling native `Spring.value`/`UnitCurve` progress. Remove
   the old production path and invalidate the link on retarget, completion, and
-  teardown.
+  teardown. Defer each intermediate redraw to AppKit's display cycle instead of
+  forcing synchronous layout from inside the display-link callback.
 - [x] Keep the panel as the only owner of animated window size. Configure the
   `NSHostingView` with no content-derived sizing constraints or safe-area
-  regions, and do not wrap the root state change in a second SwiftUI animation.
+  regions, host it in a plain autoresizing `NSView` so its intrinsic width
+  cannot resize the panel, and do not wrap the root state change in a second
+  SwiftUI animation.
   Evidence: after the original path triggered AppKit's Update Constraints loop,
   live hover, expand, close, and reopen completed on one process with no new
   crash report on 2026-07-13.
@@ -226,9 +234,13 @@ Depends on: Track 2
   Evidence: `IslandTransitionPlanTests` cover every state-pair duration and
   curve, both 2% spring peaks, monotonic close, top attachment through
   overshoot, Reduce Motion, close-to-hover bounds, and stale-generation
-  rejection; full `xcodebuild test` passed on 2026-07-13.
-- [x] Remove the extra main-actor scheduling turn from collapsed↔hover while
-  retaining layout staging for transitions involving expanded content.
+  rejection; full `xcodebuild test` passed again on 2026-07-14.
+- [x] Keep collapsed↔hover immediate and retain layout staging only for
+  expanded transitions. The autoresizing host container lets the mounted hover
+  layout clip to every intermediate panel frame instead of forcing its full
+  420-point width before the centered animation starts. A 2026-07-14 live
+  window-frame capture confirmed that width and centered origin now advance
+  together from the first sampled hover frame.
 - [x] Keep terminal processing active while compact, but publish render
   snapshots only while expanded content is mounted. Publish output lifecycle
   state only when its value changes and refresh the latest snapshot before

@@ -126,7 +126,11 @@ final class IslandPanelController: ObservableObject {
         let hostingView = NSHostingView(rootView: rootView.environmentObject(self))
         hostingView.sizingOptions = []
         hostingView.safeAreaRegions = []
-        panel.contentView = hostingView
+        let contentView = NSView(frame: panel.contentLayoutRect)
+        hostingView.frame = contentView.bounds
+        hostingView.autoresizingMask = [.width, .height]
+        contentView.addSubview(hostingView)
+        panel.contentView = contentView
         panel.onEscape = { [weak self] in self?.collapse() }
     }
 
@@ -379,7 +383,6 @@ final class IslandPanelController: ObservableObject {
             guard state != .hover else {
                 return
             }
-            activateHoverPanel()
             transition(to: .hover)
         } else {
             guard state == .hover else {
@@ -620,7 +623,7 @@ final class IslandPanelController: ObservableObject {
             progress: 0,
             screenFrame: screen.frame
         )
-        panel.setFrame(startFrame, display: true)
+        panel.setFrame(startFrame, display: false)
         panelFrameAnimation = PanelFrameAnimation(
             plan: plan,
             generation: generation,
@@ -647,7 +650,7 @@ final class IslandPanelController: ObservableObject {
             progress: animation.plan.progress(at: elapsedTime),
             screenFrame: animation.screenFrame
         )
-        panel.setFrame(frame, display: true)
+        panel.setFrame(frame, display: false)
 
         guard elapsedTime >= animation.plan.duration else {
             return
@@ -678,7 +681,9 @@ final class IslandPanelController: ObservableObject {
         case .expanded:
             finishExpandPanelAnimation()
         case .hover:
-            if plan.from == .expanded {
+            if plan.from == .collapsed {
+                activateHoverPanel()
+            } else if plan.from == .expanded {
                 lastHoverContainment = nil
                 refreshHoverState()
             }

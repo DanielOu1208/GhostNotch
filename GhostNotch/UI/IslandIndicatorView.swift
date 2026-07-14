@@ -84,7 +84,7 @@ struct IslandIndicatorView: View {
     private var collapsedAgentTransition: AnyTransition {
         .asymmetric(
             insertion: .opacity.animation(compactCloseAnimation),
-            removal: .identity
+            removal: .opacity.animation(collapsedExitAnimation)
         )
     }
 
