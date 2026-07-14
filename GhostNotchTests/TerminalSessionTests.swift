@@ -165,6 +165,21 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(captured.outputText, "prompt")
     }
 
+    func testHasReceivedOutputPublishesOnlyWhenItsValueChanges() {
+        let state = TerminalSessionState()
+        var publishedValues: [Bool] = []
+        let cancellable = state.$hasReceivedOutput.sink { publishedValues.append($0) }
+
+        state.appendOutput(Data("first".utf8))
+        state.appendOutput(Data("second".utf8))
+        state.clearOutput()
+        state.clearOutput()
+        state.appendOutput(Data("third".utf8))
+
+        XCTAssertEqual(publishedValues, [false, true, false, true])
+        withExtendedLifetime(cancellable) {}
+    }
+
     func testStartupTimeoutRecordsVisibleErrorAndStopsProcess() async throws {
         let state = TerminalSessionState()
         let process = FakeTerminalProcess()

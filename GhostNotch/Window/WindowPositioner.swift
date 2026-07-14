@@ -115,6 +115,10 @@ struct IslandTransitionPlan: Equatable {
     let curve: IslandTransitionCurve
     let reducesMotion: Bool
 
+    var requiresLayoutStaging: Bool {
+        from == .expanded || to == .expanded
+    }
+
     init(from: IslandState, to: IslandState, reducesMotion: Bool) {
         self.from = from
         self.to = to

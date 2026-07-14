@@ -206,6 +206,20 @@ Depends on: Track 2
   curve, both 2% spring peaks, monotonic close, top attachment through
   overshoot, Reduce Motion, close-to-hover bounds, and stale-generation
   rejection; full `xcodebuild test` passed on 2026-07-13.
+- [x] Remove the extra main-actor scheduling turn from collapsed↔hover while
+  retaining layout staging for transitions involving expanded content.
+- [x] Keep terminal processing active while compact, but publish render
+  snapshots only while expanded content is mounted. Publish output lifecycle
+  state only when its value changes and refresh the latest snapshot before
+  expanded content appears.
+- [x] Resolve valid directory presets and enabled launchers once per hover
+  render pass, without persistent caching or changes to the Track 4 status
+  indicator and trailing-period behavior.
+  Evidence: focused transition/publication tests, full `xcodebuild test`,
+  `xcodebuild analyze`, and a clean Release build passed on 2026-07-13. A live
+  Release smoke check covered launch, expand, collapse, terminal focus, and
+  hidden terminal output without a crash. Direct pointer-hover pacing remains
+  part of the performance and user-approval gates below.
 
 Exit gate:
 

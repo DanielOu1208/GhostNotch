@@ -141,25 +141,28 @@ struct IslandIndicatorView: View {
     }
 
     private var hoverIndicator: some View {
-        HStack(alignment: .bottom, spacing: 0) {
+        let directoryPresets = visibleDirectoryPresets
+        let enabledLaunchers = presetStore.enabledLaunchers
+
+        return HStack(alignment: .bottom, spacing: 0) {
             hoverStatus
                 .layoutPriority(1)
 
             Spacer(minLength: 8)
 
             HStack(alignment: .bottom, spacing: 12) {
-                if !visibleDirectoryPresets.isEmpty {
+                if !directoryPresets.isEmpty {
                     VStack(spacing: IslandMetrics.hoverControlLabelSpacing) {
                         Text("Folders")
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.secondary)
                             .frame(height: IslandMetrics.hoverControlLabelHeight)
 
-                        directoryPresetControls
+                        directoryPresetControls(directoryPresets)
                     }
                 }
 
-                if !presetStore.enabledLaunchers.isEmpty {
+                if !enabledLaunchers.isEmpty {
                     VStack(spacing: IslandMetrics.hoverControlLabelSpacing) {
                         Text("Agents")
                             .font(.caption2.weight(.medium))
@@ -167,7 +170,7 @@ struct IslandIndicatorView: View {
                             .frame(height: IslandMetrics.hoverControlLabelHeight)
 
                         HStack(alignment: .center, spacing: 0) {
-                            ForEach(presetStore.enabledLaunchers) { launcher in
+                            ForEach(enabledLaunchers) { launcher in
                                 AgentLauncherButton(launcher: launcher) {
                                     onLaunchAgent(launcher)
                                 }
@@ -191,15 +194,17 @@ struct IslandIndicatorView: View {
         )
     }
 
-    private var directoryPresetControls: some View {
+    private func directoryPresetControls(
+        _ directoryPresets: [AgentLaunchDirectoryPreset]
+    ) -> some View {
         ZStack {
             if !reduceTransparency {
-                directorySelectionLayer(usesOpaqueGlass: false)
+                directorySelectionLayer(directoryPresets, usesOpaqueGlass: false)
                     .padding(IslandMetrics.notchCapsuleGroupInset)
             }
 
             HStack(alignment: .center, spacing: 0) {
-                ForEach(visibleDirectoryPresets) { preset in
+                ForEach(directoryPresets) { preset in
                     DirectoryPresetButton(
                         preset: preset,
                         isSelected: preset.id == selectedDirectoryPresetID,
@@ -213,7 +218,7 @@ struct IslandIndicatorView: View {
             }
             .background {
                 if reduceTransparency {
-                    directorySelectionLayer(usesOpaqueGlass: true)
+                    directorySelectionLayer(directoryPresets, usesOpaqueGlass: true)
                 }
             }
             .notchCapsuleGroupStyle()
@@ -221,9 +226,12 @@ struct IslandIndicatorView: View {
         .animation(directorySelectionAnimation, value: selectedDirectoryPresetID)
     }
 
-    private func directorySelectionLayer(usesOpaqueGlass: Bool) -> some View {
+    private func directorySelectionLayer(
+        _ directoryPresets: [AgentLaunchDirectoryPreset],
+        usesOpaqueGlass: Bool
+    ) -> some View {
         HStack(spacing: 0) {
-            ForEach(visibleDirectoryPresets) { preset in
+            ForEach(directoryPresets) { preset in
                 ZStack {
                     if preset.id == selectedDirectoryPresetID {
                         directorySelectionCapsule(usesOpaqueGlass: usesOpaqueGlass)

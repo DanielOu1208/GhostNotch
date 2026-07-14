@@ -199,6 +199,31 @@ final class IslandTransitionPlanTests: XCTestCase {
         XCTAssertEqual(plan.curve, .easeOut)
     }
 
+    func testOnlyExpandedTransitionsRequireLayoutStaging() {
+        XCTAssertFalse(
+            IslandTransitionPlan(from: .collapsed, to: .hover, reducesMotion: false)
+                .requiresLayoutStaging
+        )
+        XCTAssertFalse(
+            IslandTransitionPlan(from: .hover, to: .collapsed, reducesMotion: false)
+                .requiresLayoutStaging
+        )
+
+        let stagedTransitions: [(IslandState, IslandState)] = [
+            (.collapsed, .expanded),
+            (.hover, .expanded),
+            (.expanded, .collapsed),
+            (.expanded, .hover),
+        ]
+
+        for (from, to) in stagedTransitions {
+            XCTAssertTrue(
+                IslandTransitionPlan(from: from, to: to, reducesMotion: false)
+                    .requiresLayoutStaging
+            )
+        }
+    }
+
     func testExpandedSpringStartsFastAndSettlesAfterOneSmallOvershoot() {
         let plan = IslandTransitionPlan(from: .collapsed, to: .expanded, reducesMotion: false)
         let samples = stride(from: 0.0, through: plan.duration, by: 0.001).map(plan.progress(at:))

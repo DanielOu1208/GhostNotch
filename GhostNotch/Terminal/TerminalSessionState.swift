@@ -234,7 +234,9 @@ final class TerminalSessionState: ObservableObject {
     }
 
     func appendOutput(_ data: Data) {
-        hasReceivedOutput = true
+        if !hasReceivedOutput {
+            hasReceivedOutput = true
+        }
 
         guard let outputCaptureLimit else {
             return
@@ -248,7 +250,9 @@ final class TerminalSessionState: ObservableObject {
     }
 
     func clearOutput() {
-        hasReceivedOutput = false
+        if hasReceivedOutput {
+            hasReceivedOutput = false
+        }
         capturedOutput.removeAll(keepingCapacity: true)
         resetAgentActivityState()
     }

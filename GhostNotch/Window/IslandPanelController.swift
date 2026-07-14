@@ -97,7 +97,11 @@ final class IslandPanelController: ObservableObject {
         )
 
         terminalSurfaceCoordinator.onSnapshotChange = { [weak self] snapshot in
-            self?.terminalSnapshot = snapshot
+            guard let self, self.showsExpandedContent else {
+                return
+            }
+
+            self.terminalSnapshot = snapshot
         }
 
         configurePanel()
@@ -124,6 +128,7 @@ final class IslandPanelController: ObservableObject {
         pendingHoverExitTask?.cancel()
         pendingReducedMotionCompletionTask?.cancel()
         pendingTransitionStartTask?.cancel()
+        pendingTransitionStartTask = nil
         stopPanelFrameAnimation()
         restorePreviousApplication()
         outsideClickMonitor.stop()
@@ -434,6 +439,7 @@ final class IslandPanelController: ObservableObject {
 
         pendingReducedMotionCompletionTask?.cancel()
         pendingTransitionStartTask?.cancel()
+        pendingTransitionStartTask = nil
         stopPanelFrameAnimation()
         transitionGeneration += 1
         let generation = transitionGeneration
@@ -445,13 +451,19 @@ final class IslandPanelController: ObservableObject {
         transitionPlan = plan
 
         state = newState
-
         if newState == .expanded {
+            terminalSnapshot = terminalSurfaceCoordinator.currentSnapshot()
             lastHoverContainment = nil
         } else if newState == .hover {
             lastHoverContainment = true
         } else {
             lastHoverContainment = false
+        }
+
+        guard plan.requiresLayoutStaging else {
+            animateContent(for: plan)
+            animatePanel(for: plan, generation: generation)
+            return
         }
 
         pendingTransitionStartTask = Task { @MainActor [weak self] in
