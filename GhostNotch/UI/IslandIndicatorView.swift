@@ -200,7 +200,13 @@ struct IslandIndicatorView: View {
 
             HStack(alignment: .center, spacing: 0) {
                 ForEach(visibleDirectoryPresets) { preset in
-                    DirectoryPresetButton(preset: preset) {
+                    DirectoryPresetButton(
+                        preset: preset,
+                        isSelected: preset.id == selectedDirectoryPresetID,
+                        selectionColor: directorySelectionColor,
+                        selectionNamespace: directorySelectionNamespace,
+                        selectionTransition: directorySelectionTransition
+                    ) {
                         onSelectDirectory(preset)
                     }
                 }
@@ -239,17 +245,23 @@ struct IslandIndicatorView: View {
 
     @ViewBuilder
     private func directorySelectionCapsule(usesOpaqueGlass: Bool) -> some View {
-        if usesOpaqueGlass {
-            Color.clear
-                .glassEffect(
-                    .regular.tint(directorySelectionColor),
-                    in: Capsule()
-                )
-                .clipShape(Capsule())
-        } else {
-            Capsule()
-                .fill(directorySelectionColor)
+        Group {
+            if usesOpaqueGlass {
+                Color.clear
+                    .glassEffect(
+                        .regular.tint(directorySelectionColor),
+                        in: Capsule()
+                    )
+                    .clipShape(Capsule())
+            } else {
+                Capsule()
+                    .fill(directorySelectionColor)
+            }
         }
+        .frame(
+            width: IslandMetrics.notchControlWidth + IslandMetrics.notchCapsuleGroupInset + 1,
+            height: IslandMetrics.notchControlHeight + IslandMetrics.notchCapsuleGroupInset + 1
+        )
     }
 
     private var directorySelectionColor: Color {
@@ -300,17 +312,39 @@ struct IslandIndicatorView: View {
 
 private struct DirectoryPresetButton: View {
     let preset: AgentLaunchDirectoryPreset
+    let isSelected: Bool
+    let selectionColor: Color
+    let selectionNamespace: Namespace.ID
+    let selectionTransition: AnyTransition
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(displayIcon)
-                .font(iconFont)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-                .foregroundStyle(.primary)
-                .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
-                .contentShape(Capsule())
+            ZStack {
+                if isSelected {
+                    Capsule()
+                        .fill(selectionColor)
+                        .frame(
+                            width: IslandMetrics.notchControlWidth
+                                - IslandMetrics.notchCapsuleGroupInset * 2,
+                            height: IslandMetrics.notchControlHeight
+                                - IslandMetrics.notchCapsuleGroupInset * 2
+                        )
+                        .matchedGeometryEffect(
+                            id: "foreground-directory-selection",
+                            in: selectionNamespace
+                        )
+                        .transition(selectionTransition)
+                }
+
+                Text(displayIcon)
+                    .font(iconFont)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .foregroundStyle(.primary)
+            }
+            .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
+            .contentShape(Capsule())
         }
         .frame(width: IslandMetrics.notchControlWidth, height: IslandMetrics.notchControlHeight)
         .notchControlStyle()

@@ -123,11 +123,13 @@ Depends on: Track 1
   inset it from the screen top. Keep Settings on native grouped-Form controls.
 - [x] Add clear hover, pressed, selected, disabled, and keyboard-focus states
   without changing actions or selection behavior. Use exact-size native inner
-  glass only for hover/press. Put the selected folder's 40-by-32-point system
+  glass only for hover/press. Put the selected folder's 43-by-35-point system
   blue backing, mixed 18% toward white, beneath the persistent outer glass so
-  native refraction reaches only sibling folder segments; use the same brighter
-  blue in an exact-size native tinted segment when Reduce Transparency is
-  enabled. Add no imitation glass surface or outline.
+  native refraction reaches only sibling folder segments. Add a solid
+  36-by-28-point capsule in the same blue above the outer glass and below the
+  folder icon. When Reduce Transparency is enabled, replace only the backing
+  with a 43-by-35-point native tinted glass segment. Add no imitation glass
+  surface or outline.
 - [x] Keep the opaque black shell and apply semantic label/symbol colors.
 - [x] Let native Liquid Glass respond to Reduce Transparency and Increase
   Contrast. Use semantic foregrounds and native focus/hover/press treatments;
