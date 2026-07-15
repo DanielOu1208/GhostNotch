@@ -126,6 +126,25 @@ static GNVTCellWidthRole GNVTWidthRoleFromGhosttyWide(GhosttyCellWide wide) {
     }
 }
 
+static void GNVTResetCell(GNVTCell *cell) {
+    cell->graphemeStart = 0;
+    cell->graphemeLength = 0;
+    cell->widthRole = GNVT_CELL_WIDTH_NARROW;
+    cell->foreground = GNVTDefaultForeground;
+    cell->background = GNVTDefaultBackground;
+    cell->underlineColor = GNVTDefaultForeground;
+    cell->bold = false;
+    cell->italic = false;
+    cell->faint = false;
+    cell->blink = false;
+    cell->inverse = false;
+    cell->invisible = false;
+    cell->strikethrough = false;
+    cell->overline = false;
+    cell->hasUnderlineColor = false;
+    cell->underlineStyle = GHOSTTY_SGR_UNDERLINE_NONE;
+}
+
 static GhosttyKey GNVTGhosttyKeyFromKey(GNVTKey key) {
     switch (key) {
         case GNVT_KEY_ESCAPE: return GHOSTTY_KEY_ESCAPE;
@@ -406,6 +425,8 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     bool focusEventMode = false;
     size_t totalRows = 0;
     size_t scrollbackRows = 0;
+    GhosttyTerminalScrollbar scrollbar = {0};
+    GhosttyString title = {0};
     GhosttyString pwd = {0};
     GhosttyRenderStateCursorVisualStyle cursorStyle = GHOSTTY_RENDER_STATE_CURSOR_VISUAL_STYLE_BAR;
     GhosttyRenderStateDirty dirtyState = GHOSTTY_RENDER_STATE_DIRTY_FULL;
@@ -426,6 +447,8 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_MOUSE_TRACKING, &hasMouseTracking);
     ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_TOTAL_ROWS, &totalRows);
     ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_SCROLLBACK_ROWS, &scrollbackRows);
+    ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_SCROLLBAR, &scrollbar);
+    ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_TITLE, &title);
     ghostty_terminal_get(terminal->terminal, GHOSTTY_TERMINAL_DATA_PWD, &pwd);
     ghostty_terminal_mode_get(terminal->terminal, GHOSTTY_MODE_BRACKETED_PASTE, &bracketedPasteMode);
     ghostty_terminal_mode_get(terminal->terminal, GHOSTTY_MODE_FOCUS_EVENT, &focusEventMode);
@@ -446,22 +469,7 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     }
 
     for (size_t index = 0; index < required; index += 1) {
-        cells[index].graphemeStart = 0;
-        cells[index].graphemeLength = 0;
-        cells[index].widthRole = GNVT_CELL_WIDTH_NARROW;
-        cells[index].foreground = GNVTDefaultForeground;
-        cells[index].background = GNVTDefaultBackground;
-        cells[index].underlineColor = GNVTDefaultForeground;
-        cells[index].bold = false;
-        cells[index].italic = false;
-        cells[index].faint = false;
-        cells[index].blink = false;
-        cells[index].inverse = false;
-        cells[index].invisible = false;
-        cells[index].strikethrough = false;
-        cells[index].overline = false;
-        cells[index].hasUnderlineColor = false;
-        cells[index].underlineStyle = GHOSTTY_SGR_UNDERLINE_NONE;
+        GNVTResetCell(&cells[index]);
     }
 
     if (ghostty_render_state_get(terminal->renderState,
@@ -572,6 +580,9 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     meta->focusEventMode = focusEventMode;
     meta->totalRows = totalRows;
     meta->scrollbackRows = scrollbackRows;
+    meta->viewportAtBottom = scrollbar.offset + scrollbar.len >= scrollbar.total;
+    meta->title = title.ptr;
+    meta->titleLen = title.len;
     meta->pwd = pwd.ptr;
     meta->pwdLen = pwd.len;
     meta->dirtyState = (uint8_t)dirtyState;
@@ -585,6 +596,85 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
                              GHOSTTY_RENDER_STATE_OPTION_DIRTY,
                              &cleanDirtyState);
     return true;
+}
+
+bool GNVTTerminalActiveAreaSnapshot(GNVTTerminal *terminal,
+                                    GNVTCell *cells,
+                                    size_t cellCount,
+                                    uint32_t *graphemes,
+                                    size_t graphemeCapacity,
+                                    size_t *requiredGraphemeCount) {
+    if (terminal == NULL || terminal->terminal == NULL || cells == NULL || requiredGraphemeCount == NULL) {
+        return false;
+    }
+    if (graphemeCapacity > 0 && graphemes == NULL) {
+        return false;
+    }
+
+    size_t requiredCells = (size_t)terminal->columns * (size_t)terminal->rows;
+    if (cellCount < requiredCells) {
+        return false;
+    }
+
+    bool overflow = false;
+    size_t usedGraphemes = 0;
+    *requiredGraphemeCount = 0;
+
+    for (uint16_t row = 0; row < terminal->rows; row += 1) {
+        for (uint16_t column = 0; column < terminal->columns; column += 1) {
+            size_t index = (size_t)row * (size_t)terminal->columns + (size_t)column;
+            GNVTCell *cell = &cells[index];
+            GNVTResetCell(cell);
+
+            GhosttyPoint point = {0};
+            point.tag = GHOSTTY_POINT_TAG_ACTIVE;
+            point.value.coordinate.x = column;
+            point.value.coordinate.y = row;
+            GhosttyGridRef ref = GHOSTTY_INIT_SIZED(GhosttyGridRef);
+            if (ghostty_terminal_grid_ref(terminal->terminal, point, &ref) != GHOSTTY_SUCCESS) {
+                continue;
+            }
+
+            GhosttyCell rawCell = 0;
+            if (ghostty_grid_ref_cell(&ref, &rawCell) == GHOSTTY_SUCCESS) {
+                GhosttyCellWide wide = GHOSTTY_CELL_WIDE_NARROW;
+                if (ghostty_cell_get(rawCell, GHOSTTY_CELL_DATA_WIDE, &wide) == GHOSTTY_SUCCESS) {
+                    cell->widthRole = GNVTWidthRoleFromGhosttyWide(wide);
+                }
+            }
+
+            size_t graphemeLength = 0;
+            GhosttyResult result = ghostty_grid_ref_graphemes(&ref, NULL, 0, &graphemeLength);
+            if (result != GHOSTTY_SUCCESS && result != GHOSTTY_OUT_OF_SPACE) {
+                continue;
+            }
+            if (graphemeLength > UINT32_MAX) {
+                return false;
+            }
+
+            cell->graphemeStart = usedGraphemes;
+            cell->graphemeLength = (uint32_t)graphemeLength;
+            *requiredGraphemeCount += graphemeLength;
+            if (graphemeLength == 0) {
+                continue;
+            }
+
+            if (usedGraphemes + graphemeLength <= graphemeCapacity) {
+                if (ghostty_grid_ref_graphemes(
+                        &ref,
+                        &graphemes[usedGraphemes],
+                        graphemeLength,
+                        &graphemeLength) != GHOSTTY_SUCCESS) {
+                    return false;
+                }
+            } else {
+                overflow = true;
+            }
+            usedGraphemes += graphemeLength;
+        }
+    }
+
+    return !overflow;
 }
 
 void GNVTTerminalScrollViewport(GNVTTerminal *terminal, intptr_t deltaRows) {

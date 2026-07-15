@@ -16,6 +16,23 @@ At a high level:
 
 The terminal backend is intentionally not owned by SwiftUI views. Window and panel behavior stay in the window layer; shell lifecycle, PTY output batching, terminal rendering, resize, focus, scroll, and restart policy stay in the terminal layer.
 
+## Agent Status Boundary
+
+Codex and Claude status is terminal-authoritative: GhostNotch identifies the
+supported descendant process, then classifies the current live terminal state
+from bottom-grid text, the terminal title, and progress signals. It does not use
+agent lifecycle hooks or a shared state file for Ready, Working, or Waiting.
+
+The process identity and terminal evidence stay in the terminal layer. SwiftUI
+receives only the active agent and the existing `idle`, `working`, or
+`attention` presentation state. When a supported process exits, its identity
+and retained evidence are cleared together so a later process cannot inherit a
+stale status.
+
+Terminal contents used for classification remain in memory and are not written
+to status logs. See [Agent status detection](agent-indicator-hooks.md) for the
+current rules and legacy-hook cleanup path.
+
 ## Ghostty Boundary
 
 GhostNotch uses a vendored `libghostty-vt` artifact for VT parsing, terminal state, render snapshots, key encoding, paste encoding, focus events, scrollback viewport control, mouse encoding, and terminal query write-back behavior.

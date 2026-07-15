@@ -262,7 +262,7 @@ Required automated checks:
 
 ```sh
 git diff --check
-python3 scripts/install-agent-hooks.py self-test
+python3 scripts/remove-agent-hooks.py --self-test
 xcodebuild test -project GhostNotch.xcodeproj -scheme GhostNotch -destination 'platform=macOS'
 xcodebuild -project GhostNotch.xcodeproj -scheme GhostNotch -configuration Release build
 ```

@@ -9,6 +9,10 @@ final class GhosttyTerminalCore {
     private var terminal: OpaquePointer?
     private var cachedSnapshot: TerminalRenderSnapshot
     private var currentWorkingDirectory: String?
+    private var agentStatusTextSequence: UInt64 = 0
+    private var terminalTitle: String?
+    private var terminalTitleSequence: UInt64 = 0
+    private var progressTracker = AgentOSCProgressTracker()
 
     init(columns: Int = 80, rows: Int = 18) {
         self.columns = max(columns, 2)
@@ -33,6 +37,9 @@ final class GhosttyTerminalCore {
     }
 
     func processOutput(_ data: Data) {
+        agentStatusTextSequence &+= 1
+        progressTracker.observe(data)
+
         if let report = Self.workingDirectoryReport(in: data) {
             switch report {
             case .clear:
@@ -75,6 +82,10 @@ final class GhosttyTerminalCore {
         columns = max(newColumns, 2)
         rows = max(newRows, 1)
         currentWorkingDirectory = nil
+        agentStatusTextSequence = 0
+        terminalTitle = nil
+        terminalTitleSequence = 0
+        progressTracker = AgentOSCProgressTracker()
         cachedSnapshot = .empty(columns: columns, rows: rows)
 
         terminal = GNVTTerminalCreate(
@@ -251,10 +262,19 @@ final class GhosttyTerminalCore {
         let dirtyRows = Set(loadResult.dirtyRows.enumerated().compactMap { index, isDirty in
             isDirty ? index : nil
         })
+        let cells = loadResult.cells.map { TerminalCell(ghosttyCell: $0, graphemes: loadResult.graphemes) }
+        let nextTitle = Self.terminalTitle(from: meta)
+        if nextTitle != terminalTitle {
+            terminalTitle = nextTitle
+            terminalTitleSequence &+= 1
+        }
+        let agentStatusText = meta.viewportAtBottom
+            ? Self.plainText(cells: cells, columns: columns, rows: rows)
+            : activeAreaText()
         cachedSnapshot = TerminalRenderSnapshot(
             columns: columns,
             rows: rows,
-            cells: loadResult.cells.map { TerminalCell(ghosttyCell: $0, graphemes: loadResult.graphemes) },
+            cells: cells,
             cursorColumn: Int(meta.cursorColumn),
             cursorRow: Int(meta.cursorRow),
             cursorVisible: meta.cursorVisible,
@@ -268,8 +288,25 @@ final class GhosttyTerminalCore {
             totalRows: Int(meta.totalRows),
             scrollbackRows: Int(meta.scrollbackRows),
             dirtyState: dirtyState,
-            dirtyRows: dirtyState == .full ? Set(0..<rows) : dirtyRows
+            dirtyRows: dirtyState == .full ? Set(0..<rows) : dirtyRows,
+            agentStatusText: agentStatusText,
+            agentStatusTextSequence: agentStatusTextSequence,
+            terminalTitle: terminalTitle,
+            terminalTitleSequence: terminalTitleSequence,
+            terminalProgress: progressTracker.latest,
+            terminalProgressSequence: progressTracker.sequence
         )
+    }
+
+    private static func terminalTitle(from meta: GNVTSnapshotMeta) -> String? {
+        guard let title = meta.title, meta.titleLen > 0,
+              let value = String(data: Data(bytes: title, count: meta.titleLen), encoding: .utf8)
+        else {
+            return nil
+        }
+
+        let sanitized = sanitizedAgentSignal(value)
+        return sanitized.isEmpty ? nil : sanitized
     }
 
     private static func currentWorkingDirectory(from meta: GNVTSnapshotMeta) -> String? {
@@ -393,6 +430,50 @@ final class GhosttyTerminalCore {
         )
     }
 
+    private func activeAreaText() -> String {
+        var graphemeCapacity = max(columns * rows * 2, 1)
+        for _ in 0..<3 {
+            var cells = Array(repeating: GNVTCell.blank, count: columns * rows)
+            var graphemes = Array(repeating: UInt32(0), count: graphemeCapacity)
+            var requiredGraphemeCount = 0
+            let success = cells.withUnsafeMutableBufferPointer { cellBuffer in
+                graphemes.withUnsafeMutableBufferPointer { graphemeBuffer in
+                    GNVTTerminalActiveAreaSnapshot(
+                        terminal,
+                        cellBuffer.baseAddress,
+                        cellBuffer.count,
+                        graphemeBuffer.baseAddress,
+                        graphemeBuffer.count,
+                        &requiredGraphemeCount
+                    )
+                }
+            }
+
+            if success {
+                graphemes.removeSubrange(requiredGraphemeCount..<graphemes.count)
+                let terminalCells = cells.map { TerminalCell(ghosttyCell: $0, graphemes: graphemes) }
+                return Self.plainText(cells: terminalCells, columns: columns, rows: rows)
+            }
+            guard requiredGraphemeCount > graphemeCapacity else { break }
+            graphemeCapacity = requiredGraphemeCount
+        }
+
+        return ""
+    }
+
+    private static func plainText(cells: [TerminalCell], columns: Int, rows: Int) -> String {
+        (0..<rows).map { row in
+            var line = cells[(row * columns)..<((row + 1) * columns)]
+                .filter { !$0.widthRole.isSpacer }
+                .map(\.character)
+                .joined()
+            while line.last == " " || line.last == "\t" {
+                line.removeLast()
+            }
+            return line
+        }.joined(separator: "\n")
+    }
+
     private func encodeKey(
         key: TerminalKey,
         modifiers: TerminalKeyModifiers,
@@ -432,6 +513,78 @@ final class GhosttyTerminalCore {
 
         onWriteToPTY?(Data(bytes: bytes, count: count))
     }
+}
+
+private struct AgentOSCProgressTracker {
+    private enum State {
+        case ground
+        case escape
+        case body
+        case bodyEscape
+    }
+
+    private var state = State.ground
+    private var body: [UInt8] = []
+    private(set) var latest: String?
+    private(set) var sequence: UInt64 = 0
+
+    mutating func observe(_ data: Data) {
+        for byte in data {
+            switch state {
+            case .ground:
+                state = byte == 0x1B ? .escape : .ground
+            case .escape:
+                if byte == 0x5D {
+                    body.removeAll(keepingCapacity: true)
+                    state = .body
+                } else {
+                    state = byte == 0x1B ? .escape : .ground
+                }
+            case .body:
+                if byte == 0x07 {
+                    finishBody()
+                    state = .ground
+                } else if byte == 0x1B {
+                    state = .bodyEscape
+                } else {
+                    body.append(byte)
+                }
+            case .bodyEscape:
+                if byte == 0x5C {
+                    finishBody()
+                    state = .ground
+                } else {
+                    body.append(0x1B)
+                    body.append(byte)
+                    state = .body
+                }
+            }
+
+            if body.count > 4_096 {
+                body.removeAll(keepingCapacity: true)
+                state = .ground
+            }
+        }
+    }
+
+    private mutating func finishBody() {
+        defer { body.removeAll(keepingCapacity: true) }
+        guard let separator = body.firstIndex(of: 0x3B),
+              body[..<separator].elementsEqual([0x39])
+        else {
+            return
+        }
+
+        let payload = body[body.index(after: separator)...]
+        latest = sanitizedAgentSignal(String(decoding: payload, as: UTF8.self))
+        sequence &+= 1
+    }
+}
+
+private func sanitizedAgentSignal(_ value: String) -> String {
+    String(value.filter { character in
+        character.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) }
+    }.prefix(256))
 }
 
 private extension TerminalMouseEventAction {

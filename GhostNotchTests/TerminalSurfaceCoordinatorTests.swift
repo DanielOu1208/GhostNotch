@@ -175,8 +175,7 @@ final class TerminalSurfaceCoordinatorTests: XCTestCase {
     }
 }
 
-@MainActor
-private final class CoordinatorTestTerminalProcess: @MainActor TerminalProcess {
+private final class CoordinatorTestTerminalProcess: TerminalProcess, @unchecked Sendable {
     var onOutput: TerminalOutputHandler?
     var onTermination: TerminalTerminationHandler?
     private(set) var isRunning = false
@@ -184,8 +183,8 @@ private final class CoordinatorTestTerminalProcess: @MainActor TerminalProcess {
     private(set) var stopCallCount = 0
     private(set) var startWorkingDirectories: [String] = []
 
-    func descendantProcessNames(matching executableNames: Set<String>) -> Set<String> {
-        executableNames
+    func descendantProcessSnapshot(matching executableNames: Set<String>) async -> TerminalProcessSnapshot {
+        TerminalProcessSnapshot(descendants: [], foregroundProcessGroupID: nil)
     }
 
     func start(
@@ -211,6 +210,7 @@ private final class CoordinatorTestTerminalProcess: @MainActor TerminalProcess {
 
     func resize(cols: Int, rows: Int) throws {}
 
+    @MainActor
     func emitOutput(_ text: String) {
         onOutput?(Data(text.utf8))
     }

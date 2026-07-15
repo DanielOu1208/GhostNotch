@@ -24,7 +24,18 @@ Run the app and terminal tests:
 xcodebuild test -project GhostNotch.xcodeproj -scheme GhostNotch -destination 'platform=macOS'
 ```
 
-Current automated coverage includes shell resolution, real PTY command output, session stopping, input mapping, Ghostty-backed terminal snapshots, ANSI styles, cursor behavior, scrollback, graphemes, wide cells, paste encoding, resize behavior, focus events, mouse encoding, and selected Ghostty comparison streams.
+Exercise the legacy GhostNotch hook cleanup without changing user files:
+
+```sh
+python3 scripts/remove-agent-hooks.py --self-test
+```
+
+The automated suite covers shell resolution, real PTY command output, session
+stopping, input mapping, Ghostty-backed terminal snapshots, ANSI styles, cursor
+behavior, scrollback, graphemes, wide cells, paste encoding, resize behavior,
+focus events, mouse encoding, and selected Ghostty comparison streams. It also
+checks process identity, title/progress parsing, Codex and Claude terminal rules,
+transition stabilization, process exit and relaunch, and legacy-hook cleanup.
 
 ## Manual Terminal Acceptance
 
@@ -40,6 +51,26 @@ Required checks:
 - Trackpad/wheel scroll works in `less`.
 - Mouse-enabled TUI press/release/drag behavior does not inject visible garbage.
 - ANSI/style, box/block glyphs, Powerline glyphs, cursor alignment, paste, Escape routing, and CJK/wide-cell copy remain visually correct in the expanded island.
+
+### Codex and Claude Status
+
+Run these checks with both a launcher-started agent and an agent typed directly
+into the shell:
+
+- The agent asset appears while its process is alive and clears when it exits.
+- A normal prompt shows Ready; active generation or tool work shows Working;
+  permissions, questions, and other required input show Waiting.
+- Approving, denying, or cancelling a prompt clears Waiting from current
+  terminal evidence alone.
+- Escape interruption and compaction do not leave a stuck state or briefly
+  report a false Ready state.
+- Opening a transcript viewer or model picker does not replace the state behind
+  the overlay.
+- Scrolling into history while the agent continues to run does not make old
+  visible text drive the current state.
+- Restarting the same agent clears the previous process's terminal evidence.
+- Ready remains static with Reduce Motion, and Working/Waiting remain readable
+  in collapsed and hover states.
 
 Useful commands:
 
@@ -61,5 +92,5 @@ vim docs/testing.md # or nano if vim is unavailable
 Notes:
 
 - Powerline/private-use glyphs require an installed compatible developer font such as MesloLGS NF, JetBrainsMono Nerd Font, Hack Nerd Font, or FiraCode Nerd Font.
-- `TERM` intentionally remains `xterm-256color`; `TERM_PROGRAM=GhostNotch`, GhostNotch version metadata, `COLORTERM=truecolor`, and `GHOSTNOTCH_RESOURCES_DIR` are set by the PTY environment.
+- `TERM` intentionally remains `xterm-256color`; `TERM_PROGRAM=GhostNotch`, GhostNotch version metadata, and `COLORTERM=truecolor` are set by the PTY environment.
 - Focused-terminal Escape should reach the terminal program. Use `Option+Space`, the close button, or outside click for app-level collapse.

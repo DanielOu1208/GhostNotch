@@ -3,12 +3,24 @@ import Foundation
 typealias TerminalOutputHandler = @MainActor @Sendable (Data) -> Void
 typealias TerminalTerminationHandler = @MainActor @Sendable () -> Void
 
-protocol TerminalProcess: AnyObject {
+struct TerminalDescendantProcess: Equatable, Sendable {
+    let processID: Int32
+    let processGroupID: Int32?
+    let depth: Int
+    let commandNames: Set<String>
+}
+
+struct TerminalProcessSnapshot: Equatable, Sendable {
+    let descendants: [TerminalDescendantProcess]
+    let foregroundProcessGroupID: Int32?
+}
+
+protocol TerminalProcess: AnyObject, Sendable {
     var onOutput: TerminalOutputHandler? { get set }
     var onTermination: TerminalTerminationHandler? { get set }
     var isRunning: Bool { get }
 
-    func descendantProcessNames(matching executableNames: Set<String>) -> Set<String>
+    func descendantProcessSnapshot(matching executableNames: Set<String>) async -> TerminalProcessSnapshot
 
     func start(
         shell: String,
@@ -44,12 +56,10 @@ final class TerminalSession {
     private let defaultWorkingDirectory: String
     private let startupTimeout: TimeInterval
     private let process: any TerminalProcess
-    private let agentStateFileURL: URL
-    private let agentEventLogFileURL: URL
     private var outputObservers: [@MainActor (Data) -> Void] = []
     private var lifecycleGeneration = 0
     private var startupWatchdogTask: Task<Void, Never>?
-    private var agentStateMonitorTask: Task<Void, Never>?
+    private var agentStatusMonitorTask: Task<Void, Never>?
 
     init(
         shellResolver: ShellResolver = ShellResolver(),
@@ -63,12 +73,6 @@ final class TerminalSession {
         self.state = state ?? TerminalSessionState()
         self.process = process
         self.startupTimeout = startupTimeout
-        let agentStateIdentifier = UUID().uuidString
-        agentStateFileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ghostnotch-agent-state-\(agentStateIdentifier)", isDirectory: false)
-        agentEventLogFileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ghostnotch-agent-events-\(agentStateIdentifier).jsonl", isDirectory: false)
-
         process.onOutput = { [weak self] data in
             self?.state.appendOutput(data)
             if self?.state.phase == .starting {
@@ -99,7 +103,7 @@ final class TerminalSession {
 
     func stop() {
         cancelStartupWatchdog()
-        stopAgentStateMonitoring()
+        stopAgentStatusMonitoring()
         lifecycleGeneration += 1
         _ = process.stop()
         resetAgentActivityState()
@@ -108,7 +112,7 @@ final class TerminalSession {
 
     func restart(cols: Int = 80, rows: Int = 24, workingDirectory: String? = nil) throws {
         cancelStartupWatchdog()
-        stopAgentStateMonitoring()
+        stopAgentStatusMonitoring()
         lifecycleGeneration += 1
         let generation = lifecycleGeneration
         state.clearOutput()
@@ -166,7 +170,7 @@ final class TerminalSession {
 
         cancelStartupWatchdog()
         state.markStopped()
-        stopAgentStateMonitoring()
+        stopAgentStatusMonitoring()
         resetAgentActivityState()
     }
 
@@ -180,17 +184,14 @@ final class TerminalSession {
                 workingDirectory: workingDirectory ?? defaultWorkingDirectory,
                 cols: cols,
                 rows: rows,
-                environmentOverrides: [
-                    "GHOSTNOTCH_AGENT_STATE_FILE": agentStateFileURL.path,
-                    "GHOSTNOTCH_AGENT_EVENT_LOG": agentEventLogFileURL.path,
-                ]
+                environmentOverrides: [:]
             )
             state.markStarting()
-            startAgentStateMonitoring()
+            startAgentStatusMonitoring(generation: generation)
             scheduleStartupWatchdog(shell: shell, generation: generation)
         } catch {
             cancelStartupWatchdog()
-            stopAgentStateMonitoring()
+            stopAgentStatusMonitoring()
             state.recordError(error)
             throw error
         }
@@ -221,6 +222,7 @@ final class TerminalSession {
             return
         }
 
+        stopAgentStatusMonitoring()
         _ = process.stop()
         state.recordError(TerminalSessionError.startupTimeout(shell: shell, seconds: startupTimeout))
     }
@@ -230,17 +232,18 @@ final class TerminalSession {
         startupWatchdogTask = nil
     }
 
-    private func startAgentStateMonitoring() {
-        stopAgentStateMonitoring()
+    private func startAgentStatusMonitoring(generation: Int) {
+        stopAgentStatusMonitoring()
 
-        agentStateMonitorTask = Task { [weak self] in
+        agentStatusMonitorTask = Task { [weak self] in
             while !Task.isCancelled {
-                await MainActor.run {
-                    self?.refreshAgentActivityState()
-                }
+                await self?.refreshAgentActivityState(generation: generation)
 
                 do {
-                    try await Task.sleep(nanoseconds: 200_000_000)
+                    let fastRefresh = await MainActor.run {
+                        self?.state.agentStatusNeedsFastRefresh == true
+                    }
+                    try await Task.sleep(nanoseconds: fastRefresh ? 100_000_000 : 300_000_000)
                 } catch {
                     return
                 }
@@ -248,66 +251,63 @@ final class TerminalSession {
         }
     }
 
-    private func stopAgentStateMonitoring() {
-        agentStateMonitorTask?.cancel()
-        agentStateMonitorTask = nil
+    private func stopAgentStatusMonitoring() {
+        agentStatusMonitorTask?.cancel()
+        agentStatusMonitorTask = nil
     }
 
     private func resetAgentActivityState() {
-        state.updateAgentActivityState(.idle)
-
-        do {
-            try "idle\n".write(to: agentStateFileURL, atomically: true, encoding: .utf8)
-        } catch {
-            NSLog("GhostNotch failed to reset agent state file: \(error.localizedDescription)")
-        }
+        state.updateDetectedAgentProcess(nil)
     }
 
-    private func refreshAgentActivityState() {
-        guard process.isRunning else {
-            state.updateAgentActivityState(.idle)
+    private func refreshAgentActivityState(generation: Int) async {
+        guard generation == lifecycleGeneration, process.isRunning else {
+            state.updateDetectedAgentProcess(nil)
             return
         }
 
-        guard let stateText = try? String(contentsOf: agentStateFileURL, encoding: .utf8) else {
-            state.updateAgentActivityState(.idle)
-            return
-        }
-
-        let record = TerminalAgentActivityRecord(rawFileValue: stateText)
-        let detectedProcessNames = process.descendantProcessNames(
+        let snapshot = await process.descendantProcessSnapshot(
             matching: Set(TerminalAgentActivityAgent.supportedCases.compactMap(\.executableName))
         )
-
-        if let recordedProcessName = record.agent.executableName,
-           detectedProcessNames.contains(recordedProcessName) {
-            state.updateAgentActivityRecord(record)
+        guard generation == lifecycleGeneration, process.isRunning else {
             return
         }
 
-        guard let detectedAgent = TerminalAgentActivityAgent.supportedCases.first(where: {
-            guard let executableName = $0.executableName else {
-                return false
-            }
-            return detectedProcessNames.contains(executableName)
-        }) else {
-            if record.agent == .unknown {
-                state.updateAgentActivityRecord(record)
-            } else {
-                state.updateAgentActivityState(.idle)
-            }
-            return
-        }
-
-        let detectedState = record.agent == .unknown ? record.state : .idle
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: detectedAgent,
-                state: detectedState,
-                event: record.agent == .unknown ? record.event : nil,
-                timestamp: record.agent == .unknown ? record.timestamp : nil,
-                isLegacy: record.isLegacy
-            )
+        state.updateDetectedAgentProcess(
+            Self.selectAgentProcess(from: snapshot, previous: state.activeAgentProcessIdentity)
         )
+        state.refreshAgentStatus()
+    }
+
+    private static func selectAgentProcess(
+        from snapshot: TerminalProcessSnapshot,
+        previous: TerminalAgentProcessIdentity?
+    ) -> TerminalAgentProcessIdentity? {
+        let candidates = snapshot.descendants.compactMap { process -> (TerminalAgentProcessIdentity, Int, Int32?)? in
+            guard let agent = TerminalAgentActivityAgent.supportedCases.first(where: { agent in
+                guard let executableName = agent.executableName else { return false }
+                return process.commandNames.contains(executableName)
+            }) else {
+                return nil
+            }
+            return (
+                TerminalAgentProcessIdentity(agent: agent, processID: process.processID),
+                process.depth,
+                process.processGroupID
+            )
+        }
+
+        let foreground = snapshot.foregroundProcessGroupID.flatMap { foregroundGroup in
+            let matches = candidates.filter { $0.2 == foregroundGroup }
+            return matches.isEmpty ? nil : matches
+        }
+        let eligible = foreground ?? candidates
+        guard let deepest = eligible.map(\.1).max() else { return nil }
+        let deepestCandidates = eligible.filter { $0.1 == deepest }.map(\.0)
+
+        if let previous, deepestCandidates.contains(previous) {
+            return previous
+        }
+        return deepestCandidates.count == 1 ? deepestCandidates[0] : nil
     }
 }

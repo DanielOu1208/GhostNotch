@@ -1,383 +1,257 @@
-import Foundation
 import XCTest
 
 @MainActor
 final class CodexQuestionSelectorIndicatorTests: XCTestCase {
+    private let codex = TerminalAgentProcessIdentity(agent: .codex, processID: 101)
+    private let claude = TerminalAgentProcessIdentity(agent: .claude, processID: 202)
+
+    func testCodexUsesTitleAndStrictSelectorEvidence() {
+        let state = TerminalSessionState(agentStartupGrace: 0)
+        state.updateDetectedAgentProcess(codex)
+
+        state.updateVisibleTerminalSnapshot(evidence(title: "⠋ Working", titleSequence: 1))
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        state.updateVisibleTerminalSnapshot(evidence(title: "Action Required", titleSequence: 2))
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.updateVisibleTerminalSnapshot(evidence(
+            text: "Question 1/1\n1. First\n2. Second\nunanswered\nenter to submit answer\nesc to interrupt",
+            textSequence: 1,
+            titleSequence: 3
+        ))
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.updateVisibleTerminalSnapshot(evidence(title: "Codex", titleSequence: 4))
+        XCTAssertEqual(state.agentActivityState, .idle)
+    }
+
+    func testClaudeUsesWorkingWaitingPreserveAndVisibleReadyEvidence() {
+        let state = TerminalSessionState(agentStartupGrace: 0)
+        state.updateDetectedAgentProcess(claude)
+
+        state.updateVisibleTerminalSnapshot(evidence(title: "⠙ Claude", titleSequence: 1))
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        state.updateVisibleTerminalSnapshot(evidence(
+            text: "Permission required\nAllow this command?\nYes\nNo",
+            textSequence: 1,
+            titleSequence: 2
+        ))
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.updateVisibleTerminalSnapshot(evidence(
+            text: "Transcript viewer\nEsc to close",
+            textSequence: 2,
+            titleSequence: 2
+        ))
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.updateVisibleTerminalSnapshot(evidence(
+            text: "❯ ",
+            textSequence: 3,
+            titleSequence: 2
+        ))
+        XCTAssertEqual(state.agentActivityState, .idle)
+    }
+
+    func testStartupGraceIgnoresEarlyEvidenceThenClassifies() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let state = TerminalSessionState(agentStartupGrace: 3)
+        state.updateDetectedAgentProcess(codex, now: start)
+        state.updateVisibleTerminalSnapshot(
+            evidence(title: "⠋ Working", titleSequence: 1),
+            now: start.addingTimeInterval(0.1)
+        )
+
+        state.refreshAgentStatus(now: start.addingTimeInterval(2.9))
+        XCTAssertEqual(state.agentActivityState, .idle)
+
+        state.refreshAgentStatus(now: start.addingTimeInterval(3.1))
+        XCTAssertEqual(state.agentActivityState, .working)
+    }
+
+    func testEvidenceRenderedImmediatelyBeforeProcessDetectionIsNotLost() {
+        let state = TerminalSessionState(agentStartupGrace: 0)
+        state.updateVisibleTerminalSnapshot(evidence(title: "Action Required", titleSequence: 1))
+
+        state.updateDetectedAgentProcess(codex)
+        state.refreshAgentStatus()
+
+        XCTAssertEqual(state.agentActivityState, .attention)
+    }
+
+    func testPlainWorkingToReadyRequiresThreeTimedConfirmations() {
+        let start = Date(timeIntervalSince1970: 2_000)
+        let state = TerminalSessionState(
+            agentStartupGrace: 0,
+            idleConfirmationInterval: 0.1,
+            idleConfirmationCap: 0.7
+        )
+        state.updateDetectedAgentProcess(codex, now: start)
+        state.updateVisibleTerminalSnapshot(
+            evidence(title: "⠋ Working", titleSequence: 1),
+            now: start
+        )
+        state.updateVisibleTerminalSnapshot(
+            evidence(textSequence: 1, titleSequence: 2),
+            now: start
+        )
+
+        XCTAssertEqual(state.agentActivityState, .working)
+        XCTAssertTrue(state.agentStatusNeedsFastRefresh)
+
+        state.refreshAgentStatus(now: start.addingTimeInterval(0.11))
+        state.refreshAgentStatus(now: start.addingTimeInterval(0.22))
+        XCTAssertEqual(state.agentActivityState, .working)
+
+        state.refreshAgentStatus(now: start.addingTimeInterval(0.33))
+        XCTAssertEqual(state.agentActivityState, .idle)
+        XCTAssertFalse(state.agentStatusNeedsFastRefresh)
+    }
+
+    func testVisibleReadyAndProcessExitBypassPendingIdle() {
+        let start = Date(timeIntervalSince1970: 3_000)
+        let state = TerminalSessionState(agentStartupGrace: 0)
+        state.updateDetectedAgentProcess(claude, now: start)
+        state.updateVisibleTerminalSnapshot(
+            evidence(title: "⠋ Claude", titleSequence: 1),
+            now: start
+        )
+
+        state.updateVisibleTerminalSnapshot(
+            evidence(text: "❯ ", textSequence: 1, titleSequence: 2),
+            now: start
+        )
+        XCTAssertEqual(state.agentActivityState, .idle)
+
+        state.updateDetectedAgentProcess(nil, now: start)
+        XCTAssertNil(state.activeAgent)
+        XCTAssertEqual(state.agentActivityState, .idle)
+    }
+
+    func testSameAgentRelaunchResetsEvidenceAndIdentity() {
+        let start = Date(timeIntervalSince1970: 4_000)
+        let state = TerminalSessionState(agentStartupGrace: 0)
+        state.updateDetectedAgentProcess(codex, now: start)
+        state.updateVisibleTerminalSnapshot(
+            evidence(title: "⠋ Working", titleSequence: 1),
+            now: start
+        )
+        XCTAssertEqual(state.agentActivityState, .working)
+        state.updateDetectedAgentProcess(codex, now: start.addingTimeInterval(0.5))
+
+        state.updateDetectedAgentProcess(
+            TerminalAgentProcessIdentity(agent: .codex, processID: 102),
+            now: start.addingTimeInterval(1)
+        )
+        state.refreshAgentStatus(now: start.addingTimeInterval(1))
+
+        XCTAssertEqual(state.activeAgentProcessIdentity?.processID, 102)
+        XCTAssertEqual(state.agentActivityState, .idle)
+    }
+
+    func testWeakPromptLikeProseDoesNotReportWaiting() {
+        let state = TerminalSessionState(agentStartupGrace: 0)
+        state.updateDetectedAgentProcess(codex)
+        state.updateVisibleTerminalSnapshot(evidence(
+            text: "The docs ask: would you like to learn why yes and no differ?",
+            textSequence: 1
+        ))
+
+        XCTAssertEqual(state.agentActivityState, .idle)
+    }
+
+    func testFreshReadyEvidenceOutranksStaleWaitingText() {
+        let codexState = TerminalSessionState(agentStartupGrace: 0)
+        codexState.updateDetectedAgentProcess(codex)
+        codexState.updateVisibleTerminalSnapshot(evidence(
+            text: "Allow command?\n› \n? for shortcuts",
+            textSequence: 1,
+            title: "Codex",
+            titleSequence: 1
+        ))
+        XCTAssertEqual(codexState.agentActivityState, .idle)
+
+        let staleSelectorState = TerminalSessionState(agentStartupGrace: 0)
+        staleSelectorState.updateDetectedAgentProcess(codex)
+        staleSelectorState.updateVisibleTerminalSnapshot(evidence(
+            text: """
+            Question 1/1
+            1. First
+            2. Second
+            unanswered
+            enter to submit answer
+            esc to interrupt
+            › 1+1
+            ? for shortcuts
+            """,
+            textSequence: 1
+        ))
+        XCTAssertEqual(staleSelectorState.agentActivityState, .idle)
+
+        let currentSelectorState = TerminalSessionState(agentStartupGrace: 0)
+        currentSelectorState.updateDetectedAgentProcess(codex)
+        currentSelectorState.updateVisibleTerminalSnapshot(evidence(
+            text: "›\nAllow command?",
+            textSequence: 1
+        ))
+        XCTAssertEqual(currentSelectorState.agentActivityState, .attention)
+
+        let claudeState = TerminalSessionState(agentStartupGrace: 0)
+        claudeState.updateDetectedAgentProcess(claude)
+        claudeState.updateVisibleTerminalSnapshot(evidence(
+            text: "Permission required\nAllow this command?\nYes\nNo\n❯ ",
+            textSequence: 1
+        ))
+        XCTAssertEqual(claudeState.agentActivityState, .idle)
+    }
+
     func testCodexQuestionSelectorDetectorRequiresStrictMarkers() {
-        let questionSelectorText = """
-        Question 1/1 (1 unanswered)
-        Which hover animation direction should the plan use?
-
-          1. Terminal cursor
-        > 2. Status breath
-          3. Subtle entrance
-
-        tab to add notes | enter to submit answer | esc to interrupt
-        """
-
-        XCTAssertTrue(CodexTerminalUserSelectorDetector.isQuestionSelectorVisible(in: questionSelectorText))
-        XCTAssertTrue(CodexTerminalUserSelectorDetector.isUserSelectorVisible(in: questionSelectorText))
-        XCTAssertFalse(CodexTerminalUserSelectorDetector.isQuestionSelectorVisible(in: "Question 1/1\n1. Not enough\n2. Markers"))
-        XCTAssertFalse(CodexTerminalUserSelectorDetector.isQuestionSelectorVisible(in: "enter to submit answer\nesc to interrupt\nno question marker"))
+        XCTAssertTrue(CodexTerminalUserSelectorDetector.isQuestionSelectorVisible(in: """
+        Question 1/1
+        1. First
+        2. Second
+        unanswered
+        enter to submit answer
+        esc to interrupt
+        """))
+        XCTAssertFalse(CodexTerminalUserSelectorDetector.isQuestionSelectorVisible(in: "enter to submit answer"))
     }
 
-    func testCodexPlanImplementationSelectorDetectorRequiresStrictMarkers() {
-        let planSelectorText = """
-        Implement this plan?
-
-        > 1. Yes, implement this plan          Switch to Default and start coding.
-          2. Yes, clear context and implement  Fresh thread. Context: 6% used.
-          3. No, stay in Plan mode             Continue planning with the model.
-
-        Press enter to confirm or esc to go back
-        """
-
-        XCTAssertTrue(CodexTerminalUserSelectorDetector.isPlanImplementationSelectorVisible(in: planSelectorText))
-        XCTAssertTrue(CodexTerminalUserSelectorDetector.isUserSelectorVisible(in: planSelectorText))
-        XCTAssertFalse(
-            CodexTerminalUserSelectorDetector.isPlanImplementationSelectorVisible(
-                in: "Implement this plan?\n1. Yes\n2. No\nPress enter to confirm or esc to go back"
-            )
-        )
-        XCTAssertFalse(
-            CodexTerminalUserSelectorDetector.isPlanImplementationSelectorVisible(
-                in: "The implementation plan says to press enter to confirm or esc to go back later."
-            )
-        )
-    }
-
-    private let selectorDwellNanoseconds: UInt64 = 20_000_000
-
-    func testCodexVisibleQuestionSelectorOverridesWorkingStateToAttention() async throws {
-        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .codex,
-                state: .working,
-                event: "PreToolUse",
-                timestamp: Date(),
-                isLegacy: false
-            )
-        )
-
-        state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-
-        XCTAssertEqual(state.agentActivityState, .working)
-        try await waitForSelectorDwell()
-        XCTAssertEqual(state.agentActivityState, .attention)
-    }
-
-    func testCodexPlanImplementationSelectorOverridesWorkingStateToAttention() async throws {
-        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .codex,
-                state: .working,
-                event: "PostToolUse",
-                timestamp: Date(),
-                isLegacy: false
-            )
-        )
-
-        state.updateVisibleTerminalSnapshot(codexPlanImplementationSelectorSnapshot())
-
-        XCTAssertEqual(state.agentActivityState, .working)
-        try await waitForSelectorDwell()
-        XCTAssertEqual(state.agentActivityState, .attention)
-    }
-
-    func testPermissionRequestOverridesVisibleQuestionSelectorToAttention() {
-        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .codex,
-                state: .working,
-                event: "PreToolUse",
-                timestamp: Date(),
-                isLegacy: false
-            )
-        )
-        state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .working)
-
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .codex,
-                state: .attention,
-                event: "PermissionRequest",
-                timestamp: Date().addingTimeInterval(1),
-                isLegacy: false
-            )
-        )
-
-        XCTAssertEqual(state.agentActivityState, .attention)
-    }
-
-    func testNonCodexAndNonQuestionSelectorSnapshotsDoNotOverrideHookState() {
-        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .claude,
-                state: .working,
-                event: "ElicitationResult",
-                timestamp: Date(),
-                isLegacy: false
-            )
-        )
-
-        state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .working)
-        state.updateVisibleTerminalSnapshot(codexPlanImplementationSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .working)
-
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .codex,
-                state: .working,
-                event: "PreToolUse",
-                timestamp: Date(),
-                isLegacy: false
-            )
-        )
-        state.updateVisibleTerminalSnapshot(.message("Question 1/1\nworking output", columns: 120, rows: 8))
-
-        XCTAssertEqual(state.agentActivityState, .working)
-    }
-
-    func testNonCodexSnapshotsSkipVisibleTextExtraction() {
-        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
-        var didExtractVisibleText = false
-
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .claude,
-                state: .working,
-                event: "ElicitationResult",
-                timestamp: Date(),
-                isLegacy: false
-            )
-        )
-        state.updateVisibleTerminalSnapshot(.empty(), visibleText: {
-            didExtractVisibleText = true
-            return ""
-        })
-
-        XCTAssertFalse(didExtractVisibleText)
-
-        state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date()))
-        state.updateVisibleTerminalSnapshot(.empty(), visibleText: {
-            didExtractVisibleText = true
-            return ""
-        })
-
-        XCTAssertTrue(didExtractVisibleText)
-    }
-
-    func testClaudeAttentionReturnsToWorkingThenIdleFromHooks() {
-        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
-        state.markRunning()
-
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .claude,
-                state: .attention,
-                event: "PermissionRequest",
-                timestamp: Date(),
-                isLegacy: false
-            )
-        )
-        XCTAssertEqual(state.agentActivityState, .attention)
-
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .claude,
-                state: .working,
-                event: "PreToolUse",
-                timestamp: Date().addingTimeInterval(1),
-                isLegacy: false
-            )
-        )
-        XCTAssertEqual(state.agentActivityState, .working)
-
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .claude,
-                state: .idle,
-                event: "Stop",
-                timestamp: Date().addingTimeInterval(2),
-                isLegacy: false
-            )
-        )
-        XCTAssertEqual(state.agentActivityState, .idle)
-    }
-
-    func testFreshCodexWorkingHooksKeepVisibleQuestionSelectorAttention() async throws {
-        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
-        let firstRecord = TerminalAgentActivityRecord(
-            agent: .codex,
-            state: .working,
-            event: "PreToolUse",
-            timestamp: Date(),
-            isLegacy: false
-        )
-        state.updateAgentActivityRecord(firstRecord)
-        state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .working)
-
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .codex,
-                state: .working,
-                event: "PostToolUse",
-                timestamp: Date().addingTimeInterval(1),
-                isLegacy: false
-            )
-        )
-        XCTAssertEqual(state.agentActivityState, .working)
-
-        try await waitForSelectorDwell()
-        XCTAssertEqual(state.agentActivityState, .attention)
-
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .codex,
-                state: .working,
-                event: "PreToolUse",
-                timestamp: Date().addingTimeInterval(2),
-                isLegacy: false
-            )
-        )
-        XCTAssertEqual(state.agentActivityState, .attention)
-
-        state.updateVisibleTerminalSnapshot(.message("Codex is working", columns: 120, rows: 12))
-        XCTAssertEqual(state.agentActivityState, .working)
-    }
-
-    func testFreshCodexWorkingHooksKeepVisiblePlanImplementationSelectorAttention() async throws {
-        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
-        state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date()))
-        state.updateVisibleTerminalSnapshot(codexPlanImplementationSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .working)
-
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .codex,
-                state: .working,
-                event: "PostToolUse",
-                timestamp: Date().addingTimeInterval(1),
-                isLegacy: false
-            )
-        )
-        XCTAssertEqual(state.agentActivityState, .working)
-
-        try await waitForSelectorDwell()
-        XCTAssertEqual(state.agentActivityState, .attention)
-
-        state.updateAgentActivityRecord(
-            TerminalAgentActivityRecord(
-                agent: .codex,
-                state: .working,
-                event: "PreToolUse",
-                timestamp: Date().addingTimeInterval(2),
-                isLegacy: false
-            )
-        )
-        XCTAssertEqual(state.agentActivityState, .attention)
-
-        state.updateVisibleTerminalSnapshot(.message("Codex is working", columns: 120, rows: 12))
-        XCTAssertEqual(state.agentActivityState, .working)
-    }
-
-    func testTransientCodexUserSelectorClearsBeforeDwellWithoutAttention() async throws {
-        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
-        state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date()))
-        state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .working)
-
-        state.updateVisibleTerminalSnapshot(.message("Codex is working", columns: 120, rows: 12))
-        try await waitForSelectorDwell()
-
-        XCTAssertEqual(state.agentActivityState, .working)
-    }
-
-    func testStopFailureAndClearOutputClearCodexUserSelectorOverride() async throws {
-        let state = TerminalSessionState(codexSelectorDwellNanoseconds: selectorDwellNanoseconds)
-        state.markRunning()
-        state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date()))
-        state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .working)
-
-        state.markStopped()
-        try await waitForSelectorDwell()
-        XCTAssertEqual(state.agentActivityState, .idle)
-
-        state.markRunning()
-        state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date().addingTimeInterval(1)))
-        state.updateVisibleTerminalSnapshot(codexPlanImplementationSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .working)
-        try await waitForSelectorDwell()
-        XCTAssertEqual(state.agentActivityState, .attention)
-
-        state.recordError("boom")
-        XCTAssertEqual(state.agentActivityState, .idle)
-
-        state.markRunning()
-        state.updateAgentActivityRecord(codexWorkingRecord(timestamp: Date().addingTimeInterval(2)))
-        state.updateVisibleTerminalSnapshot(codexQuestionSelectorSnapshot())
-        XCTAssertEqual(state.agentActivityState, .working)
-        try await waitForSelectorDwell()
-        XCTAssertEqual(state.agentActivityState, .attention)
-
-        state.clearOutput()
-        XCTAssertEqual(state.agentActivityState, .idle)
-    }
-
-    private func codexWorkingRecord(timestamp: Date) -> TerminalAgentActivityRecord {
-        TerminalAgentActivityRecord(
-            agent: .codex,
-            state: .working,
-            event: "PreToolUse",
-            timestamp: timestamp,
-            isLegacy: false
-        )
-    }
-
-    private func waitForSelectorDwell() async throws {
-        try await Task.sleep(nanoseconds: selectorDwellNanoseconds + 30_000_000)
-    }
-
-    private func codexQuestionSelectorSnapshot(
-        question: String = "Which hover animation direction should the plan use?"
+    private func evidence(
+        text: String = "",
+        textSequence: UInt64 = 0,
+        title: String? = nil,
+        titleSequence: UInt64 = 0,
+        progress: String? = nil,
+        progressSequence: UInt64 = 0
     ) -> TerminalRenderSnapshot {
-        TerminalRenderSnapshot.message(
-            """
-            Question 1/1 (1 unanswered)
-            \(question)
-
-              1. Terminal cursor
-            > 2. Status breath
-              3. Subtle entrance
-
-            tab to add notes | enter to submit answer | esc to interrupt
-            """,
-            columns: 120,
-            rows: 12
-        )
-    }
-
-    private func codexPlanImplementationSelectorSnapshot() -> TerminalRenderSnapshot {
-        TerminalRenderSnapshot.message(
-            """
-            Implement this plan?
-
-            > 1. Yes, implement this plan          Switch to Default and start coding.
-              2. Yes, clear context and implement  Fresh thread. Context: 6% used.
-              3. No, stay in Plan mode             Continue planning with the model.
-
-            Press enter to confirm or esc to go back
-            """,
-            columns: 120,
-            rows: 10
+        let base = TerminalRenderSnapshot.message(text, columns: 120, rows: 18)
+        return TerminalRenderSnapshot(
+            columns: base.columns,
+            rows: base.rows,
+            cells: base.cells,
+            cursorColumn: base.cursorColumn,
+            cursorRow: base.cursorRow,
+            cursorVisible: base.cursorVisible,
+            cursorBlinking: base.cursorBlinking,
+            cursorStyle: base.cursorStyle,
+            isAlternateScreen: base.isAlternateScreen,
+            hasMouseTracking: base.hasMouseTracking,
+            isBracketedPasteMode: base.isBracketedPasteMode,
+            isFocusReportingMode: base.isFocusReportingMode,
+            currentWorkingDirectory: base.currentWorkingDirectory,
+            totalRows: base.totalRows,
+            scrollbackRows: base.scrollbackRows,
+            dirtyState: base.dirtyState,
+            dirtyRows: base.dirtyRows,
+            agentStatusText: text,
+            agentStatusTextSequence: textSequence,
+            terminalTitle: title,
+            terminalTitleSequence: titleSequence,
+            terminalProgress: progress,
+            terminalProgressSequence: progressSequence
         )
     }
 }

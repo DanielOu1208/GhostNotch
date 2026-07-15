@@ -12,10 +12,6 @@ enum TerminalAgentActivityState: String, Equatable {
     case idle
     case working
     case attention
-
-    init(rawFileValue: String) {
-        self = TerminalAgentActivityRecord(rawFileValue: rawFileValue).state
-    }
 }
 
 struct AgentStatusIndicatorStyle: Equatable {
@@ -69,96 +65,6 @@ enum TerminalAgentActivityAgent: String, Equatable {
             nil
         }
     }
-}
-
-struct TerminalAgentActivityRecord: Equatable {
-    private static let supportedAgents = Set(["codex", "claude"])
-
-    let agent: TerminalAgentActivityAgent
-    let state: TerminalAgentActivityState
-    let event: String?
-    let timestamp: Date?
-    let isLegacy: Bool
-
-    init(
-        agent: TerminalAgentActivityAgent,
-        state: TerminalAgentActivityState,
-        event: String? = nil,
-        timestamp: Date? = nil,
-        isLegacy: Bool
-    ) {
-        self.agent = agent
-        self.state = state
-        self.event = event
-        self.timestamp = timestamp
-        self.isLegacy = isLegacy
-    }
-
-    init(rawFileValue: String) {
-        let trimmedValue = rawFileValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let structuredRecord = Self.structuredRecord(from: trimmedValue) {
-            self = structuredRecord
-            return
-        }
-
-        self = TerminalAgentActivityRecord(
-            agent: .unknown,
-            state: TerminalAgentActivityState(rawValue: trimmedValue.lowercased()) ?? .idle,
-            isLegacy: true
-        )
-    }
-
-    private static func structuredRecord(from rawValue: String) -> TerminalAgentActivityRecord? {
-        guard rawValue.first == "{",
-              let data = rawValue.data(using: .utf8),
-              let envelope = try? JSONDecoder().decode(AgentActivityEnvelope.self, from: data)
-        else {
-            return rawValue.first == "{" ? malformedStructuredRecord : nil
-        }
-
-        let normalizedAgent = envelope.agent.lowercased()
-        guard supportedAgents.contains(normalizedAgent),
-              let agent = TerminalAgentActivityAgent(rawValue: normalizedAgent),
-              let state = TerminalAgentActivityState(rawValue: envelope.state.lowercased())
-        else {
-            return malformedStructuredRecord
-        }
-
-        return TerminalAgentActivityRecord(
-            agent: agent,
-            state: state,
-            event: envelope.event,
-            timestamp: parseTimestamp(envelope.timestamp),
-            isLegacy: false
-        )
-    }
-
-    private static var malformedStructuredRecord: TerminalAgentActivityRecord {
-        TerminalAgentActivityRecord(agent: .unknown, state: .idle, isLegacy: false)
-    }
-
-    private static func parseTimestamp(_ value: String?) -> Date? {
-        guard let value else {
-            return nil
-        }
-
-        let formatterWithFractionalSeconds = ISO8601DateFormatter()
-        formatterWithFractionalSeconds.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatterWithFractionalSeconds.date(from: value) {
-            return date
-        }
-
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: value)
-    }
-}
-
-private struct AgentActivityEnvelope: Decodable {
-    let agent: String
-    let state: String
-    let event: String?
-    let timestamp: String?
 }
 
 enum CodexTerminalUserSelectorDetector {
@@ -222,6 +128,284 @@ enum CodexTerminalUserSelectorDetector {
     }
 }
 
+struct TerminalAgentProcessIdentity: Equatable, Sendable {
+    let agent: TerminalAgentActivityAgent
+    let processID: Int32
+}
+
+private struct TerminalAgentStatusEvidence {
+    var text = ""
+    var textSequence: UInt64 = 0
+    var title: String?
+    var titleSequence: UInt64 = 0
+    var progress: String?
+    var progressSequence: UInt64 = 0
+
+    init() {}
+
+    init(snapshot: TerminalRenderSnapshot) {
+        text = snapshot.agentStatusText
+        textSequence = snapshot.agentStatusTextSequence
+        title = snapshot.terminalTitle
+        titleSequence = snapshot.terminalTitleSequence
+        progress = snapshot.terminalProgress
+        progressSequence = snapshot.terminalProgressSequence
+    }
+}
+
+private enum TerminalAgentScreenDetection {
+    case state(TerminalAgentActivityState, visibleIdle: Bool = false)
+    case preserve
+}
+
+private enum TerminalAgentScreenRules {
+    static func detect(
+        agent: TerminalAgentActivityAgent,
+        text: String,
+        title: String?,
+        progress: String?
+    ) -> TerminalAgentScreenDetection {
+        switch agent {
+        case .codex:
+            codex(text: text, title: title)
+        case .claude:
+            claude(text: text, title: title, progress: progress)
+        case .unknown:
+            .state(.idle)
+        }
+    }
+
+    private static func codex(text: String, title: String?) -> TerminalAgentScreenDetection {
+        let normalizedTitle = title?.lowercased() ?? ""
+        let normalizedText = text.lowercased()
+        let bottom = bottomLines(in: normalizedText)
+
+        if normalizedTitle.contains("action required") {
+            return .state(.attention)
+        }
+        if containsBrailleSpinner(title) {
+            return .state(.working)
+        }
+        if isCodexReadyPromptVisible(bottom) {
+            return .state(.idle, visibleIdle: true)
+        }
+        if isTranscriptViewer(bottom) {
+            return .preserve
+        }
+        if CodexTerminalUserSelectorDetector.isUserSelectorVisible(in: bottom) ||
+            bottom.contains("enter to submit answer") ||
+            bottom.contains("enter to submit all") ||
+            bottom.contains("allow command?") ||
+            (bottom.contains("press enter to confirm") && bottom.contains("esc to")) ||
+            ((bottom.contains("do you want to") || bottom.contains("would you like to")) &&
+                (bottom.contains("[y/n]") || bottom.contains("yes (y)"))) {
+            return .state(.attention)
+        }
+        if !normalizedTitle.isEmpty {
+            return .state(.idle, visibleIdle: true)
+        }
+        return .state(.idle)
+    }
+
+    private static func claude(
+        text: String,
+        title: String?,
+        progress: String?
+    ) -> TerminalAgentScreenDetection {
+        let normalizedTitle = title?.lowercased() ?? ""
+        let normalizedText = text.lowercased()
+        let bottom = bottomLines(in: normalizedText)
+        let lastLine = bottom.split(separator: "\n", omittingEmptySubsequences: true).last?
+            .trimmingCharacters(in: .whitespaces) ?? ""
+
+        if containsBrailleSpinner(title) {
+            return .state(.working)
+        }
+        if bottom.contains("/btw") && bottom.contains("esc to close") {
+            return .state(.working)
+        }
+        if isTranscriptViewer(bottom) ||
+            (bottom.contains("select model") && bottom.contains("enter to select")) {
+            return .preserve
+        }
+        if lastLine == "❯" {
+            return .state(.idle, visibleIdle: true)
+        }
+        if (bottom.contains("enter to select") && bottom.contains("esc to cancel")) ||
+            bottom.contains("do you want to proceed?") ||
+            (bottom.contains("permission") && bottom.contains("allow")) ||
+            ((bottom.contains("do you want to") || bottom.contains("would you like to")) &&
+                bottom.contains("yes") && bottom.contains("no")) {
+            return .state(.attention)
+        }
+        if bottom.contains("❯") && !bottom.contains("enter to select") {
+            return .state(.idle, visibleIdle: true)
+        }
+        if normalizedTitle == "✳" {
+            return .state(.idle, visibleIdle: true)
+        }
+        if progress?.trimmingCharacters(in: CharacterSet(charactersIn: ";")) == "4;0" {
+            return .state(.idle)
+        }
+        return .state(.idle)
+    }
+
+    private static func containsBrailleSpinner(_ text: String?) -> Bool {
+        text?.unicodeScalars.contains(where: { (0x2800...0x28FF).contains($0.value) }) == true
+    }
+
+    private static func isCodexReadyPromptVisible(_ text: String) -> Bool {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        if lines.last == "›" {
+            return true
+        }
+        guard lines.last == "? for shortcuts" else {
+            return false
+        }
+
+        return lines.dropLast().contains(where: { $0.first == "›" })
+    }
+
+    private static func isTranscriptViewer(_ text: String) -> Bool {
+        text.contains("transcript") && text.contains("esc to close")
+    }
+
+    private static func bottomLines(in text: String) -> String {
+        text.split(separator: "\n", omittingEmptySubsequences: true)
+            .suffix(8)
+            .joined(separator: "\n")
+    }
+}
+
+private struct TerminalAgentStatusDetector {
+    private let startupGrace: TimeInterval
+    private let idleConfirmationInterval: TimeInterval
+    private let idleConfirmationCap: TimeInterval
+
+    private(set) var process: TerminalAgentProcessIdentity?
+    private(set) var state: TerminalAgentActivityState = .idle
+    private(set) var needsFastRefresh = false
+    private var evidence = TerminalAgentStatusEvidence()
+    private var graceUntil: Date?
+    private var sequenceFloor = TerminalAgentStatusEvidence()
+    private var lastProcessObservationEvidence = TerminalAgentStatusEvidence()
+    private var pendingIdleStartedAt: Date?
+    private var lastIdleConfirmationAt: Date?
+    private var idleConfirmations = 0
+
+    init(
+        startupGrace: TimeInterval,
+        idleConfirmationInterval: TimeInterval,
+        idleConfirmationCap: TimeInterval
+    ) {
+        self.startupGrace = startupGrace
+        self.idleConfirmationInterval = idleConfirmationInterval
+        self.idleConfirmationCap = idleConfirmationCap
+    }
+
+    mutating func updateProcess(_ nextProcess: TerminalAgentProcessIdentity?, now: Date) {
+        guard process != nextProcess else {
+            lastProcessObservationEvidence = evidence
+            return
+        }
+
+        process = nextProcess
+        state = .idle
+        sequenceFloor = lastProcessObservationEvidence
+        lastProcessObservationEvidence = evidence
+        graceUntil = nextProcess == nil ? nil : now.addingTimeInterval(startupGrace)
+        clearPendingIdle()
+    }
+
+    mutating func updateEvidence(_ nextEvidence: TerminalAgentStatusEvidence, now: Date) {
+        evidence = nextEvidence
+        evaluate(now: now)
+    }
+
+    mutating func refresh(now: Date) {
+        evaluate(now: now)
+    }
+
+    private mutating func evaluate(now: Date) {
+        guard let process else {
+            state = .idle
+            clearPendingIdle()
+            return
+        }
+        if let graceUntil, now < graceUntil {
+            state = .idle
+            clearPendingIdle()
+            return
+        }
+        graceUntil = nil
+
+        let text = evidence.textSequence > sequenceFloor.textSequence ? evidence.text : ""
+        let title = evidence.titleSequence > sequenceFloor.titleSequence ? evidence.title : nil
+        let progress = evidence.progressSequence > sequenceFloor.progressSequence ? evidence.progress : nil
+        switch TerminalAgentScreenRules.detect(
+            agent: process.agent,
+            text: text,
+            title: title,
+            progress: progress
+        ) {
+        case .preserve:
+            clearPendingIdle()
+        case .state(let nextState, let visibleIdle):
+            apply(nextState, visibleIdle: visibleIdle, now: now)
+        }
+    }
+
+    private mutating func apply(
+        _ nextState: TerminalAgentActivityState,
+        visibleIdle: Bool,
+        now: Date
+    ) {
+        guard state == .working, nextState == .idle, !visibleIdle else {
+            state = nextState
+            clearPendingIdle()
+            return
+        }
+
+        guard let startedAt = pendingIdleStartedAt else {
+            pendingIdleStartedAt = now
+            lastIdleConfirmationAt = now
+            idleConfirmations = 0
+            needsFastRefresh = true
+            return
+        }
+
+        if now.timeIntervalSince(startedAt) >= idleConfirmationCap {
+            state = .idle
+            clearPendingIdle()
+            return
+        }
+
+        guard let lastConfirmation = lastIdleConfirmationAt,
+              now.timeIntervalSince(lastConfirmation) >= idleConfirmationInterval
+        else {
+            needsFastRefresh = true
+            return
+        }
+
+        lastIdleConfirmationAt = now
+        idleConfirmations += 1
+        if idleConfirmations >= 3 {
+            state = .idle
+            clearPendingIdle()
+        } else {
+            needsFastRefresh = true
+        }
+    }
+
+    private mutating func clearPendingIdle() {
+        pendingIdleStartedAt = nil
+        lastIdleConfirmationAt = nil
+        idleConfirmations = 0
+        needsFastRefresh = false
+    }
+}
+
 @MainActor
 final class TerminalSessionState: ObservableObject {
     @Published private(set) var isRunning = false
@@ -234,18 +418,26 @@ final class TerminalSessionState: ObservableObject {
 
     private var capturedOutput = Data()
     private let outputCaptureLimit: Int?
-    private let codexSelectorDwellNanoseconds: UInt64
-    private var hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: .idle, isLegacy: true)
-    private var hasConfirmedCodexVisibleUserSelector = false
-    private var pendingCodexUserSelectorTask: Task<Void, Never>?
-    private var codexUserSelectorGeneration = 0
+    private let startupGrace: TimeInterval
+    private let idleConfirmationInterval: TimeInterval
+    private let idleConfirmationCap: TimeInterval
+    private var detector: TerminalAgentStatusDetector
 
     init(
         outputLimit: Int? = nil,
-        codexSelectorDwellNanoseconds: UInt64 = 200_000_000
+        agentStartupGrace: TimeInterval = 3,
+        idleConfirmationInterval: TimeInterval = 0.1,
+        idleConfirmationCap: TimeInterval = 0.7
     ) {
         outputCaptureLimit = outputLimit
-        self.codexSelectorDwellNanoseconds = codexSelectorDwellNanoseconds
+        startupGrace = agentStartupGrace
+        self.idleConfirmationInterval = idleConfirmationInterval
+        self.idleConfirmationCap = idleConfirmationCap
+        detector = TerminalAgentStatusDetector(
+            startupGrace: agentStartupGrace,
+            idleConfirmationInterval: idleConfirmationInterval,
+            idleConfirmationCap: idleConfirmationCap
+        )
     }
 
     var outputText: String {
@@ -313,118 +505,52 @@ final class TerminalSessionState: ObservableObject {
         currentWorkingDirectory = path
     }
 
-    func updateAgentActivityState(_ newState: TerminalAgentActivityState) {
-        hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: newState, isLegacy: true)
-        clearCodexUserSelectorOverride()
-        resolveAgentActivityState()
+    var activeAgentProcessIdentity: TerminalAgentProcessIdentity? {
+        detector.process
     }
 
-    func updateAgentActivityRecord(_ record: TerminalAgentActivityRecord) {
-        let isNewRecord = record != hookActivityRecord
-        hookActivityRecord = record
-
-        if isNewRecord,
-           (record.agent != .codex || record.state != .working || record.isLegacy) {
-            clearCodexUserSelectorOverride()
-        }
-
-        resolveAgentActivityState()
+    var agentStatusNeedsFastRefresh: Bool {
+        detector.needsFastRefresh
     }
 
-    func updateVisibleTerminalSnapshot(_ snapshot: TerminalRenderSnapshot) {
-        updateVisibleTerminalSnapshot(snapshot, visibleText: { snapshot.plainText })
+    func updateDetectedAgentProcess(
+        _ process: TerminalAgentProcessIdentity?,
+        now: Date = Date()
+    ) {
+        detector.updateProcess(process, now: now)
+        publishDetectedAgentStatus()
     }
 
-    func updateVisibleTerminalSnapshot(_: TerminalRenderSnapshot, visibleText: () -> String) {
-        guard isStructuredCodexWorkingHook
-        else {
-            clearCodexUserSelectorOverride()
-            return
-        }
+    func updateVisibleTerminalSnapshot(
+        _ snapshot: TerminalRenderSnapshot,
+        now: Date = Date()
+    ) {
+        detector.updateEvidence(TerminalAgentStatusEvidence(snapshot: snapshot), now: now)
+        publishDetectedAgentStatus()
+    }
 
-        let isVisibleUserSelector = CodexTerminalUserSelectorDetector.isUserSelectorVisible(in: visibleText())
-        if isVisibleUserSelector {
-            scheduleCodexUserSelectorConfirmationIfNeeded()
-        } else {
-            clearCodexUserSelectorOverride()
-        }
+    func refreshAgentStatus(now: Date = Date()) {
+        detector.refresh(now: now)
+        publishDetectedAgentStatus()
     }
 
     private func resetAgentActivityState() {
-        hookActivityRecord = TerminalAgentActivityRecord(agent: .unknown, state: .idle, isLegacy: true)
-        clearCodexUserSelectorOverride()
-        resolveAgentActivityState()
+        detector = TerminalAgentStatusDetector(
+            startupGrace: startupGrace,
+            idleConfirmationInterval: idleConfirmationInterval,
+            idleConfirmationCap: idleConfirmationCap
+        )
+        publishDetectedAgentStatus()
     }
 
-    private var isStructuredCodexWorkingHook: Bool {
-        hookActivityRecord.agent == .codex &&
-            hookActivityRecord.state == .working &&
-            hookActivityRecord.isLegacy == false
-    }
-
-    private func scheduleCodexUserSelectorConfirmationIfNeeded() {
-        guard hasConfirmedCodexVisibleUserSelector == false,
-              pendingCodexUserSelectorTask == nil
-        else {
-            return
+    private func publishDetectedAgentStatus() {
+        let nextAgent = detector.process?.agent
+        if activeAgent != nextAgent {
+            activeAgent = nextAgent
         }
-
-        codexUserSelectorGeneration += 1
-        let generation = codexUserSelectorGeneration
-        pendingCodexUserSelectorTask = Task { @MainActor [weak self] in
-            do {
-                try await Task.sleep(nanoseconds: self?.codexSelectorDwellNanoseconds ?? 0)
-            } catch {
-                return
-            }
-
-            guard let self,
-                  self.codexUserSelectorGeneration == generation,
-                  self.isStructuredCodexWorkingHook
-            else {
-                return
-            }
-
-            self.pendingCodexUserSelectorTask = nil
-            self.setConfirmedCodexVisibleUserSelector(true)
+        if agentActivityState != detector.state {
+            agentActivityState = detector.state
         }
-    }
-
-    private func clearCodexUserSelectorOverride() {
-        pendingCodexUserSelectorTask?.cancel()
-        pendingCodexUserSelectorTask = nil
-        codexUserSelectorGeneration += 1
-        setConfirmedCodexVisibleUserSelector(false)
-    }
-
-    private func setConfirmedCodexVisibleUserSelector(_ isVisible: Bool) {
-        guard hasConfirmedCodexVisibleUserSelector != isVisible else { return }
-
-        hasConfirmedCodexVisibleUserSelector = isVisible
-        resolveAgentActivityState()
-    }
-
-    private func resolveAgentActivityState() {
-        let resolvedAgent = hookActivityRecord.agent == .unknown ? nil : hookActivityRecord.agent
-        if activeAgent != resolvedAgent {
-            activeAgent = resolvedAgent
-        }
-
-        let resolvedState: TerminalAgentActivityState
-        if hookActivityRecord.agent == .codex,
-           hookActivityRecord.state == .working,
-           hookActivityRecord.isLegacy == false,
-           hasConfirmedCodexVisibleUserSelector {
-            resolvedState = .attention
-        } else {
-            resolvedState = hookActivityRecord.state
-        }
-
-        guard agentActivityState != resolvedState else {
-            return
-        }
-
-        agentActivityState = resolvedState
     }
 }
 

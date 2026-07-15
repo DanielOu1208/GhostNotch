@@ -519,13 +519,67 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         let core = GhosttyTerminalCore(columns: 12, rows: 3)
         core.processOutput(Data((0..<12).map { "line\($0)" }.joined(separator: "\n").utf8))
         let bottomText = core.snapshot.plainText
+        let bottomAgentStatusText = core.snapshot.agentStatusText
 
         XCTAssertGreaterThan(core.snapshot.scrollbackRows, 0)
 
         core.scrollViewport(deltaRows: -2)
 
         XCTAssertNotEqual(core.snapshot.plainText, bottomText)
+        XCTAssertEqual(core.snapshot.agentStatusText, bottomAgentStatusText)
         XCTAssertGreaterThan(core.snapshot.scrollbackRows, 0)
+    }
+
+    func testTitleAndProgressEvidenceAreCapturedAcrossOSCTerminatorsAndChunks() {
+        let core = GhosttyTerminalCore(columns: 20, rows: 3)
+
+        core.processOutput(Data("\u{1B}]0;Action Required\u{7}".utf8))
+        XCTAssertEqual(core.snapshot.terminalTitle, "Action Required")
+        XCTAssertEqual(core.snapshot.terminalTitleSequence, 1)
+
+        core.processOutput(Data("\u{1B}]9;4;".utf8))
+        core.processOutput(Data("3\u{1B}\\".utf8))
+        XCTAssertEqual(core.snapshot.terminalProgress, "4;3")
+        XCTAssertEqual(core.snapshot.terminalProgressSequence, 1)
+
+        core.processOutput(Data("\u{1B}]9;4;0;\u{7}".utf8))
+        XCTAssertEqual(core.snapshot.terminalProgress, "4;0;")
+        XCTAssertEqual(core.snapshot.terminalProgressSequence, 2)
+    }
+
+    func testMalformedAndOversizedOSCProgressDoesNotReplaceLatestEvidence() {
+        let core = GhosttyTerminalCore(columns: 20, rows: 3)
+        core.processOutput(Data("\u{1B}]9;4;1\u{7}".utf8))
+        let sequence = core.snapshot.terminalProgressSequence
+
+        core.processOutput(Data("\u{1B}]8;ignored\u{7}".utf8))
+        core.processOutput(Data(("\u{1B}]9;" + String(repeating: "x", count: 4_097) + "\u{7}").utf8))
+
+        XCTAssertEqual(core.snapshot.terminalProgress, "4;1")
+        XCTAssertEqual(core.snapshot.terminalProgressSequence, sequence)
+    }
+
+    func testResetClearsAgentStatusEvidence() {
+        let core = GhosttyTerminalCore(columns: 20, rows: 3)
+        core.processOutput(Data("\u{1B}]0;⠋ Working\u{7}\u{1B}]9;4;2\u{7}".utf8))
+
+        core.reset(columns: 20, rows: 3)
+
+        XCTAssertNil(core.snapshot.terminalTitle)
+        XCTAssertEqual(core.snapshot.terminalTitleSequence, 0)
+        XCTAssertNil(core.snapshot.terminalProgress)
+        XCTAssertEqual(core.snapshot.terminalProgressSequence, 0)
+        XCTAssertEqual(core.snapshot.agentStatusTextSequence, 0)
+    }
+
+    func testResizeDoesNotMakeExistingAgentTextLookNew() {
+        let core = GhosttyTerminalCore(columns: 20, rows: 3)
+        core.processOutput(Data("Allow command?".utf8))
+        let sequence = core.snapshot.agentStatusTextSequence
+
+        core.resize(columns: 24, rows: 4)
+
+        XCTAssertEqual(core.snapshot.agentStatusTextSequence, sequence)
     }
 
     func testCursorStyleMetadataComesFromGhosttyRenderState() {

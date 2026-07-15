@@ -51,6 +51,7 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
 
     private let readQueue = DispatchQueue(label: "com.ghostnotch.terminal.pty.read")
     private let terminationQueue = DispatchQueue(label: "com.ghostnotch.terminal.pty.terminate")
+    private let processInspectionQueue = DispatchQueue(label: "com.ghostnotch.terminal.pty.process-inspection")
     private let lock = NSLock()
     private var masterFileDescriptor: Int32 = -1
     private var process: Process?
@@ -63,32 +64,53 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         }
     }
 
-    func descendantProcessNames(matching executableNames: Set<String>) -> Set<String> {
-        guard let rootProcessID = lock.withLock({ process?.processIdentifier }) else {
-            return []
+    func descendantProcessSnapshot(matching executableNames: Set<String>) async -> TerminalProcessSnapshot {
+        await withCheckedContinuation { continuation in
+            processInspectionQueue.async { [weak self] in
+                guard let self else {
+                    continuation.resume(returning: TerminalProcessSnapshot(descendants: [], foregroundProcessGroupID: nil))
+                    return
+                }
+                continuation.resume(returning: self.makeDescendantProcessSnapshot(matching: executableNames))
+            }
+        }
+    }
+
+    private func makeDescendantProcessSnapshot(matching executableNames: Set<String>) -> TerminalProcessSnapshot {
+        let processState = lock.withLock {
+            (process?.processIdentifier, masterFileDescriptor)
+        }
+        guard let rootProcessID = processState.0 else {
+            return TerminalProcessSnapshot(descendants: [], foregroundProcessGroupID: nil)
         }
 
         let normalizedExecutableNames = Set(executableNames.map { $0.lowercased() })
-        var pendingProcessIDs = Self.childProcessIDs(of: rootProcessID)
+        var pendingProcessIDs = Self.childProcessIDs(of: rootProcessID).map { ($0, 1) }
         var visitedProcessIDs = Set<pid_t>()
-        var matchingProcessNames = Set<String>()
+        var matches: [TerminalDescendantProcess] = []
 
-        while let processID = pendingProcessIDs.popLast() {
-            guard visitedProcessIDs.insert(processID).inserted else {
-                continue
+        while let (processID, depth) = pendingProcessIDs.popLast() {
+            guard visitedProcessIDs.insert(processID).inserted else { continue }
+
+            let names = Self.processCommandNames(processID).intersection(normalizedExecutableNames)
+            if !names.isEmpty {
+                matches.append(
+                    TerminalDescendantProcess(
+                        processID: processID,
+                        processGroupID: Self.processGroupID(processID),
+                        depth: depth,
+                        commandNames: names
+                    )
+                )
             }
-
-            matchingProcessNames.formUnion(
-                Self.processCommandNames(processID).intersection(normalizedExecutableNames)
-            )
-            if matchingProcessNames == normalizedExecutableNames {
-                return matchingProcessNames
-            }
-
-            pendingProcessIDs.append(contentsOf: Self.childProcessIDs(of: processID))
+            pendingProcessIDs.append(contentsOf: Self.childProcessIDs(of: processID).map { ($0, depth + 1) })
         }
 
-        return matchingProcessNames
+        let foregroundGroup = processState.1 >= 0 ? tcgetpgrp(processState.1) : -1
+        return TerminalProcessSnapshot(
+            descendants: matches,
+            foregroundProcessGroupID: foregroundGroup > 0 ? foregroundGroup : nil
+        )
     }
 
     func start(
@@ -277,6 +299,15 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         }
 
         return names
+    }
+
+    private static func processGroupID(_ processID: pid_t) -> pid_t? {
+        var info = proc_bsdinfo()
+        let size = MemoryLayout<proc_bsdinfo>.stride
+        let result = withUnsafeMutablePointer(to: &info) { pointer in
+            proc_pidinfo(processID, PROC_PIDTBSDINFO, 0, pointer, Int32(size))
+        }
+        return result == size ? pid_t(info.pbi_pgid) : nil
     }
 
     private static func string(from buffer: [CChar]) -> String {

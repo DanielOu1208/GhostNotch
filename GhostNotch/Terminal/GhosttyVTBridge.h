@@ -55,6 +55,9 @@ typedef struct {
     bool focusEventMode;
     size_t totalRows;
     size_t scrollbackRows;
+    bool viewportAtBottom;
+    const uint8_t *title;
+    size_t titleLen;
     const uint8_t *pwd;
     size_t pwdLen;
     /// Render dirty state: 0 clean, 1 partial, 2 full (see `TerminalRenderDirtyState` in Swift).
@@ -157,6 +160,13 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
                           size_t dirtyRowCount,
                           size_t *requiredGraphemeCount,
                           GNVTSnapshotMeta *meta);
+
+bool GNVTTerminalActiveAreaSnapshot(GNVTTerminal *terminal,
+                                    GNVTCell *cells,
+                                    size_t cellCount,
+                                    uint32_t *graphemes,
+                                    size_t graphemeCapacity,
+                                    size_t *requiredGraphemeCount);
 void GNVTTerminalScrollViewport(GNVTTerminal *terminal, intptr_t deltaRows);
 bool GNVTTerminalEncodeKey(GNVTTerminal *terminal,
                            GNVTKey key,
