@@ -93,7 +93,7 @@ Recommended work:
 
 - Keep the committed notch hover clearance fix in the v0 baseline.
 - Keep v0 focused on the current usable app: notch-attached terminal, hover
-  controls, Codex/Claude launch buttons, directory presets, and existing
+  controls, supported-agent launch buttons, directory presets, and existing
   terminal rendering baseline.
 - Do not add Sparkle auto-update, Homebrew, App Store distribution, or full
   notarization work to v0.
@@ -170,7 +170,8 @@ Recommended work:
   - hover agent launcher buttons,
   - directory presets,
   - native Settings UI,
-  - Codex and Claude hook indicator support.
+  - Codex, Claude, OpenCode, Cursor CLI, OMP, Pi, and Droid process identity
+    with terminal-derived status indicators.
 - Add `docs/releases/v0.1.0.md` before tagging.
 - Add or choose a `LICENSE`.
 
@@ -294,7 +295,8 @@ Manual app checks:
 - Run a simple shell command.
 - Confirm collapse/reopen preserves the shell session.
 - Confirm Settings opens and directory presets persist.
-- Confirm Codex and Claude hover buttons still use the configured launch flow.
+- Confirm each supported agent's hover button still uses the configured launch
+  flow.
 - Run the manual terminal checks from `docs/testing.md` for renderer-sensitive
   changes.
 

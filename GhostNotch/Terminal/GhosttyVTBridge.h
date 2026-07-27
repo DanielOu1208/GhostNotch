@@ -34,6 +34,12 @@ typedef struct {
     int underlineStyle;
 } GNVTCell;
 
+typedef struct {
+    size_t graphemeStart;
+    uint32_t graphemeLength;
+    uint8_t widthRole;
+} GNVTTextCell;
+
 typedef enum {
     GNVT_CELL_WIDTH_NARROW = 0,
     GNVT_CELL_WIDTH_WIDE_HEAD = 1,
@@ -161,12 +167,12 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
                           size_t *requiredGraphemeCount,
                           GNVTSnapshotMeta *meta);
 
-bool GNVTTerminalActiveAreaSnapshot(GNVTTerminal *terminal,
-                                    GNVTCell *cells,
-                                    size_t cellCount,
-                                    uint32_t *graphemes,
-                                    size_t graphemeCapacity,
-                                    size_t *requiredGraphemeCount);
+bool GNVTTerminalActiveAreaTextSnapshot(GNVTTerminal *terminal,
+                                        GNVTTextCell *cells,
+                                        size_t cellCount,
+                                        uint32_t *graphemes,
+                                        size_t graphemeCapacity,
+                                        size_t *requiredGraphemeCount);
 void GNVTTerminalScrollViewport(GNVTTerminal *terminal, intptr_t deltaRows);
 bool GNVTTerminalEncodeKey(GNVTTerminal *terminal,
                            GNVTKey key,

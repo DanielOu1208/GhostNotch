@@ -158,14 +158,7 @@ struct IslandIndicatorView: View {
     }
 
     private func activeAgentAssetName(_ agent: TerminalAgentActivityAgent) -> String? {
-        switch agent {
-        case .codex:
-            AgentLauncher.codex.assetName
-        case .claude:
-            AgentLauncher.claude.assetName
-        case .unknown:
-            nil
-        }
+        AgentLauncher.launcher(for: agent)?.assetName
     }
 
     private var collapsedAccessibilityLabel: String {
@@ -177,12 +170,10 @@ struct IslandIndicatorView: View {
             return status
         }
 
-        let agentName = switch activeAgent {
-        case .codex: AgentLauncher.codex.displayName
-        case .claude: AgentLauncher.claude.displayName
-        case .unknown: ""
+        guard let agentName = AgentLauncher.launcher(for: activeAgent)?.displayName else {
+            return status
         }
-        return agentName.isEmpty ? status : "\(agentName), \(status)"
+        return "\(agentName), \(status)"
     }
 
     private var collapsedIndicatorHeight: CGFloat {
@@ -547,14 +538,7 @@ struct IslandIndicatorView: View {
     }
 
     private var activeAgentDisplayName: String? {
-        switch sessionState.activeAgent {
-        case .codex:
-            AgentLauncher.codex.displayName
-        case .claude:
-            AgentLauncher.claude.displayName
-        case .unknown, nil:
-            nil
-        }
+        sessionState.activeAgent.flatMap { AgentLauncher.launcher(for: $0)?.displayName }
     }
 
     private var selectedDirectoryName: String? {

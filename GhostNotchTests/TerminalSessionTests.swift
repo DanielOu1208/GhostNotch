@@ -94,14 +94,33 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(environment["LC_ALL"], "en_GB.UTF-8")
     }
 
-    func testPTYEnvironmentAppliesExplicitOverrides() {
+    func testPTYEnvironmentRemovesHostContextAndAppliesExplicitOverrides() {
         let environment = PTYProcess.terminalEnvironment(
-            from: ["PATH": "/usr/bin:/bin"],
+            from: [
+                "PATH": "/usr/bin:/bin",
+                "NO_COLOR": "1",
+                "HERDR_ENV": "1",
+                "HERDR_PANE_ID": "outer-pane",
+                "HERDR_SOCKET_PATH": "/tmp/outer.sock",
+                "HERDR_CONFIG_PATH": "/tmp/herdr.toml",
+                "HERDR_SESSION": "work",
+                "SSH_AUTH_SOCK": "/tmp/agent.sock",
+                "CUSTOM_VALUE": "preserved",
+            ],
             overrides: [
                 "GHOSTNOTCH_TEST_OVERRIDE": "enabled",
+                "HERDR_ENV": "intentional",
             ]
         )
 
+        XCTAssertNil(environment["NO_COLOR"])
+        XCTAssertNil(environment["HERDR_PANE_ID"])
+        XCTAssertNil(environment["HERDR_SOCKET_PATH"])
+        XCTAssertEqual(environment["HERDR_CONFIG_PATH"], "/tmp/herdr.toml")
+        XCTAssertEqual(environment["HERDR_SESSION"], "work")
+        XCTAssertEqual(environment["SSH_AUTH_SOCK"], "/tmp/agent.sock")
+        XCTAssertEqual(environment["CUSTOM_VALUE"], "preserved")
+        XCTAssertEqual(environment["HERDR_ENV"], "intentional")
         XCTAssertEqual(environment["GHOSTNOTCH_TEST_OVERRIDE"], "enabled")
     }
 
@@ -145,6 +164,49 @@ final class TerminalSessionTests: XCTestCase {
         }
 
         XCTFail("Expected the symlinked Codex process in the PTY descendant tree")
+    }
+
+    func testPTYProcessFindsScriptAgentByScriptArgument() async throws {
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ghostnotch-script-process-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: temporaryDirectory,
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? FileManager.default.removeItem(at: temporaryDirectory)
+        }
+
+        let agentURL = temporaryDirectory.appendingPathComponent("opencode")
+        try "#!/bin/sh\n/bin/sleep 2\n".write(to: agentURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: agentURL.path
+        )
+
+        let process = PTYProcess()
+        try process.start(
+            shell: "/bin/sh",
+            workingDirectory: temporaryDirectory.path,
+            cols: 80,
+            rows: 24,
+            environmentOverrides: [:]
+        )
+        defer {
+            _ = process.stop()
+        }
+
+        try process.write(Data("./opencode\n".utf8))
+        let deadline = Date().addingTimeInterval(1)
+        while Date() < deadline {
+            let snapshot = await process.descendantProcessSnapshot(matching: ["opencode"])
+            if snapshot.descendants.contains(where: { $0.commandNames.contains("opencode") }) {
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        XCTFail("Expected the script-backed OpenCode process in the PTY descendant tree")
     }
 
     func testSessionRunsCommandAndCapturesOutput() async throws {
@@ -399,8 +461,8 @@ final class TerminalSessionTests: XCTestCase {
 
         state.markRunning()
         state.updateDetectedAgentProcess(codex)
-        state.updateVisibleTerminalSnapshot(.message("", columns: 80, rows: 24))
-        state.updateVisibleTerminalSnapshot(statusEvidence(title: "⠋ Working", titleSequence: 1))
+        state.updateAgentStatusEvidence(TerminalAgentStatusEvidence())
+        state.updateAgentStatusEvidence(statusEvidence(title: "⠋ Working", titleSequence: 1))
         XCTAssertEqual(state.agentActivityState, .working)
 
         state.markStopped()
@@ -408,7 +470,7 @@ final class TerminalSessionTests: XCTestCase {
 
         state.markRunning()
         state.updateDetectedAgentProcess(codex)
-        state.updateVisibleTerminalSnapshot(statusEvidence(title: "Action Required", titleSequence: 2))
+        state.updateAgentStatusEvidence(statusEvidence(title: "Action Required", titleSequence: 2))
         XCTAssertEqual(state.agentActivityState, .attention)
 
         state.recordError("boom")
@@ -541,6 +603,22 @@ final class TerminalSessionTests: XCTestCase {
         XCTAssertEqual(coordinator.state.currentWorkingDirectory, "/tmp/project")
     }
 
+    func testCoordinatorRoutesAgentEvidenceSeparatelyFromRenderSnapshots() {
+        let state = TerminalSessionState(agentStartupGrace: 0)
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            state: state,
+            process: FakeTerminalProcess()
+        )
+        let engine = SpyRenderingEngine()
+        let coordinator = TerminalSurfaceCoordinator(session: session, engine: engine)
+        state.updateDetectedAgentProcess(TerminalAgentProcessIdentity(agent: .codex, processID: 7))
+
+        engine.publish(evidence: statusEvidence(title: "⠋ Working", titleSequence: 1))
+
+        XCTAssertEqual(coordinator.state.agentActivityState, .working)
+    }
+
     func testStoppingSessionMarksItStopped() throws {
         let state = TerminalSessionState(outputLimit: 16 * 1024)
         let session = TerminalSession(
@@ -618,28 +696,14 @@ final class TerminalSessionTests: XCTestCase {
         XCTFail("Active agent did not become \(String(describing: expectedValue)). Current value: \(String(describing: state.activeAgent))")
     }
 
-    private func statusEvidence(title: String?, titleSequence: UInt64) -> TerminalRenderSnapshot {
-        let base = TerminalRenderSnapshot.empty()
-        return TerminalRenderSnapshot(
-            columns: base.columns,
-            rows: base.rows,
-            cells: base.cells,
-            cursorColumn: base.cursorColumn,
-            cursorRow: base.cursorRow,
-            cursorVisible: base.cursorVisible,
-            cursorBlinking: base.cursorBlinking,
-            cursorStyle: base.cursorStyle,
-            isAlternateScreen: base.isAlternateScreen,
-            hasMouseTracking: base.hasMouseTracking,
-            isBracketedPasteMode: base.isBracketedPasteMode,
-            isFocusReportingMode: base.isFocusReportingMode,
-            currentWorkingDirectory: base.currentWorkingDirectory,
-            totalRows: base.totalRows,
-            scrollbackRows: base.scrollbackRows,
-            dirtyState: base.dirtyState,
-            dirtyRows: base.dirtyRows,
-            terminalTitle: title,
-            terminalTitleSequence: titleSequence
+    private func statusEvidence(title: String?, titleSequence: UInt64) -> TerminalAgentStatusEvidence {
+        TerminalAgentStatusEvidence(
+            text: "",
+            textSequence: 0,
+            title: title,
+            titleSequence: titleSequence,
+            progress: nil,
+            progressSequence: 0
         )
     }
 }
@@ -736,7 +800,7 @@ private extension TerminalProcessSnapshot {
                     processID: processID,
                     processGroupID: processGroupID,
                     depth: depth,
-                    commandNames: Set([agent.executableName].compactMap { $0 })
+                    commandNames: [AgentLauncher.launcher(for: agent)?.command ?? agent.rawValue]
                 ),
             ],
             foregroundProcessGroupID: processGroupID
@@ -749,6 +813,7 @@ private final class SpyRenderingEngine: TerminalRenderingEngine {
     var snapshot = TerminalRenderSnapshot.empty()
     var lastAppliedGridResize: TerminalGridResize?
     var onSnapshotChange: ((TerminalRenderSnapshot) -> Void)?
+    var onAgentStatusEvidenceChange: ((TerminalAgentStatusEvidence) -> Void)?
     private(set) var processedOutput: [Data] = []
     private(set) var resetRequests: [TerminalGridSize] = []
 
@@ -783,6 +848,10 @@ private final class SpyRenderingEngine: TerminalRenderingEngine {
     func publish(snapshot: TerminalRenderSnapshot) {
         self.snapshot = snapshot
         onSnapshotChange?(snapshot)
+    }
+
+    func publish(evidence: TerminalAgentStatusEvidence) {
+        onAgentStatusEvidenceChange?(evidence)
     }
 
     func focus() {}

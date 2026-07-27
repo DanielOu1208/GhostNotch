@@ -5,14 +5,14 @@ final class GhosttyTerminalCore {
 
     private(set) var columns: Int
     private(set) var rows: Int
+    private(set) var agentStatusEvidence = TerminalAgentStatusEvidence()
 
     private var terminal: OpaquePointer?
     private var cachedSnapshot: TerminalRenderSnapshot
     private var currentWorkingDirectory: String?
     private var agentStatusTextSequence: UInt64 = 0
     private var terminalTitle: String?
-    private var terminalTitleSequence: UInt64 = 0
-    private var progressTracker = AgentOSCProgressTracker()
+    private var statusTracker = TerminalOSCStatusTracker()
 
     init(columns: Int = 80, rows: Int = 18) {
         self.columns = max(columns, 2)
@@ -37,8 +37,7 @@ final class GhosttyTerminalCore {
     }
 
     func processOutput(_ data: Data) {
-        agentStatusTextSequence &+= 1
-        progressTracker.observe(data)
+        statusTracker.observe(data)
 
         if let report = Self.workingDirectoryReport(in: data) {
             switch report {
@@ -56,7 +55,7 @@ final class GhosttyTerminalCore {
 
             GNVTTerminalWrite(terminal, baseAddress, data.count)
         }
-        refreshSnapshot()
+        refreshSnapshot(recordsAgentOutput: true)
     }
 
     func resize(
@@ -84,8 +83,8 @@ final class GhosttyTerminalCore {
         currentWorkingDirectory = nil
         agentStatusTextSequence = 0
         terminalTitle = nil
-        terminalTitleSequence = 0
-        progressTracker = AgentOSCProgressTracker()
+        statusTracker = TerminalOSCStatusTracker()
+        agentStatusEvidence = TerminalAgentStatusEvidence()
         cachedSnapshot = .empty(columns: columns, rows: rows)
 
         terminal = GNVTTerminalCreate(
@@ -240,7 +239,7 @@ final class GhosttyTerminalCore {
         }
     }
 
-    private func refreshSnapshot() {
+    private func refreshSnapshot(recordsAgentOutput: Bool = false) {
         var loadResult = loadSnapshot(graphemeCapacity: max(columns * rows * 2, 1))
         var retryCount = 0
         while !loadResult.success,
@@ -263,14 +262,7 @@ final class GhosttyTerminalCore {
             isDirty ? index : nil
         })
         let cells = loadResult.cells.map { TerminalCell(ghosttyCell: $0, graphemes: loadResult.graphemes) }
-        let nextTitle = Self.terminalTitle(from: meta)
-        if nextTitle != terminalTitle {
-            terminalTitle = nextTitle
-            terminalTitleSequence &+= 1
-        }
-        let agentStatusText = meta.viewportAtBottom
-            ? Self.plainText(cells: cells, columns: columns, rows: rows)
-            : activeAreaText()
+        terminalTitle = Self.terminalTitle(from: meta)
         cachedSnapshot = TerminalRenderSnapshot(
             columns: columns,
             rows: rows,
@@ -288,13 +280,23 @@ final class GhosttyTerminalCore {
             totalRows: Int(meta.totalRows),
             scrollbackRows: Int(meta.scrollbackRows),
             dirtyState: dirtyState,
-            dirtyRows: dirtyState == .full ? Set(0..<rows) : dirtyRows,
-            agentStatusText: agentStatusText,
-            agentStatusTextSequence: agentStatusTextSequence,
-            terminalTitle: terminalTitle,
-            terminalTitleSequence: terminalTitleSequence,
-            terminalProgress: progressTracker.latest,
-            terminalProgressSequence: progressTracker.sequence
+            dirtyRows: dirtyState == .full ? Set(0..<rows) : dirtyRows
+        )
+
+        guard recordsAgentOutput else { return }
+        let text = meta.viewportAtBottom
+            ? TerminalRenderSnapshot.plainText(cells: cells, columns: columns, rows: rows)
+            : activeAreaText()
+        guard let text else { return }
+
+        agentStatusTextSequence &+= 1
+        agentStatusEvidence = TerminalAgentStatusEvidence(
+            text: text,
+            textSequence: agentStatusTextSequence,
+            title: terminalTitle,
+            titleSequence: statusTracker.titleSequence,
+            progress: statusTracker.latestProgress,
+            progressSequence: statusTracker.progressSequence
         )
     }
 
@@ -430,15 +432,15 @@ final class GhosttyTerminalCore {
         )
     }
 
-    private func activeAreaText() -> String {
+    private func activeAreaText() -> String? {
         var graphemeCapacity = max(columns * rows * 2, 1)
         for _ in 0..<3 {
-            var cells = Array(repeating: GNVTCell.blank, count: columns * rows)
+            var cells = Array(repeating: GNVTTextCell.blank, count: columns * rows)
             var graphemes = Array(repeating: UInt32(0), count: graphemeCapacity)
             var requiredGraphemeCount = 0
             let success = cells.withUnsafeMutableBufferPointer { cellBuffer in
                 graphemes.withUnsafeMutableBufferPointer { graphemeBuffer in
-                    GNVTTerminalActiveAreaSnapshot(
+                    GNVTTerminalActiveAreaTextSnapshot(
                         terminal,
                         cellBuffer.baseAddress,
                         cellBuffer.count,
@@ -451,27 +453,14 @@ final class GhosttyTerminalCore {
 
             if success {
                 graphemes.removeSubrange(requiredGraphemeCount..<graphemes.count)
-                let terminalCells = cells.map { TerminalCell(ghosttyCell: $0, graphemes: graphemes) }
-                return Self.plainText(cells: terminalCells, columns: columns, rows: rows)
+                let terminalCells = cells.map { TerminalCell(ghosttyTextCell: $0, graphemes: graphemes) }
+                return TerminalRenderSnapshot.plainText(cells: terminalCells, columns: columns, rows: rows)
             }
             guard requiredGraphemeCount > graphemeCapacity else { break }
             graphemeCapacity = requiredGraphemeCount
         }
 
-        return ""
-    }
-
-    private static func plainText(cells: [TerminalCell], columns: Int, rows: Int) -> String {
-        (0..<rows).map { row in
-            var line = cells[(row * columns)..<((row + 1) * columns)]
-                .filter { !$0.widthRole.isSpacer }
-                .map(\.character)
-                .joined()
-            while line.last == " " || line.last == "\t" {
-                line.removeLast()
-            }
-            return line
-        }.joined(separator: "\n")
+        return nil
     }
 
     private func encodeKey(
@@ -515,7 +504,7 @@ final class GhosttyTerminalCore {
     }
 }
 
-private struct AgentOSCProgressTracker {
+private struct TerminalOSCStatusTracker {
     private enum State {
         case ground
         case escape
@@ -525,8 +514,9 @@ private struct AgentOSCProgressTracker {
 
     private var state = State.ground
     private var body: [UInt8] = []
-    private(set) var latest: String?
-    private(set) var sequence: UInt64 = 0
+    private(set) var titleSequence: UInt64 = 0
+    private(set) var latestProgress: String?
+    private(set) var progressSequence: UInt64 = 0
 
     mutating func observe(_ data: Data) {
         for byte in data {
@@ -569,15 +559,20 @@ private struct AgentOSCProgressTracker {
 
     private mutating func finishBody() {
         defer { body.removeAll(keepingCapacity: true) }
-        guard let separator = body.firstIndex(of: 0x3B),
-              body[..<separator].elementsEqual([0x39])
-        else {
+        guard let separator = body.firstIndex(of: 0x3B) else {
             return
         }
 
+        let command = body[..<separator]
+        if command.elementsEqual([0x30]) || command.elementsEqual([0x32]) {
+            titleSequence &+= 1
+            return
+        }
+        guard command.elementsEqual([0x39]) else { return }
+
         let payload = body[body.index(after: separator)...]
-        latest = sanitizedAgentSignal(String(decoding: payload, as: UTF8.self))
-        sequence &+= 1
+        latestProgress = sanitizedAgentSignal(String(decoding: payload, as: UTF8.self))
+        progressSequence &+= 1
     }
 }
 
@@ -749,9 +744,19 @@ private extension GNVTCell {
     }
 }
 
+private extension GNVTTextCell {
+    static var blank: GNVTTextCell {
+        GNVTTextCell(graphemeStart: 0, graphemeLength: 0, widthRole: 0)
+    }
+}
+
 private extension TerminalCell {
     init(ghosttyCell: GNVTCell, graphemes: [UInt32]) {
-        let character = Self.character(from: ghosttyCell, graphemes: graphemes)
+        let character = Self.character(
+            graphemeStart: ghosttyCell.graphemeStart,
+            graphemeLength: ghosttyCell.graphemeLength,
+            graphemes: graphemes
+        )
 
         self.init(
             character: character,
@@ -773,13 +778,29 @@ private extension TerminalCell {
         )
     }
 
-    private static func character(from ghosttyCell: GNVTCell, graphemes: [UInt32]) -> String {
-        guard ghosttyCell.graphemeLength > 0 else {
+    init(ghosttyTextCell: GNVTTextCell, graphemes: [UInt32]) {
+        self.init(
+            character: Self.character(
+                graphemeStart: ghosttyTextCell.graphemeStart,
+                graphemeLength: ghosttyTextCell.graphemeLength,
+                graphemes: graphemes
+            ),
+            style: .default,
+            widthRole: TerminalCellWidthRole(rawValue: ghosttyTextCell.widthRole) ?? .narrow
+        )
+    }
+
+    private static func character(
+        graphemeStart: Int,
+        graphemeLength: UInt32,
+        graphemes: [UInt32]
+    ) -> String {
+        guard graphemeLength > 0 else {
             return " "
         }
 
-        let start = ghosttyCell.graphemeStart
-        let end = start + Int(ghosttyCell.graphemeLength)
+        let start = graphemeStart
+        let end = start + Int(graphemeLength)
         guard start >= 0, end <= graphemes.count else {
             return " "
         }

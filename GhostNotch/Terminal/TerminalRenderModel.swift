@@ -138,62 +138,6 @@ struct TerminalRenderSnapshot: Equatable {
     let scrollbackRows: Int
     let dirtyState: TerminalRenderDirtyState
     let dirtyRows: Set<Int>
-    let agentStatusText: String
-    let agentStatusTextSequence: UInt64
-    let terminalTitle: String?
-    let terminalTitleSequence: UInt64
-    let terminalProgress: String?
-    let terminalProgressSequence: UInt64
-
-    init(
-        columns: Int,
-        rows: Int,
-        cells: [TerminalCell],
-        cursorColumn: Int,
-        cursorRow: Int,
-        cursorVisible: Bool,
-        cursorBlinking: Bool,
-        cursorStyle: TerminalCursorStyle,
-        isAlternateScreen: Bool,
-        hasMouseTracking: Bool,
-        isBracketedPasteMode: Bool,
-        isFocusReportingMode: Bool,
-        currentWorkingDirectory: String?,
-        totalRows: Int,
-        scrollbackRows: Int,
-        dirtyState: TerminalRenderDirtyState,
-        dirtyRows: Set<Int>,
-        agentStatusText: String = "",
-        agentStatusTextSequence: UInt64 = 0,
-        terminalTitle: String? = nil,
-        terminalTitleSequence: UInt64 = 0,
-        terminalProgress: String? = nil,
-        terminalProgressSequence: UInt64 = 0
-    ) {
-        self.columns = columns
-        self.rows = rows
-        self.cells = cells
-        self.cursorColumn = cursorColumn
-        self.cursorRow = cursorRow
-        self.cursorVisible = cursorVisible
-        self.cursorBlinking = cursorBlinking
-        self.cursorStyle = cursorStyle
-        self.isAlternateScreen = isAlternateScreen
-        self.hasMouseTracking = hasMouseTracking
-        self.isBracketedPasteMode = isBracketedPasteMode
-        self.isFocusReportingMode = isFocusReportingMode
-        self.currentWorkingDirectory = currentWorkingDirectory
-        self.totalRows = totalRows
-        self.scrollbackRows = scrollbackRows
-        self.dirtyState = dirtyState
-        self.dirtyRows = dirtyRows
-        self.agentStatusText = agentStatusText
-        self.agentStatusTextSequence = agentStatusTextSequence
-        self.terminalTitle = terminalTitle
-        self.terminalTitleSequence = terminalTitleSequence
-        self.terminalProgress = terminalProgress
-        self.terminalProgressSequence = terminalProgressSequence
-    }
 
     var needsFullRedraw: Bool {
         dirtyState == .full
@@ -294,9 +238,7 @@ struct TerminalRenderSnapshot: Equatable {
             totalRows: normalizedRows,
             scrollbackRows: 0,
             dirtyState: .full,
-            dirtyRows: Set(0..<normalizedRows),
-            agentStatusText: text,
-            agentStatusTextSequence: text.isEmpty ? 0 : 1
+            dirtyRows: Set(0..<normalizedRows)
         )
     }
 
@@ -309,11 +251,17 @@ struct TerminalRenderSnapshot: Equatable {
     }
 
     var plainText: String {
-        var lines: [String] = []
-        for row in 0..<rows {
-            lines.append(textLine(row: row, startColumn: 0, endColumn: columns - 1, trimsRightPadding: true))
-        }
-        return lines.joined(separator: "\n")
+        Self.plainText(cells: cells, columns: columns, rows: rows)
+    }
+
+    static func plainText(cells: [TerminalCell], columns: Int, rows: Int) -> String {
+        (0..<rows).map { row in
+            cells[(row * columns)..<((row + 1) * columns)]
+                .filter { !$0.widthRole.isSpacer }
+                .map(\.character)
+                .joined()
+                .trimmingRightCellPadding()
+        }.joined(separator: "\n")
     }
 
     func text(in selection: TerminalSelection) -> String {

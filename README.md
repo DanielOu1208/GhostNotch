@@ -13,10 +13,10 @@ It sits flush with the top of the built-in display, looks like a small extension
 - Run commands in your default shell.
 - Collapse the island without killing the shell session.
 - Reopen it later and continue from the same session.
-- Launch Codex or Claude from the hover controls.
+- Launch Codex, Claude, OpenCode, Cursor CLI, OMP, Pi, or Droid from the hover controls.
 - Save up to three directory presets with compact hover icons and launch an agent inside one of them.
 - Open native Settings to choose visible agents and manage directory preset labels, icons, and folders.
-- See Codex and Claude status update from the running process and live terminal state, without installing agent hooks.
+- See supported-agent status update from the running process and live terminal state, without installing agent hooks.
 - Use keyboard input, paste, terminal resize, scrollback, selection, and common terminal UI programs while the renderer continues to improve.
 
 GhostNotch has three visible states:
@@ -36,10 +36,10 @@ Ready today:
 
 - Native macOS notch-attached panel.
 - Persistent default-shell PTY session.
-- Hover controls with Codex and Claude launcher buttons.
+- Hover controls for seven supported coding agents, with up to three selected in Settings.
 - Directory presets with compact hover icons for launching agents inside saved folders.
 - Native Settings UI for visible agents and directory preset labels, icons, and folders.
-- Codex and Claude process identity with terminal-derived Ready, Working, and Waiting indicators; live real-agent acceptance remains open.
+- Terminal-derived Ready, Working, and Waiting indicators for Codex, Claude, OpenCode, Cursor CLI, OMP, Pi, and Droid; live real-agent acceptance remains open.
 - Ghostty-backed terminal parsing/state through a vendored `libghostty-vt` artifact.
 - App-owned AppKit/CoreText terminal grid renderer.
 - ANSI styles, cursor movement, alternate-screen support, primary-screen scrollback, grapheme-aware snapshots, wide-cell metadata, and text selection/copy.
@@ -136,7 +136,7 @@ Use the root `GhostNotch.xcodeproj` and root `GhostNotch/` source tree.
 - [Testing](docs/testing.md) covers build, automated tests, and manual terminal acceptance.
 - [v0.1.0 release notes](docs/releases/v0.1.0.md) summarize the planned public preview release.
 - [v0 DMG release tracking](docs/v0-dmg-release-tracking.md) tracks the self-signed DMG release path.
-- [Agent status detection](docs/agent-indicator-hooks.md) explains Codex and Claude process and terminal-signal detection.
+- [Agent status detection](docs/agent-indicator-hooks.md) explains supported-agent process and terminal-signal detection.
 - [MacBook notch geometry](docs/notch-geometry.md) records the notch sizing and positioning assumptions.
 - [Xcode debugging](docs/xcode-debugging.md) covers LLDB task-port attach failures and terminal startup hangs.
 - [Ghostty VT vendor notes](vendor/ghostty-vt/README.md) describe the vendored terminal artifact.
@@ -144,6 +144,7 @@ Use the root `GhostNotch.xcodeproj` and root `GhostNotch/` source tree.
 ## License
 
 GhostNotch is available under the [MIT License](LICENSE).
+Agent marks are covered separately in [Third-Party Notices](THIRD_PARTY_NOTICES.md).
 
 ## Contributing
 
@@ -155,7 +156,7 @@ Useful areas:
 - Alternate-screen scrolling and collapse/reopen viewport stability.
 - Font, glyph, color, cursor, and selection polish.
 - Startup/debugging hardening around shell launch and Xcode attach behavior.
-- Codex and Claude status-rule fixtures and live terminal acceptance.
+- Supported-agent status-rule fixtures and live terminal acceptance.
 - Shell identity, terminfo, and shell integration design.
 - Runtime notch measurement across MacBook models and external displays.
 - Keeping the Ghostty boundary narrow, explicit, and replaceable.

@@ -37,6 +37,12 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
     static let defaultColorTerminal = "truecolor"
     static let shellIntegrationResourceSubdirectory = "ShellIntegration"
     static let defaultUTF8Locale = "en_US.UTF-8"
+    private static let inheritedHerdrConfigurationVariables: Set<String> = [
+        "HERDR_CONFIG_PATH",
+        "HERDR_DISABLE_SOUND",
+        "HERDR_LOG",
+        "HERDR_SESSION",
+    ]
     fileprivate static let defaultExecutableSearchPath = [
         "/opt/homebrew/bin",
         "/usr/local/bin",
@@ -294,8 +300,8 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
             )
         }
 
-        if let firstArgument = processFirstArgument(processID) {
-            names.insert(URL(fileURLWithPath: firstArgument).lastPathComponent.lowercased())
+        for argument in processArguments(processID, limit: 2) {
+            names.insert(URL(fileURLWithPath: argument).lastPathComponent.lowercased())
         }
 
         return names
@@ -317,27 +323,26 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         )
     }
 
-    private static func processFirstArgument(_ processID: pid_t) -> String? {
+    private static func processArguments(_ processID: pid_t, limit: Int) -> [String] {
         var managementInformationBase = [CTL_KERN, KERN_PROCARGS2, processID]
         var bufferSize = 0
         guard sysctl(&managementInformationBase, 3, nil, &bufferSize, nil, 0) == 0,
               bufferSize > MemoryLayout<Int32>.size
         else {
-            return nil
+            return []
         }
 
         var buffer = [UInt8](repeating: 0, count: bufferSize)
         guard sysctl(&managementInformationBase, 3, &buffer, &bufferSize, nil, 0) == 0 else {
-            return nil
+            return []
         }
 
         let argumentCount = Int(buffer.withUnsafeBytes { $0.load(as: Int32.self) })
         guard argumentCount > 0 else {
-            return nil
+            return []
         }
 
         var index = MemoryLayout<Int32>.size
-
         while index < bufferSize, buffer[index] != 0 {
             index += 1
         }
@@ -345,15 +350,20 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
             index += 1
         }
 
-        let argumentStart = index
-        while index < bufferSize, buffer[index] != 0 {
-            index += 1
+        var arguments: [String] = []
+        while arguments.count < min(argumentCount, limit), index < bufferSize {
+            let argumentStart = index
+            while index < bufferSize, buffer[index] != 0 {
+                index += 1
+            }
+            if argumentStart < index {
+                arguments.append(String(decoding: buffer[argumentStart..<index], as: UTF8.self))
+            }
+            while index < bufferSize, buffer[index] == 0 {
+                index += 1
+            }
         }
-
-        guard argumentStart < index else {
-            return nil
-        }
-        return String(decoding: buffer[argumentStart..<index], as: UTF8.self)
+        return arguments
     }
 
     private func startReading(from descriptor: Int32, generation: Int) {
@@ -483,6 +493,13 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         overrides: [String: String] = [:]
     ) -> [String: String] {
         var terminalEnvironment = environment
+        terminalEnvironment.removeValue(forKey: "NO_COLOR")
+        let inheritedHerdrContext = terminalEnvironment.keys.filter {
+            $0.hasPrefix("HERDR_") && !inheritedHerdrConfigurationVariables.contains($0)
+        }
+        for key in inheritedHerdrContext {
+            terminalEnvironment.removeValue(forKey: key)
+        }
         terminalEnvironment["TERM"] = defaultTerminalType
         terminalEnvironment["TERM_PROGRAM"] = termProgram
         terminalEnvironment["TERM_PROGRAM_VERSION"] = termProgramVersion

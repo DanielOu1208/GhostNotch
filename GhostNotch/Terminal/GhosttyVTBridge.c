@@ -145,6 +145,12 @@ static void GNVTResetCell(GNVTCell *cell) {
     cell->underlineStyle = GHOSTTY_SGR_UNDERLINE_NONE;
 }
 
+static void GNVTResetTextCell(GNVTTextCell *cell) {
+    cell->graphemeStart = 0;
+    cell->graphemeLength = 0;
+    cell->widthRole = GNVT_CELL_WIDTH_NARROW;
+}
+
 static GhosttyKey GNVTGhosttyKeyFromKey(GNVTKey key) {
     switch (key) {
         case GNVT_KEY_ESCAPE: return GHOSTTY_KEY_ESCAPE;
@@ -598,12 +604,12 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     return true;
 }
 
-bool GNVTTerminalActiveAreaSnapshot(GNVTTerminal *terminal,
-                                    GNVTCell *cells,
-                                    size_t cellCount,
-                                    uint32_t *graphemes,
-                                    size_t graphemeCapacity,
-                                    size_t *requiredGraphemeCount) {
+bool GNVTTerminalActiveAreaTextSnapshot(GNVTTerminal *terminal,
+                                        GNVTTextCell *cells,
+                                        size_t cellCount,
+                                        uint32_t *graphemes,
+                                        size_t graphemeCapacity,
+                                        size_t *requiredGraphemeCount) {
     if (terminal == NULL || terminal->terminal == NULL || cells == NULL || requiredGraphemeCount == NULL) {
         return false;
     }
@@ -623,8 +629,8 @@ bool GNVTTerminalActiveAreaSnapshot(GNVTTerminal *terminal,
     for (uint16_t row = 0; row < terminal->rows; row += 1) {
         for (uint16_t column = 0; column < terminal->columns; column += 1) {
             size_t index = (size_t)row * (size_t)terminal->columns + (size_t)column;
-            GNVTCell *cell = &cells[index];
-            GNVTResetCell(cell);
+            GNVTTextCell *cell = &cells[index];
+            GNVTResetTextCell(cell);
 
             GhosttyPoint point = {0};
             point.tag = GHOSTTY_POINT_TAG_ACTIVE;

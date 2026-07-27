@@ -21,8 +21,10 @@ final class TerminalSurfaceCoordinator {
         engine.start(session: session)
         engine.onSnapshotChange = { [weak self] snapshot in
             self?.session.state.updateWorkingDirectory(snapshot.currentWorkingDirectory)
-            self?.session.state.updateVisibleTerminalSnapshot(snapshot)
             self?.onSnapshotChange?(snapshot)
+        }
+        engine.onAgentStatusEvidenceChange = { [weak self] evidence in
+            self?.session.state.updateAgentStatusEvidence(evidence)
         }
         session.addOutputObserver { [weak self] data in
             self?.enqueueOutput(data)

@@ -151,7 +151,7 @@ struct AgentPresetConfiguration: Codable, Equatable, Sendable {
 
     static let `default` = AgentPresetConfiguration(
         directoryPresets: [],
-        enabledAgentIDs: AgentLauncher.all.map(\.id)
+        enabledAgentIDs: [.codex, .claude]
     )
 
     func normalized() -> AgentPresetConfiguration {

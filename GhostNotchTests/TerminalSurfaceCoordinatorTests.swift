@@ -226,6 +226,7 @@ private final class CoordinatorTestRenderingEngine: TerminalRenderingEngine {
     var snapshot = TerminalRenderSnapshot.empty()
     var lastAppliedGridResize: TerminalGridResize?
     var onSnapshotChange: ((TerminalRenderSnapshot) -> Void)?
+    var onAgentStatusEvidenceChange: ((TerminalAgentStatusEvidence) -> Void)?
     private(set) var resetRequests: [CoordinatorTestTerminalGridSize] = []
     private(set) var sentInputs: [Data] = []
 

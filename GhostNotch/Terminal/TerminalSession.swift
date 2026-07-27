@@ -105,9 +105,8 @@ final class TerminalSession {
         cancelStartupWatchdog()
         stopAgentStatusMonitoring()
         lifecycleGeneration += 1
-        _ = process.stop()
-        resetAgentActivityState()
         state.markStopped()
+        _ = process.stop()
     }
 
     func restart(cols: Int = 80, rows: Int = 24, workingDirectory: String? = nil) throws {
@@ -116,7 +115,7 @@ final class TerminalSession {
         lifecycleGeneration += 1
         let generation = lifecycleGeneration
         state.clearOutput()
-        resetAgentActivityState()
+        state.markStopped()
         _ = process.stop()
 
         try launch(
@@ -164,19 +163,17 @@ final class TerminalSession {
     }
 
     private func handleProcessTermination() {
-        guard !process.isRunning, state.phase != .failed else {
+        guard !process.isRunning, state.phase != .failed, state.phase != .stopped else {
             return
         }
 
         cancelStartupWatchdog()
-        state.markStopped()
         stopAgentStatusMonitoring()
-        resetAgentActivityState()
+        state.markStopped()
     }
 
     private func launch(cols: Int, rows: Int, workingDirectory: String?, generation: Int) throws {
         let shell = shellResolver.resolve()
-        resetAgentActivityState()
 
         do {
             try process.start(
@@ -256,10 +253,6 @@ final class TerminalSession {
         agentStatusMonitorTask = nil
     }
 
-    private func resetAgentActivityState() {
-        state.updateDetectedAgentProcess(nil)
-    }
-
     private func refreshAgentActivityState(generation: Int) async {
         guard generation == lifecycleGeneration, process.isRunning else {
             state.updateDetectedAgentProcess(nil)
@@ -267,7 +260,7 @@ final class TerminalSession {
         }
 
         let snapshot = await process.descendantProcessSnapshot(
-            matching: Set(TerminalAgentActivityAgent.supportedCases.compactMap(\.executableName))
+            matching: Set(AgentLauncher.all.map { $0.command.lowercased() })
         )
         guard generation == lifecycleGeneration, process.isRunning else {
             return
@@ -284,14 +277,13 @@ final class TerminalSession {
         previous: TerminalAgentProcessIdentity?
     ) -> TerminalAgentProcessIdentity? {
         let candidates = snapshot.descendants.compactMap { process -> (TerminalAgentProcessIdentity, Int, Int32?)? in
-            guard let agent = TerminalAgentActivityAgent.supportedCases.first(where: { agent in
-                guard let executableName = agent.executableName else { return false }
-                return process.commandNames.contains(executableName)
+            guard let launcher = AgentLauncher.all.first(where: { launcher in
+                process.commandNames.contains(launcher.command.lowercased())
             }) else {
                 return nil
             }
             return (
-                TerminalAgentProcessIdentity(agent: agent, processID: process.processID),
+                TerminalAgentProcessIdentity(agent: launcher.id, processID: process.processID),
                 process.depth,
                 process.processGroupID
             )

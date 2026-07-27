@@ -48,30 +48,9 @@ struct AgentStatusIndicatorStyle: Equatable {
     }
 }
 
-enum TerminalAgentActivityAgent: String, Equatable {
-    case codex
-    case claude
-    case unknown
-
-    static let supportedCases: [TerminalAgentActivityAgent] = [.codex, .claude]
-
-    var executableName: String? {
-        switch self {
-        case .codex:
-            "codex"
-        case .claude:
-            "claude"
-        case .unknown:
-            nil
-        }
-    }
-}
+typealias TerminalAgentActivityAgent = AgentLauncher.ID
 
 enum CodexTerminalUserSelectorDetector {
-    static func isUserSelectorVisible(in snapshot: TerminalRenderSnapshot) -> Bool {
-        isUserSelectorVisible(in: snapshot.plainText)
-    }
-
     static func isUserSelectorVisible(in text: String) -> Bool {
         isQuestionSelectorVisible(in: text) || isPlanImplementationSelectorVisible(in: text)
     }
@@ -133,28 +112,20 @@ struct TerminalAgentProcessIdentity: Equatable, Sendable {
     let processID: Int32
 }
 
-private struct TerminalAgentStatusEvidence {
+struct TerminalAgentStatusEvidence: Equatable {
     var text = ""
     var textSequence: UInt64 = 0
     var title: String?
     var titleSequence: UInt64 = 0
     var progress: String?
     var progressSequence: UInt64 = 0
-
-    init() {}
-
-    init(snapshot: TerminalRenderSnapshot) {
-        text = snapshot.agentStatusText
-        textSequence = snapshot.agentStatusTextSequence
-        title = snapshot.terminalTitle
-        titleSequence = snapshot.terminalTitleSequence
-        progress = snapshot.terminalProgress
-        progressSequence = snapshot.terminalProgressSequence
-    }
 }
 
 private enum TerminalAgentScreenDetection {
-    case state(TerminalAgentActivityState, visibleIdle: Bool = false)
+    case working
+    case attention
+    case readyExplicit
+    case readyFallback
     case preserve
 }
 
@@ -170,8 +141,16 @@ private enum TerminalAgentScreenRules {
             codex(text: text, title: title)
         case .claude:
             claude(text: text, title: title, progress: progress)
-        case .unknown:
-            .state(.idle)
+        case .opencode:
+            opencode(text: text, title: title)
+        case .cursor:
+            cursor(text: text, title: title)
+        case .omp:
+            omp(text: text, title: title)
+        case .pi:
+            pi(text: text, title: title)
+        case .droid:
+            droid(text: text, title: title)
         }
     }
 
@@ -181,30 +160,24 @@ private enum TerminalAgentScreenRules {
         let bottom = bottomLines(in: normalizedText)
 
         if normalizedTitle.contains("action required") {
-            return .state(.attention)
+            return .attention
         }
         if containsBrailleSpinner(title) {
-            return .state(.working)
+            return .working
         }
         if isCodexReadyPromptVisible(bottom) {
-            return .state(.idle, visibleIdle: true)
+            return .readyExplicit
         }
         if isTranscriptViewer(bottom) {
             return .preserve
         }
-        if CodexTerminalUserSelectorDetector.isUserSelectorVisible(in: bottom) ||
-            bottom.contains("enter to submit answer") ||
-            bottom.contains("enter to submit all") ||
-            bottom.contains("allow command?") ||
-            (bottom.contains("press enter to confirm") && bottom.contains("esc to")) ||
-            ((bottom.contains("do you want to") || bottom.contains("would you like to")) &&
-                (bottom.contains("[y/n]") || bottom.contains("yes (y)"))) {
-            return .state(.attention)
+        if isCodexAttentionPrompt(bottom) {
+            return .attention
         }
         if !normalizedTitle.isEmpty {
-            return .state(.idle, visibleIdle: true)
+            return .readyExplicit
         }
-        return .state(.idle)
+        return .readyFallback
     }
 
     private static func claude(
@@ -219,39 +192,145 @@ private enum TerminalAgentScreenRules {
             .trimmingCharacters(in: .whitespaces) ?? ""
 
         if containsBrailleSpinner(title) {
-            return .state(.working)
+            return .working
         }
         if bottom.contains("/btw") && bottom.contains("esc to close") {
-            return .state(.working)
+            return .working
         }
         if isTranscriptViewer(bottom) ||
             (bottom.contains("select model") && bottom.contains("enter to select")) {
             return .preserve
         }
         if lastLine == "❯" {
-            return .state(.idle, visibleIdle: true)
+            return .readyExplicit
         }
-        if (bottom.contains("enter to select") && bottom.contains("esc to cancel")) ||
-            bottom.contains("do you want to proceed?") ||
-            (bottom.contains("permission") && bottom.contains("allow")) ||
-            ((bottom.contains("do you want to") || bottom.contains("would you like to")) &&
-                bottom.contains("yes") && bottom.contains("no")) {
-            return .state(.attention)
+        if isClaudeAttentionPrompt(bottom) {
+            return .attention
         }
         if bottom.contains("❯") && !bottom.contains("enter to select") {
-            return .state(.idle, visibleIdle: true)
+            return .readyExplicit
         }
         if normalizedTitle == "✳" {
-            return .state(.idle, visibleIdle: true)
+            return .readyExplicit
         }
         if progress?.trimmingCharacters(in: CharacterSet(charactersIn: ";")) == "4;0" {
-            return .state(.idle)
+            return .readyFallback
         }
-        return .state(.idle)
+        return .readyFallback
+    }
+
+    private static func opencode(text: String, title: String?) -> TerminalAgentScreenDetection {
+        let bottom = bottomLines(in: text.lowercased())
+
+        if bottom.contains("permission required"),
+           bottom.contains("allow once"),
+           bottom.contains("reject") {
+            return .attention
+        }
+        if containsBrailleSpinner(title) || containsBrailleSpinner(bottom) ||
+            hasActivityLine(in: bottom, prefixes: ["thinking", "working"]) {
+            return .working
+        }
+        if isSimpleComposerVisible(bottom) {
+            return .readyExplicit
+        }
+        return .readyFallback
+    }
+
+    private static func cursor(text: String, title: String?) -> TerminalAgentScreenDetection {
+        let bottom = bottomLines(in: text.lowercased())
+        let hasApprovalChoice = bottom.contains("[y/n]") ||
+            (bottom.contains("y to approve") && bottom.contains("n to reject"))
+
+        if (bottom.contains("approve") || bottom.contains("run this command")) &&
+            hasApprovalChoice {
+            return .attention
+        }
+        if containsBrailleSpinner(title) || containsBrailleSpinner(bottom) ||
+            hasActivityLine(in: bottom, prefixes: ["thinking", "working"]) {
+            return .working
+        }
+        if isSimpleComposerVisible(bottom) {
+            return .readyExplicit
+        }
+        return .readyFallback
+    }
+
+    private static func omp(text: String, title: String?) -> TerminalAgentScreenDetection {
+        let normalizedTitle = title?.lowercased() ?? ""
+        let bottom = bottomLines(in: text.lowercased())
+
+        if normalizedTitle.contains("π !") {
+            return .attention
+        }
+        if containsBrailleSpinner(title) || containsBrailleSpinner(bottom) ||
+            hasActivityLine(in: bottom, prefixes: ["working"]) {
+            return .working
+        }
+        if normalizedTitle.contains("π >") {
+            return .readyExplicit
+        }
+        if bottom.contains("approve and execute") ||
+            (bottom.contains("approval") && bottom.contains("reject")) {
+            return .attention
+        }
+        if isSimpleComposerVisible(bottom) {
+            return .readyExplicit
+        }
+        return .readyFallback
+    }
+
+    private static func pi(text: String, title: String?) -> TerminalAgentScreenDetection {
+        let bottom = bottomLines(in: text.lowercased())
+
+        if bottom.contains("trust this project"),
+           bottom.contains("yes"),
+           bottom.contains("no") {
+            return .attention
+        }
+        if containsBrailleSpinner(title) || containsBrailleSpinner(bottom) ||
+            hasActivityLine(in: bottom, prefixes: ["working", "retrying", "compacting"]) {
+            return .working
+        }
+        if isSimpleComposerVisible(bottom) {
+            return .readyExplicit
+        }
+        return .readyFallback
+    }
+
+    private static func droid(text: String, title: String?) -> TerminalAgentScreenDetection {
+        let bottom = bottomLines(in: text.lowercased())
+
+        if (bottom.contains("permission") || bottom.contains("approval")) &&
+            (bottom.contains("allow") || bottom.contains("approve") || bottom.contains("accept")) &&
+            (bottom.contains("reject") || bottom.contains("decline")) {
+            return .attention
+        }
+        if containsBrailleSpinner(title) || containsBrailleSpinner(bottom) ||
+            hasActivityLine(in: bottom, prefixes: ["thinking", "working"]) {
+            return .working
+        }
+        if isSimpleComposerVisible(bottom) {
+            return .readyExplicit
+        }
+        return .readyFallback
     }
 
     private static func containsBrailleSpinner(_ text: String?) -> Bool {
         text?.unicodeScalars.contains(where: { (0x2800...0x28FF).contains($0.value) }) == true
+    }
+
+    private static func hasActivityLine(in text: String, prefixes: [String]) -> Bool {
+        text.split(separator: "\n").contains { line in
+            let normalizedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            return prefixes.contains { normalizedLine.hasPrefix($0) }
+        }
+    }
+
+    private static func isSimpleComposerVisible(_ text: String) -> Bool {
+        let lastLine = text.split(separator: "\n", omittingEmptySubsequences: true).last?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return lastLine == ">" || lastLine == "›"
     }
 
     private static func isCodexReadyPromptVisible(_ text: String) -> Bool {
@@ -271,8 +350,26 @@ private enum TerminalAgentScreenRules {
         text.contains("transcript") && text.contains("esc to close")
     }
 
+    private static func isCodexAttentionPrompt(_ text: String) -> Bool {
+        CodexTerminalUserSelectorDetector.isUserSelectorVisible(in: text) ||
+            text.contains("enter to submit answer") ||
+            text.contains("enter to submit all") ||
+            text.contains("allow command?") ||
+            (text.contains("press enter to confirm") && text.contains("esc to")) ||
+            ((text.contains("do you want to") || text.contains("would you like to")) &&
+                (text.contains("[y/n]") || text.contains("yes (y)")))
+    }
+
+    private static func isClaudeAttentionPrompt(_ text: String) -> Bool {
+        (text.contains("enter to select") && text.contains("esc to cancel")) ||
+            text.contains("do you want to proceed?") ||
+            (text.contains("permission") && text.contains("allow")) ||
+            ((text.contains("do you want to") || text.contains("would you like to")) &&
+                text.contains("yes") && text.contains("no"))
+    }
+
     private static func bottomLines(in text: String) -> String {
-        text.split(separator: "\n", omittingEmptySubsequences: true)
+        text.split(separator: "\n", omittingEmptySubsequences: false)
             .suffix(8)
             .joined(separator: "\n")
     }
@@ -289,7 +386,6 @@ private struct TerminalAgentStatusDetector {
     private var evidence = TerminalAgentStatusEvidence()
     private var graceUntil: Date?
     private var sequenceFloor = TerminalAgentStatusEvidence()
-    private var lastProcessObservationEvidence = TerminalAgentStatusEvidence()
     private var pendingIdleStartedAt: Date?
     private var lastIdleConfirmationAt: Date?
     private var idleConfirmations = 0
@@ -306,14 +402,18 @@ private struct TerminalAgentStatusDetector {
 
     mutating func updateProcess(_ nextProcess: TerminalAgentProcessIdentity?, now: Date) {
         guard process != nextProcess else {
-            lastProcessObservationEvidence = evidence
+            if nextProcess == nil {
+                sequenceFloor = evidence
+            }
             return
         }
 
+        let previousProcess = process
         process = nextProcess
         state = .idle
-        sequenceFloor = lastProcessObservationEvidence
-        lastProcessObservationEvidence = evidence
+        if previousProcess != nil || nextProcess == nil {
+            sequenceFloor = evidence
+        }
         graceUntil = nextProcess == nil ? nil : now.addingTimeInterval(startupGrace)
         clearPendingIdle()
     }
@@ -351,8 +451,14 @@ private struct TerminalAgentStatusDetector {
         ) {
         case .preserve:
             clearPendingIdle()
-        case .state(let nextState, let visibleIdle):
-            apply(nextState, visibleIdle: visibleIdle, now: now)
+        case .working:
+            apply(.working, visibleIdle: false, now: now)
+        case .attention:
+            apply(.attention, visibleIdle: false, now: now)
+        case .readyExplicit:
+            apply(.idle, visibleIdle: true, now: now)
+        case .readyFallback:
+            apply(.idle, visibleIdle: false, now: now)
         }
     }
 
@@ -445,6 +551,7 @@ final class TerminalSessionState: ObservableObject {
     }
 
     func markStarting() {
+        resetAgentActivityState()
         isRunning = true
         phase = .starting
         lastError = nil
@@ -494,7 +601,6 @@ final class TerminalSessionState: ObservableObject {
             hasReceivedOutput = false
         }
         capturedOutput.removeAll(keepingCapacity: true)
-        resetAgentActivityState()
     }
 
     func updateWorkingDirectory(_ path: String?) {
@@ -521,11 +627,11 @@ final class TerminalSessionState: ObservableObject {
         publishDetectedAgentStatus()
     }
 
-    func updateVisibleTerminalSnapshot(
-        _ snapshot: TerminalRenderSnapshot,
+    func updateAgentStatusEvidence(
+        _ evidence: TerminalAgentStatusEvidence,
         now: Date = Date()
     ) {
-        detector.updateEvidence(TerminalAgentStatusEvidence(snapshot: snapshot), now: now)
+        detector.updateEvidence(evidence, now: now)
         publishDetectedAgentStatus()
     }
 

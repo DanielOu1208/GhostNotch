@@ -16,6 +16,18 @@ Build a Debug app:
 xcodebuild -project GhostNotch.xcodeproj -scheme GhostNotch -configuration Debug build
 ```
 
+Build and run the newest local app with a clean terminal-host context:
+
+```sh
+scripts/run-local.sh
+```
+
+Set `CONFIGURATION=Debug` when needed. Use this launcher instead of calling
+`open` directly from an agent or terminal multiplexer: macOS passes the
+caller's environment to apps launched with `open`, including temporary values
+such as `NO_COLOR` and Herdr pane ownership. The launcher preserves ordinary
+user environment values while removing that host-only context.
+
 ## Automated Tests
 
 Run the app and terminal tests:
@@ -34,8 +46,9 @@ The automated suite covers shell resolution, real PTY command output, session
 stopping, input mapping, Ghostty-backed terminal snapshots, ANSI styles, cursor
 behavior, scrollback, graphemes, wide cells, paste encoding, resize behavior,
 focus events, mouse encoding, and selected Ghostty comparison streams. It also
-checks process identity, title/progress parsing, Codex and Claude terminal rules,
-transition stabilization, process exit and relaunch, and legacy-hook cleanup.
+checks process identity, title/progress parsing, terminal rules for all seven
+supported agents, transition stabilization, process exit and relaunch, and
+legacy-hook cleanup.
 
 ## Manual Terminal Acceptance
 
@@ -52,10 +65,10 @@ Required checks:
 - Mouse-enabled TUI press/release/drag behavior does not inject visible garbage.
 - ANSI/style, box/block glyphs, Powerline glyphs, cursor alignment, paste, Escape routing, and CJK/wide-cell copy remain visually correct in the expanded island.
 
-### Codex and Claude Status
+### Supported Agent Status
 
-Run these checks with both a launcher-started agent and an agent typed directly
-into the shell:
+Run these checks with Codex, Claude, OpenCode, Cursor CLI, OMP, Pi, and Droid,
+using both a launcher-started agent and an agent typed directly into the shell:
 
 - The agent asset appears while its process is alive and clears when it exits.
 - A normal prompt shows Ready; active generation or tool work shows Working;
@@ -64,8 +77,8 @@ into the shell:
   terminal evidence alone.
 - Escape interruption and compaction do not leave a stuck state or briefly
   report a false Ready state.
-- Opening a transcript viewer or model picker does not replace the state behind
-  the overlay.
+- In Codex and Claude, opening a transcript viewer or model picker does not
+  replace the state behind the overlay.
 - Scrolling into history while the agent continues to run does not make old
   visible text drive the current state.
 - Restarting the same agent clears the previous process's terminal evidence.

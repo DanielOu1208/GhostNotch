@@ -7,7 +7,7 @@ Start here if you want to understand, build, test, or contribute to GhostNotch.
 - [Architecture](architecture.md) explains the app structure, terminal lifecycle, and Ghostty VT boundary.
 - [Testing](testing.md) covers local builds, automated tests, and manual terminal acceptance checks.
 - [v0.1.0 release notes](releases/v0.1.0.md) summarize the planned public-preview DMG release.
-- [Agent status detection](agent-indicator-hooks.md) explains how Codex and Claude process identity and live terminal signals drive the indicator without status hooks.
+- [Agent status detection](agent-indicator-hooks.md) explains how supported-agent process identity and live terminal signals drive the indicator without status hooks.
 - [MacBook notch geometry](notch-geometry.md) records the AppKit notch measurement approach and sizing assumptions.
 - [UI polish research](ui-polish-research.md) records the approved macOS 26 visual, motion, accessibility, and Rose Three direction for v0.1.0.
 - [UI polish sprint tracking](ui-polish-sprint-tracking.md) is the agent-oriented execution tracker for that work.

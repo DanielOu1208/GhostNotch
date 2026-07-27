@@ -9,6 +9,7 @@ enum TerminalAlternateScreenScrollPolicy {
 @MainActor
 final class GhosttyTerminalEngine: TerminalRenderingEngine {
     var onSnapshotChange: ((TerminalRenderSnapshot) -> Void)?
+    var onAgentStatusEvidenceChange: ((TerminalAgentStatusEvidence) -> Void)?
 
     private let core: GhosttyTerminalCore
     private let sessionWriter: (TerminalSession?, Data) throws -> Void
@@ -44,7 +45,11 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
             return
         }
 
+        let previousEvidence = core.agentStatusEvidence
         core.processOutput(data)
+        if core.agentStatusEvidence != previousEvidence {
+            onAgentStatusEvidenceChange?(core.agentStatusEvidence)
+        }
         publishSnapshot()
     }
 
@@ -120,6 +125,7 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
             cellWidthPixels: cellWidthPixels,
             cellHeightPixels: cellHeightPixels
         )
+        let previousEvidence = core.agentStatusEvidence
         core.reset(columns: requested.columns, rows: requested.rows)
         core.resize(
             columns: requested.columns,
@@ -128,6 +134,9 @@ final class GhosttyTerminalEngine: TerminalRenderingEngine {
             cellHeightPixels: requested.cellHeightPixels
         )
         lastAppliedGridResize = requested
+        if core.agentStatusEvidence != previousEvidence {
+            onAgentStatusEvidenceChange?(core.agentStatusEvidence)
+        }
         publishSnapshot()
     }
 
