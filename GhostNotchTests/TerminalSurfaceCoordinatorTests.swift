@@ -158,6 +158,26 @@ final class TerminalSurfaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(engine.sentInputs, [Data("codex\n".utf8)])
     }
 
+    func testRestartDropsBufferedOutputFromPreviousSession() async throws {
+        let process = CoordinatorTestTerminalProcess()
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            process: process
+        )
+        let engine = CoordinatorTestRenderingEngine()
+        let coordinator = TerminalSurfaceCoordinator(session: session, engine: engine)
+
+        try session.start(cols: 80, rows: 24)
+        process.emitOutput("old session")
+        coordinator.restartPreservingGrid(currentSnapshot: .empty(columns: 80, rows: 24))
+        process.emitOutput("new session")
+
+        await Task.yield()
+        coordinator.flushPendingOutputForTesting()
+
+        XCTAssertEqual(engine.processedOutputs, [Data("new session".utf8)])
+    }
+
     private func waitForStartCallCount(
         _ expectedValue: Int,
         in process: CoordinatorTestTerminalProcess
@@ -175,8 +195,7 @@ final class TerminalSurfaceCoordinatorTests: XCTestCase {
     }
 }
 
-@MainActor
-private final class CoordinatorTestTerminalProcess: @MainActor TerminalProcess {
+private final class CoordinatorTestTerminalProcess: TerminalProcess, @unchecked Sendable {
     var onOutput: TerminalOutputHandler?
     var onTermination: TerminalTerminationHandler?
     private(set) var isRunning = false
@@ -184,8 +203,8 @@ private final class CoordinatorTestTerminalProcess: @MainActor TerminalProcess {
     private(set) var stopCallCount = 0
     private(set) var startWorkingDirectories: [String] = []
 
-    func descendantProcessNames(matching executableNames: Set<String>) -> Set<String> {
-        executableNames
+    func descendantProcessSnapshot(matching executableNames: Set<String>) async -> TerminalProcessSnapshot {
+        TerminalProcessSnapshot(descendants: [], foregroundProcessGroupID: nil)
     }
 
     func start(
@@ -211,6 +230,7 @@ private final class CoordinatorTestTerminalProcess: @MainActor TerminalProcess {
 
     func resize(cols: Int, rows: Int) throws {}
 
+    @MainActor
     func emitOutput(_ text: String) {
         onOutput?(Data(text.utf8))
     }
@@ -226,12 +246,16 @@ private final class CoordinatorTestRenderingEngine: TerminalRenderingEngine {
     var snapshot = TerminalRenderSnapshot.empty()
     var lastAppliedGridResize: TerminalGridResize?
     var onSnapshotChange: ((TerminalRenderSnapshot) -> Void)?
+    var onAgentStatusEvidenceChange: ((TerminalAgentStatusEvidence) -> Void)?
     private(set) var resetRequests: [CoordinatorTestTerminalGridSize] = []
     private(set) var sentInputs: [Data] = []
+    private(set) var processedOutputs: [Data] = []
 
     func start(session: TerminalSession) {}
 
-    func processOutput(_ data: Data) {}
+    func processOutput(_ data: Data) {
+        processedOutputs.append(data)
+    }
 
     func sendInput(_ input: Data) {
         sentInputs.append(input)

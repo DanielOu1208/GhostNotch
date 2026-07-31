@@ -3,15 +3,39 @@ import XCTest
 @MainActor
 final class AgentLauncherTests: XCTestCase {
     func testAgentLauncherDefinitionsUsePlainCommandsAndAssets() {
-        XCTAssertEqual(AgentLauncher.all.map(\.id), [.codex, .claude])
-        XCTAssertEqual(AgentLauncher.codex.command, "codex")
-        XCTAssertEqual(AgentLauncher.claude.command, "claude")
-        XCTAssertEqual(AgentLauncher.codex.displayName, "Codex")
-        XCTAssertEqual(AgentLauncher.claude.displayName, "Claude")
-        XCTAssertEqual(AgentLauncher.codex.commandLine, "codex\n")
-        XCTAssertEqual(AgentLauncher.claude.commandLine, "claude\n")
-        XCTAssertEqual(AgentLauncher.codex.assetName, "OpenAILogo")
-        XCTAssertEqual(AgentLauncher.claude.assetName, "ClaudeLogo")
+        XCTAssertEqual(
+            AgentLauncher.all.map(\.id),
+            [.codex, .claude, .opencode, .cursor, .omp, .pi, .droid]
+        )
+        XCTAssertEqual(
+            AgentLauncher.all.map(\.command),
+            ["codex", "claude", "opencode", "cursor-agent", "omp", "pi", "droid"]
+        )
+        XCTAssertEqual(
+            AgentLauncher.all.map(\.displayName),
+            ["Codex", "Claude", "OpenCode", "Cursor", "OMP", "Pi", "Droid"]
+        )
+        XCTAssertEqual(
+            AgentLauncher.all.map(\.assetName),
+            [
+                "OpenAILogo",
+                "ClaudeLogo",
+                "OpenCodeLogo",
+                "CursorLogo",
+                "OMPLogo",
+                "PiLogo",
+                "DroidLogo",
+            ]
+        )
+        XCTAssertEqual(AgentLauncher.all.map(\.commandLine), [
+            "codex\n",
+            "claude\n",
+            "opencode\n",
+            "cursor-agent\n",
+            "omp\n",
+            "pi\n",
+            "droid\n",
+        ])
     }
 
     func testAgentSelectionTogglesReplacesAndValidates() {

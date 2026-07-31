@@ -5,6 +5,7 @@ protocol TerminalRenderingEngine: AnyObject {
     var snapshot: TerminalRenderSnapshot { get }
     var lastAppliedGridResize: TerminalGridResize? { get }
     var onSnapshotChange: ((TerminalRenderSnapshot) -> Void)? { get set }
+    var onAgentStatusEvidenceChange: ((TerminalAgentStatusEvidence) -> Void)? { get set }
 
     func start(session: TerminalSession)
     func processOutput(_ data: Data)

@@ -37,6 +37,12 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
     static let defaultColorTerminal = "truecolor"
     static let shellIntegrationResourceSubdirectory = "ShellIntegration"
     static let defaultUTF8Locale = "en_US.UTF-8"
+    private static let inheritedHerdrConfigurationVariables: Set<String> = [
+        "HERDR_CONFIG_PATH",
+        "HERDR_DISABLE_SOUND",
+        "HERDR_LOG",
+        "HERDR_SESSION",
+    ]
     fileprivate static let defaultExecutableSearchPath = [
         "/opt/homebrew/bin",
         "/usr/local/bin",
@@ -51,6 +57,7 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
 
     private let readQueue = DispatchQueue(label: "com.ghostnotch.terminal.pty.read")
     private let terminationQueue = DispatchQueue(label: "com.ghostnotch.terminal.pty.terminate")
+    private let processInspectionQueue = DispatchQueue(label: "com.ghostnotch.terminal.pty.process-inspection")
     private let lock = NSLock()
     private var masterFileDescriptor: Int32 = -1
     private var process: Process?
@@ -63,32 +70,53 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         }
     }
 
-    func descendantProcessNames(matching executableNames: Set<String>) -> Set<String> {
-        guard let rootProcessID = lock.withLock({ process?.processIdentifier }) else {
-            return []
+    func descendantProcessSnapshot(matching executableNames: Set<String>) async -> TerminalProcessSnapshot {
+        await withCheckedContinuation { continuation in
+            processInspectionQueue.async { [weak self] in
+                guard let self else {
+                    continuation.resume(returning: TerminalProcessSnapshot(descendants: [], foregroundProcessGroupID: nil))
+                    return
+                }
+                continuation.resume(returning: self.makeDescendantProcessSnapshot(matching: executableNames))
+            }
+        }
+    }
+
+    private func makeDescendantProcessSnapshot(matching executableNames: Set<String>) -> TerminalProcessSnapshot {
+        let processState = lock.withLock {
+            (process?.processIdentifier, masterFileDescriptor)
+        }
+        guard let rootProcessID = processState.0 else {
+            return TerminalProcessSnapshot(descendants: [], foregroundProcessGroupID: nil)
         }
 
         let normalizedExecutableNames = Set(executableNames.map { $0.lowercased() })
-        var pendingProcessIDs = Self.childProcessIDs(of: rootProcessID)
+        var pendingProcessIDs = Self.childProcessIDs(of: rootProcessID).map { ($0, 1) }
         var visitedProcessIDs = Set<pid_t>()
-        var matchingProcessNames = Set<String>()
+        var matches: [TerminalDescendantProcess] = []
 
-        while let processID = pendingProcessIDs.popLast() {
-            guard visitedProcessIDs.insert(processID).inserted else {
-                continue
+        while let (processID, depth) = pendingProcessIDs.popLast() {
+            guard visitedProcessIDs.insert(processID).inserted else { continue }
+
+            let names = Self.processCommandNames(processID).intersection(normalizedExecutableNames)
+            if !names.isEmpty {
+                matches.append(
+                    TerminalDescendantProcess(
+                        processID: processID,
+                        processGroupID: Self.processGroupID(processID),
+                        depth: depth,
+                        commandNames: names
+                    )
+                )
             }
-
-            matchingProcessNames.formUnion(
-                Self.processCommandNames(processID).intersection(normalizedExecutableNames)
-            )
-            if matchingProcessNames == normalizedExecutableNames {
-                return matchingProcessNames
-            }
-
-            pendingProcessIDs.append(contentsOf: Self.childProcessIDs(of: processID))
+            pendingProcessIDs.append(contentsOf: Self.childProcessIDs(of: processID).map { ($0, depth + 1) })
         }
 
-        return matchingProcessNames
+        let foregroundGroup = processState.1 >= 0 ? tcgetpgrp(processState.1) : -1
+        return TerminalProcessSnapshot(
+            descendants: matches,
+            foregroundProcessGroupID: foregroundGroup > 0 ? foregroundGroup : nil
+        )
     }
 
     func start(
@@ -272,11 +300,20 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
             )
         }
 
-        if let firstArgument = processFirstArgument(processID) {
-            names.insert(URL(fileURLWithPath: firstArgument).lastPathComponent.lowercased())
+        for argument in processArguments(processID, limit: 2) {
+            names.insert(URL(fileURLWithPath: argument).lastPathComponent.lowercased())
         }
 
         return names
+    }
+
+    private static func processGroupID(_ processID: pid_t) -> pid_t? {
+        var info = proc_bsdinfo()
+        let size = MemoryLayout<proc_bsdinfo>.stride
+        let result = withUnsafeMutablePointer(to: &info) { pointer in
+            proc_pidinfo(processID, PROC_PIDTBSDINFO, 0, pointer, Int32(size))
+        }
+        return result == size ? pid_t(info.pbi_pgid) : nil
     }
 
     private static func string(from buffer: [CChar]) -> String {
@@ -286,27 +323,26 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         )
     }
 
-    private static func processFirstArgument(_ processID: pid_t) -> String? {
+    private static func processArguments(_ processID: pid_t, limit: Int) -> [String] {
         var managementInformationBase = [CTL_KERN, KERN_PROCARGS2, processID]
         var bufferSize = 0
         guard sysctl(&managementInformationBase, 3, nil, &bufferSize, nil, 0) == 0,
               bufferSize > MemoryLayout<Int32>.size
         else {
-            return nil
+            return []
         }
 
         var buffer = [UInt8](repeating: 0, count: bufferSize)
         guard sysctl(&managementInformationBase, 3, &buffer, &bufferSize, nil, 0) == 0 else {
-            return nil
+            return []
         }
 
         let argumentCount = Int(buffer.withUnsafeBytes { $0.load(as: Int32.self) })
         guard argumentCount > 0 else {
-            return nil
+            return []
         }
 
         var index = MemoryLayout<Int32>.size
-
         while index < bufferSize, buffer[index] != 0 {
             index += 1
         }
@@ -314,15 +350,20 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
             index += 1
         }
 
-        let argumentStart = index
-        while index < bufferSize, buffer[index] != 0 {
-            index += 1
+        var arguments: [String] = []
+        while arguments.count < min(argumentCount, limit), index < bufferSize {
+            let argumentStart = index
+            while index < bufferSize, buffer[index] != 0 {
+                index += 1
+            }
+            if argumentStart < index {
+                arguments.append(String(decoding: buffer[argumentStart..<index], as: UTF8.self))
+            }
+            while index < bufferSize, buffer[index] == 0 {
+                index += 1
+            }
         }
-
-        guard argumentStart < index else {
-            return nil
-        }
-        return String(decoding: buffer[argumentStart..<index], as: UTF8.self)
+        return arguments
     }
 
     private func startReading(from descriptor: Int32, generation: Int) {
@@ -352,10 +393,13 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
 
         if bytesRead > 0 {
             let data = Data(buffer.prefix(bytesRead))
-            if let onOutput {
-                Task { @MainActor in
-                    onOutput(data)
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.lock.withLock({ eventGeneration == self.generation })
+                else {
+                    return
                 }
+                self.onOutput?(data)
             }
             return
         }
@@ -452,6 +496,13 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
         overrides: [String: String] = [:]
     ) -> [String: String] {
         var terminalEnvironment = environment
+        terminalEnvironment.removeValue(forKey: "NO_COLOR")
+        let inheritedHerdrContext = terminalEnvironment.keys.filter {
+            $0.hasPrefix("HERDR_") && !inheritedHerdrConfigurationVariables.contains($0)
+        }
+        for key in inheritedHerdrContext {
+            terminalEnvironment.removeValue(forKey: key)
+        }
         terminalEnvironment["TERM"] = defaultTerminalType
         terminalEnvironment["TERM_PROGRAM"] = termProgram
         terminalEnvironment["TERM_PROGRAM_VERSION"] = termProgramVersion

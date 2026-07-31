@@ -331,21 +331,26 @@ Implementation constraints:
 - Change those starting values only if a 1x or 2x capture shows merged pixels,
   an unrecognizable three-petal shape, or clipping. Record the final value and
   evidence in this brief.
-- Preserve `TerminalAgentActivityState` and hook/state-file contracts unchanged.
+- Preserve the existing `TerminalAgentActivityState` presentation model while
+  replacing hook/state-file authority with live process and terminal evidence.
 - Provide an accessibility label that includes the state; color is not the only
   programmatic signal.
 - Make the hover labels static `Ready`, `Working`, and `Waiting`; the Rose Three
   mark replaces the current animated trailing periods.
-- Put the active supported agent in the collapsed left wing: Codex or Claude's
-  existing asset, rendered monochrome primary at 22 points. Keep that mark for
-  the CLI's full lifetime, including `Ready`, and leave the wing blank when no
-  supported agent is running.
+- Put the active supported agent in the collapsed left wing: the Codex, Claude,
+  OpenCode, Cursor CLI, OMP, Pi, or Droid asset, rendered monochrome primary at
+  22 points. Keep that mark for the CLI's full lifetime, including `Ready`, and
+  leave the wing blank when no supported agent is running. Keep the Rose Three
+  status mark in the right wing.
 - Cross-fade agent identity over 0.12 seconds. With Reduce Motion, update it
   immediately.
 - Derive identity for launcher-started and manually typed sessions from the
-  terminal's descendant process tree so it appears before the first structured
-  hook. Use the unchanged hook/state-file contract for working and waiting
-  status, and clear identity after the named CLI exits.
+  terminal's descendant process tree. Derive working and waiting from live
+  bottom-grid text, terminal title, and progress signals, and clear identity and
+  retained evidence after the named CLI exits.
+- Treat hover launchers only as shortcuts into GhostNotch's embedded terminal.
+  Do not claim detection for sessions in Terminal.app, iTerm, Ghostty, or
+  another external terminal.
 
 ## Acceptance evidence required before implementation sign-off
 

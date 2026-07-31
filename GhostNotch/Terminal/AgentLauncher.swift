@@ -4,6 +4,11 @@ struct AgentLauncher: Identifiable, Equatable, Sendable {
     enum ID: String, CaseIterable, Codable, Sendable {
         case codex
         case claude
+        case opencode
+        case cursor
+        case omp
+        case pi
+        case droid
     }
 
     let id: ID
@@ -29,15 +34,57 @@ struct AgentLauncher: Identifiable, Equatable, Sendable {
         assetName: "ClaudeLogo"
     )
 
+    static let opencode = AgentLauncher(
+        id: .opencode,
+        command: "opencode",
+        displayName: "OpenCode",
+        assetName: "OpenCodeLogo"
+    )
+
+    static let cursor = AgentLauncher(
+        id: .cursor,
+        command: "cursor-agent",
+        displayName: "Cursor",
+        assetName: "CursorLogo"
+    )
+
+    static let omp = AgentLauncher(
+        id: .omp,
+        command: "omp",
+        displayName: "OMP",
+        assetName: "OMPLogo"
+    )
+
+    static let pi = AgentLauncher(
+        id: .pi,
+        command: "pi",
+        displayName: "Pi",
+        assetName: "PiLogo"
+    )
+
+    static let droid = AgentLauncher(
+        id: .droid,
+        command: "droid",
+        displayName: "Droid",
+        assetName: "DroidLogo"
+    )
+
     static let all: [AgentLauncher] = [
         codex,
         claude,
+        opencode,
+        cursor,
+        omp,
+        pi,
+        droid,
     ]
 
+    static func launcher(for id: ID) -> AgentLauncher? {
+        all.first { $0.id == id }
+    }
+
     static func launchers(for enabledIDs: [ID]) -> [AgentLauncher] {
-        enabledIDs.compactMap { enabledID in
-            all.first { $0.id == enabledID }
-        }
+        enabledIDs.compactMap(launcher(for:))
     }
 }
 

@@ -32,6 +32,9 @@ struct AgentPresetSettingsView: View {
             }
 
             Section("Agents") {
+                Text("Choose up to three agents for the hover launcher.")
+                    .foregroundStyle(.secondary)
+
                 ForEach(AgentLauncher.all) { launcher in
                     Toggle(
                         launcher.displayName,
@@ -39,6 +42,10 @@ struct AgentPresetSettingsView: View {
                             get: { store.enabledAgentIDs.contains(launcher.id) },
                             set: { store.setAgent(launcher.id, isEnabled: $0) }
                         )
+                    )
+                    .disabled(
+                        !store.enabledAgentIDs.contains(launcher.id) &&
+                            store.enabledAgentIDs.count >= AgentPresetStore.maximumVisibleAgents
                     )
                 }
             }

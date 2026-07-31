@@ -2,7 +2,7 @@ import XCTest
 
 @MainActor
 final class AgentPresetStoreTests: XCTestCase {
-    func testStoreDefaultsToAllAgentsAndNoDirectoryPresets() {
+    func testStoreDefaultsToCodexAndClaudeAndNoDirectoryPresets() {
         let (userDefaults, suiteName) = makeIsolatedUserDefaults()
         defer { userDefaults.removePersistentDomain(forName: suiteName) }
         let store = AgentPresetStore(userDefaults: userDefaults)
@@ -146,6 +146,34 @@ final class AgentPresetStoreTests: XCTestCase {
         )
 
         XCTAssertEqual(store.enabledLaunchers.map(\.id), [.claude, .codex])
+    }
+
+    func testStoreAllowsAnyThreeAgentsAndRejectsAFourth() {
+        let (userDefaults, suiteName) = makeIsolatedUserDefaults()
+        defer { userDefaults.removePersistentDomain(forName: suiteName) }
+        let store = AgentPresetStore(userDefaults: userDefaults)
+
+        store.setAgent(.claude, isEnabled: false)
+        store.setAgent(.opencode, isEnabled: true)
+        store.setAgent(.cursor, isEnabled: true)
+        store.setAgent(.omp, isEnabled: true)
+
+        XCTAssertEqual(store.enabledAgentIDs, [.codex, .opencode, .cursor])
+        XCTAssertEqual(store.enabledLaunchers.map(\.command), ["codex", "opencode", "cursor-agent"])
+    }
+
+    func testStorePersistsNewAgentIDs() {
+        let (userDefaults, suiteName) = makeIsolatedUserDefaults()
+        defer { userDefaults.removePersistentDomain(forName: suiteName) }
+        let firstStore = AgentPresetStore(userDefaults: userDefaults)
+        firstStore.setAgent(.codex, isEnabled: false)
+        firstStore.setAgent(.claude, isEnabled: false)
+        firstStore.setAgent(.pi, isEnabled: true)
+        firstStore.setAgent(.droid, isEnabled: true)
+
+        let secondStore = AgentPresetStore(userDefaults: userDefaults)
+
+        XCTAssertEqual(secondStore.enabledAgentIDs, [.pi, .droid])
     }
 
     private func makeIsolatedUserDefaults() -> (UserDefaults, String) {

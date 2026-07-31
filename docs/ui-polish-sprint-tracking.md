@@ -1,6 +1,6 @@
 # GhostNotch v0.1.0 UI Polish Sprint Tracking
 
-Status: Track 4 implementation complete; Track 3/4 performance evidence and live approval pending
+Status: Track 4 implementation complete; terminal-status validation, Track 3/4 performance evidence, and live approval pending
 Created: 2026-07-10
 Depends on: [UI Polish Research Brief](ui-polish-research.md)
 
@@ -22,9 +22,9 @@ visible and cannot be treated as complete.
 - Use an Alcove-like balance: Dynamic Island fluidity, restrained macOS utility
   styling, opaque black notch shell.
 - Cover all visible chrome, notch first. Do not modify the terminal canvas, font
-  metrics, parser, PTY input/output behavior, or hook contracts. A read-only PTY
-  descendant-process query is allowed only to identify a manually typed or
-  launcher-started supported CLI and clear its identity after it exits.
+  metrics, or PTY input/output behavior. Supported-agent status may read the
+  descendant process, live bottom-grid text, terminal title, and progress
+  signals; agent lifecycle hooks are not a status authority.
 - Keep the 220-by-38-point physical notch as hidden black space: place compact
   side marks directly against its left/right boundary instead of padding away
   from it. Keep visible screen-edge and bottom spacing equal.
@@ -293,15 +293,23 @@ Depends on: Track 3
   trail constants.
 - [x] Use static hover labels `Ready`, `Working`, and `Waiting`; remove the
   animated trailing-period timeline.
-- [x] Replace the collapsed Ghost mark with the active Codex or Claude asset in
-  monochrome primary color for the CLI's full lifetime, including its ready
-  state. Clear it when that CLI process exits; keep the left wing blank when no
-  supported agent is running. Preserve the structured hook/state-file format.
-- [x] Support launcher-started and manually typed Codex/Claude sessions by
-  deriving identity from a recursive read-only descendant-process check before
-  the first hook event. Keep hooks as the working/waiting status source.
+- [x] Replace the collapsed Ghost mark with the active Codex, Claude, OpenCode,
+  Cursor CLI, OMP, Pi, or Droid asset in monochrome primary color for the CLI's
+  full lifetime, including its ready state. Clear it when that CLI process
+  exits; keep the left wing blank when no supported agent is running and keep
+  the Rose Three status in the right wing.
+- [x] Support launcher-started and manually typed sessions for all seven agents
+  by deriving identity and process lifetime from a recursive read-only
+  descendant-process check. Derive Ready, Working, and Waiting from live
+  bottom-grid text, terminal title, and progress signals instead of status
+  hooks. Preserve state through non-lifecycle overlays, clear evidence on
+  relaunch or process exit, and use short idle confirmation to avoid
+  partial-redraw flicker.
   Cross-fade agent identity over 0.12 seconds, or update immediately with Reduce
   Motion.
+- [x] Keep each supported-agent rule small, fixed, and independently written.
+  Use the same single-authority principle documented by Herdr without copying
+  its AGPL source, manifests, update service, or socket integration.
 - [x] Place both 22-point compact marks against the inner physical-notch
   boundary. The 30-point wings therefore derive equal 8-point top, outer, and
   bottom spacing without adding padding next to hidden hardware.
@@ -336,26 +344,17 @@ Depends on: Track 3
 - [x] Extend each selected segment's colored underlay five points beyond its
   segment width—two points more than the previous backing—and use the full
   36-point capsule height so more color refracts into neighboring glass.
-  Evidence: `AgentStatusIndicatorStyleTests`, `IslandMetricsTests`, and
-  `TerminalSessionTests` passed in the full suite on 2026-07-14; the tests cover
-  geometry, motion/color/label mapping, Reduce Motion, and process-exit cleanup.
-  `AgentLauncherTests` also cover selection, disabled-agent cleanup, and
-  session-aware Expand/Launch resolution and dynamic labels, while
-  `IslandMetricsTests` lock the three-group 420-point equation and 136-point
-  hover height. The refreshed layout still awaits the user's live visual and
-  interaction approval.
-  A live Release harness on Mac16,7 verified blank Ready, Codex Ready/Working/
-  Waiting, Claude Ready, real Codex process-exit cleanup, and the unchanged
-  expanded terminal. The temporary startup seam and shell wrappers were removed,
-  `AppDelegate.swift` returned to a clean diff, and the exact final source was
-  rebuilt successfully. Pure pointer-hover motion, accessibility variants,
-  formal CPU sampling, and user approval remain in the gates below.
+  Evidence: the 2026-07-14 UI and hook-backed build passed its then-current
+  automated suite and live Release harness. That evidence predates the
+  terminal-authoritative status rewrite and does not validate it. The current
+  implementation must complete the automated and manual gates below, including
+  interruption, compaction, scrollback, relaunch, and process-exit cases.
 
 Exit gate:
 
-- [ ] Ready, working, and waiting plus Codex/Claude identity remain recognizable
-  in collapsed and hover states at the approved 280-by-38 and 420-by-136 shell
-  dimensions.
+- [ ] Ready, working, and waiting plus all seven supported-agent identities
+  remain recognizable in collapsed and hover states at the approved
+  280-by-38 and 420-by-136 shell dimensions.
 - [x] No external loader source, package, or copied implementation is present.
 - [ ] Idle CPU returns to baseline after agent activity stops.
 - [ ] Three 60-second samples meet the research thresholds against the matching
@@ -393,22 +392,23 @@ Depends on: Tracks 1–5
 
 Automated checks:
 
-Track 4's interim 2026-07-14 verification passed `git diff --check`, both hook
-self-tests, the full macOS test suite, static analysis, and the Release build.
-The final boxes remain open because Track 6 depends on Track 5 and must rerun
-against the eventual release source.
+The terminal-authoritative Track 4 implementation passed these checks on
+2026-07-14. Rerun them against the eventual release source after Track 5.
 
-- [ ] `git diff --check`
-- [ ] `python3 scripts/install-agent-hooks.py self-test`
-- [ ] `python3 GhostNotch/Resources/ShellIntegration/ghostnotch-agent-hook --self-test`
-- [ ] `xcodebuild test -project GhostNotch.xcodeproj -scheme GhostNotch -destination 'platform=macOS'`
-- [ ] `xcodebuild -project GhostNotch.xcodeproj -scheme GhostNotch -configuration Release build`
+- [x] `git diff --check`
+- [x] `python3 scripts/remove-agent-hooks.py --self-test`
+- [x] `xcodebuild test -project GhostNotch.xcodeproj -scheme GhostNotch -destination 'platform=macOS'`
+- [x] `xcodebuild analyze -project GhostNotch.xcodeproj -scheme GhostNotch -configuration Debug`
+- [x] `xcodebuild -project GhostNotch.xcodeproj -scheme GhostNotch -configuration Release build`
 
 Visual and interaction matrix:
 
 - [ ] Collapsed, hover, expanded, and Settings before/after captures.
 - [ ] Ready, working, and waiting in collapsed and hover states.
-- [ ] Zero through three valid presets; invalid preset hidden; one through two
+- [ ] All seven agents' permissions, questions, interruption, compaction or
+  equivalent long-session flow, overlays, scrollback, relaunch, and process
+  exit follow the manual matrix in [Testing](testing.md) without a stuck state.
+- [ ] Zero through three valid presets; invalid preset hidden; one through three
   launchers.
 - [ ] Pointer entry/exit grace, rapid re-entry, selected preset, launch click,
   background click, `Option+Space`, outside click, and Escape behavior.

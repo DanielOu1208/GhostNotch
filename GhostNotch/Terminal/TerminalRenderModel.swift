@@ -251,11 +251,17 @@ struct TerminalRenderSnapshot: Equatable {
     }
 
     var plainText: String {
-        var lines: [String] = []
-        for row in 0..<rows {
-            lines.append(textLine(row: row, startColumn: 0, endColumn: columns - 1, trimsRightPadding: true))
-        }
-        return lines.joined(separator: "\n")
+        Self.plainText(cells: cells, columns: columns, rows: rows)
+    }
+
+    static func plainText(cells: [TerminalCell], columns: Int, rows: Int) -> String {
+        (0..<rows).map { row in
+            cells[(row * columns)..<((row + 1) * columns)]
+                .filter { !$0.widthRole.isSpacer }
+                .map(\.character)
+                .joined()
+                .trimmingRightCellPadding()
+        }.joined(separator: "\n")
     }
 
     func text(in selection: TerminalSelection) -> String {

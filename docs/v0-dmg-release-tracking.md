@@ -50,7 +50,7 @@ catching signature problems, but it does not make the app trusted by other Macs.
 
 ## Current Repo State
 
-Last reviewed: 2026-07-10.
+Last reviewed: 2026-07-30.
 
 Current high-level status:
 
@@ -63,17 +63,22 @@ Current high-level status:
   icon.
 - The repo has a manual self-signed DMG packaging script at
   `scripts/package-dmg.sh`.
-- The macOS 26 UI polish baseline, platform foundation, and native capsule
-  control layer are implemented; motion, Rose Three, and final acceptance
-  remain in scope.
+- The macOS 26 UI polish baseline, platform foundation, native capsule control
+  layer, coordinated motion, and Rose Three status presentation are
+  implemented; performance evidence and final acceptance remain in scope.
+- Hover controls support Codex, Claude, OpenCode, Cursor CLI, OMP, Pi, and
+  Droid, with up to three agent icons visible at once.
+- Status detection covers both hover-launched and manually typed supported CLIs
+  inside GhostNotch's embedded terminal. It does not observe sessions in
+  external terminal apps.
 - The app still does not have Developer ID signing, notarization, auto-update,
   Homebrew, or App Store distribution.
 
 Known release gaps before publishing:
 
-- The [UI polish sprint](ui-polish-sprint-tracking.md) has completed Tracks 0–2.
-  Coordinated motion, Rose Three, Settings integration, and final acceptance
-  remain before release.
+- The [UI polish sprint](ui-polish-sprint-tracking.md) has completed Tracks 0–4
+  implementation work. Performance evidence, expanded/Settings polish, and
+  final acceptance remain before release.
 - No `v0.1.0` Git tag yet.
 - No GitHub Release yet.
 - The self-signed release certificate still needs to exist locally before
@@ -93,7 +98,7 @@ Recommended work:
 
 - Keep the committed notch hover clearance fix in the v0 baseline.
 - Keep v0 focused on the current usable app: notch-attached terminal, hover
-  controls, Codex/Claude launch buttons, directory presets, and existing
+  controls, supported-agent launch buttons, directory presets, and existing
   terminal rendering baseline.
 - Do not add Sparkle auto-update, Homebrew, App Store distribution, or full
   notarization work to v0.
@@ -170,7 +175,8 @@ Recommended work:
   - hover agent launcher buttons,
   - directory presets,
   - native Settings UI,
-  - Codex and Claude hook indicator support.
+  - Codex, Claude, OpenCode, Cursor CLI, OMP, Pi, and Droid process identity
+    with terminal-derived status indicators.
 - Add `docs/releases/v0.1.0.md` before tagging.
 - Add or choose a `LICENSE`.
 
@@ -262,7 +268,7 @@ Required automated checks:
 
 ```sh
 git diff --check
-python3 scripts/install-agent-hooks.py self-test
+python3 scripts/remove-agent-hooks.py --self-test
 xcodebuild test -project GhostNotch.xcodeproj -scheme GhostNotch -destination 'platform=macOS'
 xcodebuild -project GhostNotch.xcodeproj -scheme GhostNotch -configuration Release build
 ```
@@ -294,7 +300,13 @@ Manual app checks:
 - Run a simple shell command.
 - Confirm collapse/reopen preserves the shell session.
 - Confirm Settings opens and directory presets persist.
-- Confirm Codex and Claude hover buttons still use the configured launch flow.
+- Confirm each supported agent's hover button still uses the configured launch
+  flow.
+- Confirm manually typing each supported CLI inside GhostNotch uses the same
+  identity and status detection, and that collapsed mode shows its icon on the
+  left and status on the right.
+- Confirm external Terminal.app, iTerm, and Ghostty sessions do not affect
+  GhostNotch's indicator.
 - Run the manual terminal checks from `docs/testing.md` for renderer-sensitive
   changes.
 
