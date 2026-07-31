@@ -22,7 +22,7 @@ visible and cannot be treated as complete.
 - Use an Alcove-like balance: Dynamic Island fluidity, restrained macOS utility
   styling, opaque black notch shell.
 - Cover all visible chrome, notch first. Do not modify the terminal canvas, font
-  metrics, or PTY input/output behavior. Codex and Claude status may read the
+  metrics, or PTY input/output behavior. Supported-agent status may read the
   descendant process, live bottom-grid text, terminal title, and progress
   signals; agent lifecycle hooks are not a status authority.
 - Keep the 220-by-38-point physical notch as hidden black space: place compact
@@ -293,19 +293,21 @@ Depends on: Track 3
   trail constants.
 - [x] Use static hover labels `Ready`, `Working`, and `Waiting`; remove the
   animated trailing-period timeline.
-- [x] Replace the collapsed Ghost mark with the active Codex or Claude asset in
-  monochrome primary color for the CLI's full lifetime, including its ready
-  state. Clear it when that CLI process exits; keep the left wing blank when no
-  supported agent is running.
-- [x] Support launcher-started and manually typed Codex/Claude sessions by
-  deriving identity and process lifetime from a recursive read-only descendant-
-  process check. Derive Ready, Working, and Waiting from live bottom-grid text,
-  terminal title, and progress signals instead of status hooks. Preserve state
-  through non-lifecycle overlays, clear evidence on relaunch or process exit,
-  and use short idle confirmation to avoid partial-redraw flicker.
+- [x] Replace the collapsed Ghost mark with the active Codex, Claude, OpenCode,
+  Cursor CLI, OMP, Pi, or Droid asset in monochrome primary color for the CLI's
+  full lifetime, including its ready state. Clear it when that CLI process
+  exits; keep the left wing blank when no supported agent is running and keep
+  the Rose Three status in the right wing.
+- [x] Support launcher-started and manually typed sessions for all seven agents
+  by deriving identity and process lifetime from a recursive read-only
+  descendant-process check. Derive Ready, Working, and Waiting from live
+  bottom-grid text, terminal title, and progress signals instead of status
+  hooks. Preserve state through non-lifecycle overlays, clear evidence on
+  relaunch or process exit, and use short idle confirmation to avoid
+  partial-redraw flicker.
   Cross-fade agent identity over 0.12 seconds, or update immediately with Reduce
   Motion.
-- [x] Keep the Codex and Claude rules small, fixed, and independently written.
+- [x] Keep each supported-agent rule small, fixed, and independently written.
   Use the same single-authority principle documented by Herdr without copying
   its AGPL source, manifests, update service, or socket integration.
 - [x] Place both 22-point compact marks against the inner physical-notch
@@ -350,9 +352,9 @@ Depends on: Track 3
 
 Exit gate:
 
-- [ ] Ready, working, and waiting plus Codex/Claude identity remain recognizable
-  in collapsed and hover states at the approved 280-by-38 and 420-by-136 shell
-  dimensions.
+- [ ] Ready, working, and waiting plus all seven supported-agent identities
+  remain recognizable in collapsed and hover states at the approved
+  280-by-38 and 420-by-136 shell dimensions.
 - [x] No external loader source, package, or copied implementation is present.
 - [ ] Idle CPU returns to baseline after agent activity stops.
 - [ ] Three 60-second samples meet the research thresholds against the matching
@@ -403,10 +405,10 @@ Visual and interaction matrix:
 
 - [ ] Collapsed, hover, expanded, and Settings before/after captures.
 - [ ] Ready, working, and waiting in collapsed and hover states.
-- [ ] Codex and Claude permissions, questions, interruption, compaction,
-  transcript/model overlays, scrollback, relaunch, and process exit follow the
-  manual matrix in [Testing](testing.md) without a stuck state.
-- [ ] Zero through three valid presets; invalid preset hidden; one through two
+- [ ] All seven agents' permissions, questions, interruption, compaction or
+  equivalent long-session flow, overlays, scrollback, relaunch, and process
+  exit follow the manual matrix in [Testing](testing.md) without a stuck state.
+- [ ] Zero through three valid presets; invalid preset hidden; one through three
   launchers.
 - [ ] Pointer entry/exit grace, rapid re-entry, selected preset, launch click,
   background click, `Option+Space`, outside click, and Escape behavior.

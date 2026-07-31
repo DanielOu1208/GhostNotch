@@ -222,17 +222,20 @@ private enum TerminalAgentScreenRules {
     private static func opencode(text: String, title: String?) -> TerminalAgentScreenDetection {
         let bottom = bottomLines(in: text.lowercased())
 
+        if containsBrailleSpinner(title) {
+            return .working
+        }
+        if isSimpleComposerVisible(bottom) {
+            return .readyExplicit
+        }
         if bottom.contains("permission required"),
            bottom.contains("allow once"),
            bottom.contains("reject") {
             return .attention
         }
-        if containsBrailleSpinner(title) || containsBrailleSpinner(bottom) ||
+        if containsBrailleSpinner(bottom) ||
             hasActivityLine(in: bottom, prefixes: ["thinking", "working"]) {
             return .working
-        }
-        if isSimpleComposerVisible(bottom) {
-            return .readyExplicit
         }
         return .readyFallback
     }
@@ -242,16 +245,19 @@ private enum TerminalAgentScreenRules {
         let hasApprovalChoice = bottom.contains("[y/n]") ||
             (bottom.contains("y to approve") && bottom.contains("n to reject"))
 
-        if (bottom.contains("approve") || bottom.contains("run this command")) &&
-            hasApprovalChoice {
-            return .attention
-        }
-        if containsBrailleSpinner(title) || containsBrailleSpinner(bottom) ||
-            hasActivityLine(in: bottom, prefixes: ["thinking", "working"]) {
+        if containsBrailleSpinner(title) {
             return .working
         }
         if isSimpleComposerVisible(bottom) {
             return .readyExplicit
+        }
+        if (bottom.contains("approve") || bottom.contains("run this command")) &&
+            hasApprovalChoice {
+            return .attention
+        }
+        if containsBrailleSpinner(bottom) ||
+            hasActivityLine(in: bottom, prefixes: ["thinking", "working"]) {
+            return .working
         }
         return .readyFallback
     }
@@ -263,37 +269,52 @@ private enum TerminalAgentScreenRules {
         if normalizedTitle.contains("π !") {
             return .attention
         }
-        if containsBrailleSpinner(title) || containsBrailleSpinner(bottom) ||
-            hasActivityLine(in: bottom, prefixes: ["working"]) {
+        if containsBrailleSpinner(title) {
             return .working
         }
         if normalizedTitle.contains("π >") {
+            return .readyExplicit
+        }
+        if isSimpleComposerVisible(bottom) {
             return .readyExplicit
         }
         if bottom.contains("approve and execute") ||
             (bottom.contains("approval") && bottom.contains("reject")) {
             return .attention
         }
-        if isSimpleComposerVisible(bottom) {
-            return .readyExplicit
+        if containsBrailleSpinner(bottom) ||
+            hasActivityLine(in: bottom, prefixes: ["working"]) {
+            return .working
         }
         return .readyFallback
     }
 
     private static func pi(text: String, title: String?) -> TerminalAgentScreenDetection {
         let bottom = bottomLines(in: text.lowercased())
+        let hasCurrentTrustPrompt = bottom.contains("project trust") &&
+            bottom.contains("do not trust") &&
+            bottom.split(separator: "\n").contains { line in
+                let choice = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                return choice.hasSuffix("trust") &&
+                    !choice.contains("project trust") &&
+                    !choice.contains("do not trust")
+            }
 
-        if bottom.contains("trust this project"),
-           bottom.contains("yes"),
-           bottom.contains("no") {
-            return .attention
-        }
-        if containsBrailleSpinner(title) || containsBrailleSpinner(bottom) ||
-            hasActivityLine(in: bottom, prefixes: ["working", "retrying", "compacting"]) {
+        if containsBrailleSpinner(title) {
             return .working
         }
         if isSimpleComposerVisible(bottom) {
             return .readyExplicit
+        }
+        if hasCurrentTrustPrompt ||
+            (bottom.contains("trust this project") &&
+                bottom.contains("yes") &&
+                bottom.contains("no")) {
+            return .attention
+        }
+        if containsBrailleSpinner(bottom) ||
+            hasActivityLine(in: bottom, prefixes: ["working", "retrying", "compacting"]) {
+            return .working
         }
         return .readyFallback
     }
@@ -301,17 +322,20 @@ private enum TerminalAgentScreenRules {
     private static func droid(text: String, title: String?) -> TerminalAgentScreenDetection {
         let bottom = bottomLines(in: text.lowercased())
 
+        if containsBrailleSpinner(title) {
+            return .working
+        }
+        if isSimpleComposerVisible(bottom) {
+            return .readyExplicit
+        }
         if (bottom.contains("permission") || bottom.contains("approval")) &&
             (bottom.contains("allow") || bottom.contains("approve") || bottom.contains("accept")) &&
             (bottom.contains("reject") || bottom.contains("decline")) {
             return .attention
         }
-        if containsBrailleSpinner(title) || containsBrailleSpinner(bottom) ||
+        if containsBrailleSpinner(bottom) ||
             hasActivityLine(in: bottom, prefixes: ["thinking", "working"]) {
             return .working
-        }
-        if isSimpleComposerVisible(bottom) {
-            return .readyExplicit
         }
         return .readyFallback
     }

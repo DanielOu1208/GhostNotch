@@ -12,6 +12,7 @@ final class GhosttyTerminalCore {
     private var currentWorkingDirectory: String?
     private var agentStatusTextSequence: UInt64 = 0
     private var terminalTitle: String?
+    private var terminalTitleSequence: UInt64 = 0
     private var statusTracker = TerminalOSCStatusTracker()
 
     init(columns: Int = 80, rows: Int = 18) {
@@ -83,6 +84,7 @@ final class GhosttyTerminalCore {
         currentWorkingDirectory = nil
         agentStatusTextSequence = 0
         terminalTitle = nil
+        terminalTitleSequence = 0
         statusTracker = TerminalOSCStatusTracker()
         agentStatusEvidence = TerminalAgentStatusEvidence()
         cachedSnapshot = .empty(columns: columns, rows: rows)
@@ -262,7 +264,10 @@ final class GhosttyTerminalCore {
             isDirty ? index : nil
         })
         let cells = loadResult.cells.map { TerminalCell(ghosttyCell: $0, graphemes: loadResult.graphemes) }
-        terminalTitle = Self.terminalTitle(from: meta)
+        if meta.titleSequence != terminalTitleSequence {
+            terminalTitle = Self.terminalTitle(from: meta)
+            terminalTitleSequence = meta.titleSequence
+        }
         cachedSnapshot = TerminalRenderSnapshot(
             columns: columns,
             rows: rows,
@@ -294,19 +299,19 @@ final class GhosttyTerminalCore {
             text: text,
             textSequence: agentStatusTextSequence,
             title: terminalTitle,
-            titleSequence: statusTracker.titleSequence,
+            titleSequence: terminalTitleSequence,
             progress: statusTracker.latestProgress,
             progressSequence: statusTracker.progressSequence
         )
     }
 
     private static func terminalTitle(from meta: GNVTSnapshotMeta) -> String? {
-        guard let title = meta.title, meta.titleLen > 0,
-              let value = String(data: Data(bytes: title, count: meta.titleLen), encoding: .utf8)
-        else {
+        let length = min(meta.titleLen, 1_024)
+        guard let title = meta.title, length > 0 else {
             return nil
         }
 
+        let value = String(decoding: UnsafeBufferPointer(start: title, count: length), as: UTF8.self)
         let sanitized = sanitizedAgentSignal(value)
         return sanitized.isEmpty ? nil : sanitized
     }
@@ -514,7 +519,6 @@ private struct TerminalOSCStatusTracker {
 
     private var state = State.ground
     private var body: [UInt8] = []
-    private(set) var titleSequence: UInt64 = 0
     private(set) var latestProgress: String?
     private(set) var progressSequence: UInt64 = 0
 
@@ -564,10 +568,6 @@ private struct TerminalOSCStatusTracker {
         }
 
         let command = body[..<separator]
-        if command.elementsEqual([0x30]) || command.elementsEqual([0x32]) {
-            titleSequence &+= 1
-            return
-        }
         guard command.elementsEqual([0x39]) else { return }
 
         let payload = body[body.index(after: separator)...]

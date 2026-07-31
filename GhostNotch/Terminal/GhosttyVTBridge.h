@@ -64,6 +64,7 @@ typedef struct {
     bool viewportAtBottom;
     const uint8_t *title;
     size_t titleLen;
+    uint64_t titleSequence;
     const uint8_t *pwd;
     size_t pwdLen;
     /// Render dirty state: 0 clean, 1 partial, 2 full (see `TerminalRenderDirtyState` in Swift).

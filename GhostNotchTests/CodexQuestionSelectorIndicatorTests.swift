@@ -98,13 +98,28 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
         let state = TerminalSessionState(agentStartupGrace: 0)
         state.updateDetectedAgentProcess(omp)
 
-        state.updateAgentStatusEvidence(evidence(title: "π ⠋ GhostNotch", titleSequence: 1))
+        state.updateAgentStatusEvidence(evidence(
+            text: ">",
+            textSequence: 1,
+            title: "π ⠋ GhostNotch",
+            titleSequence: 1
+        ))
         XCTAssertEqual(state.agentActivityState, .working)
 
-        state.updateAgentStatusEvidence(evidence(title: "π ! GhostNotch", titleSequence: 2))
+        state.updateAgentStatusEvidence(evidence(
+            text: ">",
+            textSequence: 2,
+            title: "π ! GhostNotch",
+            titleSequence: 2
+        ))
         XCTAssertEqual(state.agentActivityState, .attention)
 
-        state.updateAgentStatusEvidence(evidence(title: "π > GhostNotch", titleSequence: 3))
+        state.updateAgentStatusEvidence(evidence(
+            text: "Working on the old request",
+            textSequence: 3,
+            title: "π > GhostNotch",
+            titleSequence: 3
+        ))
         XCTAssertEqual(state.agentActivityState, .idle)
     }
 
@@ -121,7 +136,13 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
         ))
         XCTAssertEqual(state.agentActivityState, .attention)
 
-        state.updateAgentStatusEvidence(evidence(text: ">", textSequence: 3))
+        state.updateAgentStatusEvidence(evidence(
+            text: "Project trust\nTrust\nDo not trust",
+            textSequence: 3
+        ))
+        XCTAssertEqual(state.agentActivityState, .attention)
+
+        state.updateAgentStatusEvidence(evidence(text: ">", textSequence: 4))
         XCTAssertEqual(state.agentActivityState, .idle)
     }
 
@@ -393,6 +414,33 @@ final class CodexQuestionSelectorIndicatorTests: XCTestCase {
             textSequence: 1
         ))
         XCTAssertEqual(claudeState.agentActivityState, .idle)
+    }
+
+    func testReadyComposerOutranksHistoricalActivityForNewAgents() {
+        let cases: [(TerminalAgentProcessIdentity, String)] = [
+            (opencode, "Thinking about the task\nPermission required\nAllow once\nReject\n>"),
+            (cursor, "Working on the task\nApprove running this command? [Y/N]\n>"),
+            (pi, "Working...\nProject trust\nTrust\nDo not trust\n>"),
+            (droid, "Thinking\nPermission required\nAccept change\nReject change\n>")
+        ]
+
+        for (process, text) in cases {
+            let state = TerminalSessionState(agentStartupGrace: 0)
+            state.updateDetectedAgentProcess(process)
+            state.updateAgentStatusEvidence(evidence(text: text, textSequence: 1))
+
+            XCTAssertEqual(state.agentActivityState, .idle, "\(process.agent)")
+        }
+
+        let ompState = TerminalSessionState(agentStartupGrace: 0)
+        ompState.updateDetectedAgentProcess(omp)
+        ompState.updateAgentStatusEvidence(evidence(
+            text: "Working on the old request\nApproval required\nReject\n>",
+            textSequence: 1,
+            title: "π > GhostNotch",
+            titleSequence: 1
+        ))
+        XCTAssertEqual(ompState.agentActivityState, .idle)
     }
 
     func testCodexQuestionSelectorDetectorRequiresStrictMarkers() {

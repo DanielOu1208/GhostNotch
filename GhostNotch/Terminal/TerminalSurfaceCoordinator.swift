@@ -9,6 +9,7 @@ final class TerminalSurfaceCoordinator {
 
     private var pendingOutput = Data()
     private var isOutputFlushScheduled = false
+    private var outputEpoch: UInt64 = 0
     private let agentLaunchReadinessPollNanoseconds: UInt64 = 10_000_000
 
     init(
@@ -96,6 +97,9 @@ final class TerminalSurfaceCoordinator {
             cellHeightPixels: 16
         )
 
+        outputEpoch &+= 1
+        pendingOutput.removeAll(keepingCapacity: true)
+        isOutputFlushScheduled = false
         engine.reset(cols: resize.columns, rows: resize.rows)
 
         do {
@@ -140,7 +144,7 @@ final class TerminalSurfaceCoordinator {
     }
 
     func flushPendingOutputForTesting() {
-        flushPendingOutput()
+        flushPendingOutput(epoch: outputEpoch)
     }
 
     private func startFreshSessionForAgentLaunch(
@@ -191,13 +195,17 @@ final class TerminalSurfaceCoordinator {
         }
 
         isOutputFlushScheduled = true
+        let epoch = outputEpoch
         Task { @MainActor [weak self] in
             await Task.yield()
-            self?.flushPendingOutput()
+            self?.flushPendingOutput(epoch: epoch)
         }
     }
 
-    private func flushPendingOutput() {
+    private func flushPendingOutput(epoch: UInt64) {
+        guard epoch == outputEpoch else {
+            return
+        }
         guard !pendingOutput.isEmpty else {
             isOutputFlushScheduled = false
             return

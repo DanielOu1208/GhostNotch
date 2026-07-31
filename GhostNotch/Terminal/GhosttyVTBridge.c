@@ -17,6 +17,7 @@ struct GNVTTerminal {
     uint16_t rows;
     uint32_t cellWidth;
     uint32_t cellHeight;
+    uint64_t titleSequence;
 };
 
 static const GNVTColor GNVTDefaultForeground = {220, 224, 232};
@@ -284,6 +285,14 @@ static void GNVTWritePty(GhosttyTerminal terminal,
     wrapper->writeCallback(data, len, wrapper->userdata);
 }
 
+static void GNVTTitleChanged(GhosttyTerminal terminal, void *userdata) {
+    (void)terminal;
+    GNVTTerminal *wrapper = (GNVTTerminal *)userdata;
+    if (wrapper != NULL) {
+        wrapper->titleSequence += 1;
+    }
+}
+
 static bool GNVTDeviceAttributes(GhosttyTerminal terminal,
                                  void *userdata,
                                  GhosttyDeviceAttributes *outAttrs) {
@@ -349,6 +358,7 @@ GNVTTerminal *GNVTTerminalCreate(uint16_t columns,
     ghostty_terminal_set(wrapper->terminal, GHOSTTY_TERMINAL_OPT_COLOR_PALETTE, &palette);
     ghostty_terminal_set(wrapper->terminal, GHOSTTY_TERMINAL_OPT_USERDATA, wrapper);
     ghostty_terminal_set(wrapper->terminal, GHOSTTY_TERMINAL_OPT_WRITE_PTY, (const void *)GNVTWritePty);
+    ghostty_terminal_set(wrapper->terminal, GHOSTTY_TERMINAL_OPT_TITLE_CHANGED, (const void *)GNVTTitleChanged);
     ghostty_terminal_set(wrapper->terminal, GHOSTTY_TERMINAL_OPT_DEVICE_ATTRIBUTES, (const void *)GNVTDeviceAttributes);
     GhosttyOptionAsAlt optionAsAlt = GHOSTTY_OPTION_AS_ALT_TRUE;
     ghostty_key_encoder_setopt(wrapper->keyEncoder,
@@ -588,7 +598,8 @@ bool GNVTTerminalSnapshot(GNVTTerminal *terminal,
     meta->scrollbackRows = scrollbackRows;
     meta->viewportAtBottom = scrollbar.offset + scrollbar.len >= scrollbar.total;
     meta->title = title.ptr;
-    meta->titleLen = title.len;
+    meta->titleLen = title.len < 1024 ? title.len : 1024;
+    meta->titleSequence = terminal->titleSequence;
     meta->pwd = pwd.ptr;
     meta->pwdLen = pwd.len;
     meta->dirtyState = (uint8_t)dirtyState;

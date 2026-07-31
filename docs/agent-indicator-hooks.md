@@ -9,6 +9,15 @@ every interruption, permission result, compaction, or process-exit path. A live
 terminal signal can correct the indicator on the next update instead of leaving
 a stale state file behind.
 
+## Where Detection Applies
+
+Launching an agent from the hover controls is a shortcut. Manually typing a
+supported CLI command in GhostNotch's embedded terminal uses the same process
+and status detection.
+
+GhostNotch observes only the terminal session it owns. It does not detect agent
+sessions running in Terminal.app, iTerm, Ghostty, or another external terminal.
+
 ## Visible States
 
 GhostNotch keeps the existing three presentation states:
@@ -19,8 +28,9 @@ GhostNotch keeps the existing three presentation states:
 
 The collapsed left wing shows the active supported-agent asset in monochrome
 primary for the lifetime of that process, including its Ready state. It is blank
-when no supported agent is running. With Reduce Motion enabled, the rose stays
-static and agent identity changes immediately.
+when no supported agent is running. The right wing shows the Rose Three status
+mark. With Reduce Motion enabled, the rose stays static and agent identity
+changes immediately.
 
 ## Status Authority
 

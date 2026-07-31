@@ -158,6 +158,26 @@ final class TerminalSurfaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(engine.sentInputs, [Data("codex\n".utf8)])
     }
 
+    func testRestartDropsBufferedOutputFromPreviousSession() async throws {
+        let process = CoordinatorTestTerminalProcess()
+        let session = TerminalSession(
+            shellResolver: ShellResolver(environment: ["SHELL": "/bin/sh"]),
+            process: process
+        )
+        let engine = CoordinatorTestRenderingEngine()
+        let coordinator = TerminalSurfaceCoordinator(session: session, engine: engine)
+
+        try session.start(cols: 80, rows: 24)
+        process.emitOutput("old session")
+        coordinator.restartPreservingGrid(currentSnapshot: .empty(columns: 80, rows: 24))
+        process.emitOutput("new session")
+
+        await Task.yield()
+        coordinator.flushPendingOutputForTesting()
+
+        XCTAssertEqual(engine.processedOutputs, [Data("new session".utf8)])
+    }
+
     private func waitForStartCallCount(
         _ expectedValue: Int,
         in process: CoordinatorTestTerminalProcess
@@ -229,10 +249,13 @@ private final class CoordinatorTestRenderingEngine: TerminalRenderingEngine {
     var onAgentStatusEvidenceChange: ((TerminalAgentStatusEvidence) -> Void)?
     private(set) var resetRequests: [CoordinatorTestTerminalGridSize] = []
     private(set) var sentInputs: [Data] = []
+    private(set) var processedOutputs: [Data] = []
 
     func start(session: TerminalSession) {}
 
-    func processOutput(_ data: Data) {}
+    func processOutput(_ data: Data) {
+        processedOutputs.append(data)
+    }
 
     func sendInput(_ input: Data) {
         sentInputs.append(input)

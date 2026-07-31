@@ -14,6 +14,8 @@ It sits flush with the top of the built-in display, looks like a small extension
 - Collapse the island without killing the shell session.
 - Reopen it later and continue from the same session.
 - Launch Codex, Claude, OpenCode, Cursor CLI, OMP, Pi, or Droid from the hover controls.
+- Start any supported CLI by typing its command in GhostNotch's terminal; the
+  hover controls are shortcuts to the same embedded-terminal behavior.
 - Save up to three directory presets with compact hover icons and launch an agent inside one of them.
 - Open native Settings to choose visible agents and manage directory preset labels, icons, and folders.
 - See supported-agent status update from the running process and live terminal state, without installing agent hooks.
@@ -21,10 +23,15 @@ It sits flush with the top of the built-in display, looks like a small extension
 
 GhostNotch has three visible states:
 
-- **Collapsed:** a subtle active notch extension.
+- **Collapsed:** the active agent icon on the left, status on the right, and a
+  blank left side when no supported agent is running.
 - **Hover:** a larger preview state that temporarily takes focus for native
   macOS controls, then returns focus to the previous app when the pointer exits.
 - **Expanded:** a compact terminal panel with keyboard focus.
+
+Agent detection applies only to GhostNotch's embedded terminal. GhostNotch
+does not observe sessions running in Terminal.app, iTerm, Ghostty, or another
+external terminal.
 
 ## Project Status
 

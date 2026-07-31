@@ -393,10 +393,13 @@ final class PTYProcess: TerminalProcess, @unchecked Sendable {
 
         if bytesRead > 0 {
             let data = Data(buffer.prefix(bytesRead))
-            if let onOutput {
-                Task { @MainActor in
-                    onOutput(data)
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.lock.withLock({ eventGeneration == self.generation })
+                else {
+                    return
                 }
+                self.onOutput?(data)
             }
             return
         }

@@ -571,6 +571,25 @@ final class GhosttyTerminalCoreTests: XCTestCase {
         XCTAssertEqual(core.agentStatusEvidence.titleSequence, 2)
     }
 
+    func testTitleEvidenceUsesGhosttyParsingAndBoundsTerminalControlledInput() {
+        let core = GhosttyTerminalCore(columns: 20, rows: 3)
+
+        core.processOutput(Data("\u{1B}]2;Chunked".utf8))
+        XCTAssertEqual(core.agentStatusEvidence.titleSequence, 0)
+        core.processOutput(Data(" title\u{1B}\\".utf8))
+        XCTAssertEqual(core.agentStatusEvidence.title, "Chunked title")
+        XCTAssertEqual(core.agentStatusEvidence.titleSequence, 1)
+
+        core.processOutput(Data("\u{1B}]1;unsupported\u{7}".utf8))
+        core.processOutput(Data("\u{1B}]0missing-separator\u{7}".utf8))
+        XCTAssertEqual(core.agentStatusEvidence.title, "Chunked title")
+        XCTAssertEqual(core.agentStatusEvidence.titleSequence, 1)
+
+        core.processOutput(Data(("\u{1B}]0;" + String(repeating: "x", count: 800) + "\u{7}").utf8))
+        XCTAssertEqual(core.agentStatusEvidence.title, String(repeating: "x", count: 256))
+        XCTAssertEqual(core.agentStatusEvidence.titleSequence, 2)
+    }
+
     func testMalformedAndOversizedOSCProgressDoesNotReplaceLatestEvidence() {
         let core = GhosttyTerminalCore(columns: 20, rows: 3)
         core.processOutput(Data("\u{1B}]9;4;1\u{7}".utf8))

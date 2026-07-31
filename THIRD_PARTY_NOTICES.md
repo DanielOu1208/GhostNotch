@@ -5,9 +5,31 @@ coding agents that it can launch and observe. The product names and marks remain
 the property of their respective owners. Their inclusion does not imply
 affiliation, sponsorship, or endorsement.
 
-The checked-in SVGs are monochrome template adaptations of the listed upstream
-vectors so macOS can tint them consistently. Color and background shapes were
-removed where necessary; the recognizable mark geometry was retained.
+Where an upstream vector is listed below, the checked-in SVG is a monochrome
+template adaptation so macOS can tint it consistently. Color and background
+shapes were removed where necessary; the recognizable mark geometry was
+retained.
+
+## OpenAI Codex
+
+- Asset: `GhostNotch/Resources/Assets.xcassets/OpenAILogo.imageset/openai.svg`
+- Official product page: https://openai.com/codex/
+- Official brand guidance: https://openai.com/brand/
+- Owner: OpenAI
+
+OpenAI owns the OpenAI and Codex names and marks. GhostNotch includes this mark
+only to identify Codex. This notice does not assert the provenance of the
+checked-in SVG.
+
+## Anthropic Claude
+
+- Asset: `GhostNotch/Resources/Assets.xcassets/ClaudeLogo.imageset/claude.svg`
+- Official product page: https://www.anthropic.com/claude
+- Owner: Anthropic PBC
+
+Anthropic owns the Anthropic and Claude names and marks. GhostNotch includes
+this mark only to identify Claude. This notice does not assert the provenance
+of the checked-in SVG.
 
 ## OpenCode
 
@@ -69,8 +91,7 @@ identification.
 - Source: https://factory.ai/icon.svg
 - Owner: Factory
 
-No published asset license is relied upon for this mark. Its use in GhostNotch
-is covered by owner-confirmed permission. The mark is included only for
+Factory owns the Droid name and mark. GhostNotch includes the mark only for
 nominative product identification.
 
 ## MIT License Text

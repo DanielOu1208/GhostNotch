@@ -18,10 +18,16 @@ The terminal backend is intentionally not owned by SwiftUI views. Window and pan
 
 ## Agent Status Boundary
 
-Codex and Claude status is terminal-authoritative: GhostNotch identifies the
-supported descendant process, then classifies the current live terminal state
-from bottom-grid text, the terminal title, and progress signals. It does not use
-agent lifecycle hooks or a shared state file for Ready, Working, or Waiting.
+Codex, Claude, OpenCode, Cursor CLI, OMP, Pi, and Droid status is
+terminal-authoritative: GhostNotch identifies the supported descendant process,
+then classifies the current live terminal state from bottom-grid text, the
+terminal title, and progress signals. It does not use agent lifecycle hooks or
+a shared state file for Ready, Working, or Waiting.
+
+Hover launchers are shortcuts into the same embedded terminal. Manually typing
+a supported CLI command there uses the same detection path. Sessions in
+Terminal.app, iTerm, Ghostty, and other external terminals are outside this
+boundary and are not observed.
 
 The process identity and terminal evidence stay in the terminal layer. SwiftUI
 receives only the active agent and the existing `idle`, `working`, or
